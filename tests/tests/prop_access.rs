@@ -27,7 +27,7 @@ mod simple {
 
     #[test]
     fn current_bracket_at() {
-        let results = query("@[one]", EXAMPLE_JSON);
+        let results = query("@['one']", EXAMPLE_JSON);
 
         let res = results.get(0).unwrap();
 
@@ -89,7 +89,7 @@ mod simple {
 
     #[test]
     fn root_bracket() {
-        let results = query("$[one]", EXAMPLE_JSON);
+        let results = query("$['one']", EXAMPLE_JSON);
 
         let res = results.get(0).unwrap();
 
@@ -227,16 +227,7 @@ mod wildcards {
     fn dot_quot_double_star() {
         let results = query("@.'**'", EXAMPLE_JSON);
 
-        assert_eq!(results.len(), 12);
-
-        //check depth-first
-        let res = results.get(4).unwrap();
-        assert!(res.is_string());
-        assert_eq!(res.as_string(), String::from("a"));
-
-        let res = results.get(11).unwrap();
-        assert!(res.is_integer());
-        assert_eq!(res.as_integer().unwrap(), 4)
+        assert_eq!(results.len(), 0);
     }
 
     #[test]
@@ -282,16 +273,7 @@ mod wildcards {
     fn bracket_quot_double_star() {
         let results = query("@['**']", EXAMPLE_JSON);
 
-        assert_eq!(results.len(), 12);
-
-        //check depth-first
-        let res = results.get(4).unwrap();
-        assert!(res.is_string());
-        assert_eq!(res.as_string(), String::from("a"));
-
-        let res = results.get(11).unwrap();
-        assert!(res.is_integer());
-        assert_eq!(res.as_integer().unwrap(), 4)
+        assert_eq!(results.len(), 0);
     }
 
     #[test]

@@ -101,7 +101,7 @@ fn integer_object() {
     let res = results.get(0).unwrap();
 
     assert!(res.is_string());
-    assert_eq!(res.as_string(), "2[object Object]");
+    assert_eq!(res.as_string(), "2[object]");
 }
 
 
@@ -190,7 +190,7 @@ fn float_object() {
     let res = results.get(0).unwrap();
 
     assert!(res.is_string());
-    assert_eq!(res.as_string(), "2.1[object Object]");
+    assert_eq!(res.as_string(), "2.1[object]");
 }
 
 #[test]
@@ -259,7 +259,7 @@ fn bool_object() {
     let res = results.get(0).unwrap();
 
     assert!(res.is_string());
-    assert_eq!(res.as_string(), "false[object Object]");
+    assert_eq!(res.as_string(), "false[object]");
 }
 
 #[test]
@@ -346,7 +346,7 @@ fn null_object() {
     let res = results.get(0).unwrap();
 
     assert!(res.is_string());
-    assert_eq!(res.as_string(), "null[object Object]");
+    assert_eq!(res.as_string(), "null[object]");
 }
 
 #[test]
@@ -416,7 +416,7 @@ fn object_object() {
     let res = results.get(0).unwrap();
 
     assert!(res.is_string());
-    assert_eq!(res.as_string(), "[object Object][object Object]");
+    assert_eq!(res.as_string(), "[object][object]");
 }
 
 #[test]
@@ -466,7 +466,7 @@ fn array_object() {
     let res = results.get(0).unwrap();
 
     assert!(res.is_string());
-    assert_eq!(res.as_string(), "a,b[object Object]");
+    assert_eq!(res.as_string(), "a,b[object]");
 }
 
 #[test]
@@ -676,7 +676,7 @@ fn string_object() {
     let res = results.get(0).unwrap();
 
     assert!(res.data().is_string());
-    assert_eq!(res.as_string(), "3[object Object]");
+    assert_eq!(res.as_string(), "3[object]");
 }
 
 #[test]

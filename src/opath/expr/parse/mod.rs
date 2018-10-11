@@ -718,7 +718,6 @@ impl Parser {
             }
             Some(c) if c == '\'' || c == '\"' => {
                 let p1 = r.position();
-                r.next_char()?;
                 while let Some(k) = r.next_char()? {
                     if k == '\\' {
                         r.next_char()?;
