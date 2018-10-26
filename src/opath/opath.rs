@@ -28,11 +28,23 @@ impl Opath {
         self.expr
     }
 
-    pub fn parse(path: &str) -> Result<Opath, OpathParseError> {
+    pub fn parse(expr: &str) -> Result<Opath, OpathParseError> {
         use kg_io::*;
 
-        let mut r = MemCharReader::new(path.as_bytes());
+        let mut r = MemCharReader::new(expr.as_bytes());
         super::expr::parse::Parser::new().parse(&mut r)
+    }
+
+    pub fn parse_opt_delims(expr: &str, open_delim: &str, close_delim: &str) -> Result<Opath, OpathParseError> {
+        use kg_io::*;
+
+        let expr = expr.trim();
+        let expr = if expr.starts_with(open_delim) && expr.ends_with(close_delim) {
+            &expr[open_delim.len()..expr.len() - close_delim.len()]
+        } else {
+            expr
+        };
+        Self::parse(expr)
     }
 
     pub fn between<'a>(from: &NodeRef, to: &NodeRef) -> Opath {
@@ -225,7 +237,7 @@ impl Eq for Opath {}
 
 impl ser::Serialize for Opath {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: ser::Serializer {
-        serializer.collect_str(&format_args!("{}", self.expr))
+        serializer.collect_str(&format_args!("${{{}}}", self.expr))
     }
 }
 
@@ -246,7 +258,7 @@ impl<'de> de::Visitor<'de> for OpathVisitor {
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: de::Error {
-        match Opath::parse(v) {
+        match Opath::parse_opt_delims(v, "${", "}") {
             Ok(expr) => Ok(expr),
             Err(err) => Err(de::Error::custom(err.detail())),
         }
