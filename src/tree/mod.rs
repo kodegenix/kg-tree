@@ -267,6 +267,19 @@ impl NodeRef {
         toml::to_string(self).expect("Node should be always serializable")
     }
 
+    pub fn to_format(&self, format: FileFormat, pretty: bool) -> String {
+        match format {
+            FileFormat::Binary | FileFormat::Text => self.as_string(),
+            FileFormat::Json => if pretty {
+                self.to_json_pretty()
+            } else {
+                self.to_json()
+            }
+            FileFormat::Toml => self.to_toml(),
+            FileFormat::Yaml => self.to_yaml()
+        }
+    }
+
     pub fn data(&self) -> Ref<Node> {
         self.0.borrow()
     }
