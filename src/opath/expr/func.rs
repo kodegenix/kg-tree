@@ -83,6 +83,7 @@ pub enum FuncId {
     IsNaN,
     Sqrt,
     Json,
+    Stringify,
     Custom(String),
 }
 
@@ -93,11 +94,12 @@ impl FuncId {
             "map" => FuncId::Map,
             "readFile" => FuncId::ReadFile,
             "parse" => FuncId::Parse,
-            "json" => FuncId::Json,
             "parseInt" => FuncId::ParseInt,
             "parseFloat" => FuncId::ParseFloat,
             "isNaN" => FuncId::IsNaN,
             "sqrt" => FuncId::Sqrt,
+            "json" => FuncId::Json,
+            "stringify" => FuncId::Stringify,
             _ => FuncId::Custom(f.to_string()),
         }
     }
@@ -108,11 +110,12 @@ impl FuncId {
             FuncId::Map => "map",
             FuncId::ReadFile => "readFile",
             FuncId::Parse => "parse",
-            FuncId::Json => "json",
             FuncId::ParseInt => "parseInt",
             FuncId::ParseFloat => "parseFloat",
             FuncId::IsNaN => "isNaN",
             FuncId::Sqrt => "sqrt",
+            FuncId::Json => "json",
+            FuncId::Stringify => "stringify",
             FuncId::Custom(ref s) => s,
         }
     }
@@ -520,15 +523,60 @@ pub (super) fn apply_func_to(id: &FuncId,
         }
         FuncId::Parse => {
             args.check_count_func(id, 2, 2)?;
-            let contents = args.resolve_column(false, 0, env);
-            let formats = args.resolve_column(false, 1, env);
+            let rows = args.resolve_rows_null(false, None, env);
 
-            for (c, f) in contents.into_iter().zip(formats.into_iter()) {
-                let format: FileFormat = f.data().as_string().as_ref().into();
-                match NodeRef::from_str(c.into_string().into(), format) {
+            for r in rows {
+                let ref content = r[0];
+                let format: FileFormat = r[1].data().as_string().as_ref().into();
+                match NodeRef::from_str(content.data().as_string(), format) {
                     Ok(n) => out.add(n),
                     Err(_err) => {}, //FIXME (jc) errors should be reported to the user somehow?
                 }
+            }
+            Ok(())
+        }
+        FuncId::Stringify => {
+            args.check_count_func(id, 1, 3)?;
+            match args.count() {
+                1 => {
+                    let row = args.resolve_flat(false, env);
+                    let format = FileFormat::Json;
+                    for n in row {
+                        out.add(NodeRef::string(n.to_format(format, false)));
+                    }
+                }
+                2 => {
+                    let rows = args.resolve_rows_null(false, None, env);
+                    for r in rows {
+                        let ref n = r[0];
+                        let format = {
+                            let ref f = r[1];
+                            if f.is_string() {
+                                f.data().as_string().as_ref().into()
+                            } else {
+                                FileFormat::Json
+                            }
+                        };
+                        out.add(NodeRef::string(n.to_format(format, false)));
+                    }
+                }
+                3 => {
+                    let rows = args.resolve_rows_null(false, None, env);
+                    for r in rows {
+                        let ref n = r[0];
+                        let format = {
+                            let ref f = r[1];
+                            if f.is_string() {
+                                f.data().as_string().as_ref().into()
+                            } else {
+                                FileFormat::Json
+                            }
+                        };
+                        let pretty = r[2].as_boolean();
+                        out.add(NodeRef::string(n.to_format(format, pretty)));
+                    }
+                }
+                _ => unreachable!(),
             }
             Ok(())
         }
