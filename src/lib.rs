@@ -1,30 +1,15 @@
 #![feature(
-    box_syntax, box_patterns,
     specialization,
-    str_escape,
     integer_atomics,
-    try_from,
 )]
-
-extern crate backtrace;
-extern crate heapsize;
 
 #[macro_use]
 extern crate serde_derive;
-extern crate serde;
-extern crate serde_json;
-extern crate serde_yaml;
-extern crate toml;
-
-extern crate kg_display;
 #[macro_use]
 extern crate kg_display_derive;
-extern crate kg_diag;
 #[macro_use]
 extern crate kg_diag_derive;
-extern crate kg_io;
-extern crate kg_utils;
-extern crate kg_symbol;
+
 
 use kg_symbol::Symbol;
 use kg_diag::*;

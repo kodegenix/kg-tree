@@ -84,7 +84,7 @@ impl FileInfo {
     }
 
     pub fn file_path(&self) -> &Path {
-        ::relative_path(&self.file_path)
+        crate::relative_path(&self.file_path)
     }
 
     pub fn file_type(&self) -> FileType {
@@ -110,8 +110,8 @@ impl std::fmt::Display for FileInfo {
             }
         } else {
             match self.file_type {
-                FileType::Dir => write!(f, "{}:{}", self.file_type, ::relative_path(&self.file_path).display()),
-                FileType::File => write!(f, "{}<{}>:{}", self.file_type, self.file_format, ::relative_path(&self.file_path).display()),
+                FileType::Dir => write!(f, "{}:{}", self.file_type, crate::relative_path(&self.file_path).display()),
+                FileType::File => write!(f, "{}<{}>:{}", self.file_type, self.file_format, crate::relative_path(&self.file_path).display()),
                 _ => unreachable!(),
             }
         }

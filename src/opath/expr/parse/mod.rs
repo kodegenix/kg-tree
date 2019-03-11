@@ -1159,7 +1159,7 @@ impl Parser {
             let e = self.parse_expr(r, Context::Expr)?;
             args.push(e);
         }
-        Ok(Expr::FuncCall(box FuncCall::new(id, args)))
+        Ok(Expr::FuncCall(Box::new(FuncCall::new(id, args))))
     }
 
     fn parse_method(&mut self, r: &mut CharReader, _ctx: Context) -> Result<Expr, Error> {
@@ -1180,7 +1180,7 @@ impl Parser {
             let e = self.parse_expr(r, Context::Expr)?;
             args.push(e);
         }
-        Ok(Expr::MethodCall(box MethodCall::new(id, args)))
+        Ok(Expr::MethodCall(Box::new(MethodCall::new(id, args))))
     }
 
     fn parse_sequence(&mut self, r: &mut CharReader, ctx: Context) -> Result<Expr, Error> {
@@ -1351,13 +1351,13 @@ impl Parser {
         self.expect_token(r, Terminal::VarBegin)?;
         let e = self.parse_expr(r, Context::Expr)?;
         let _t = self.expect_token(r, Terminal::BraceRight)?;
-        Ok(Expr::Var(box e))
+        Ok(Expr::Var(Box::new(e)))
     }
 
     fn parse_env_expr(&mut self, r: &mut CharReader, _ctx: Context) -> Result<Expr, Error> {
         self.expect_token(r, Terminal::Env)?;
         let e = self.parse_expr(r, Context::Env)?;
-        Ok(Expr::Env(box e))
+        Ok(Expr::Env(Box::new(e)))
     }
 
     fn parse_level_range(&mut self, r: &mut CharReader) -> Result<Option<LevelRange>, Error> {

@@ -8,6 +8,7 @@ Generic object tree with Opath query language, similar to XPath.
 readme = "README.md"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/Kodegenix/kg-tree"
+edition = "2018"
 
 [dependencies]
 kg-display = "0.1"

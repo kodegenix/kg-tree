@@ -36,8 +36,6 @@ impl Opath {
     }
 
     pub fn parse_opt_delims(expr: &str, open_delim: &str, close_delim: &str) -> Result<Opath, OpathParseError> {
-        use kg_io::*;
-
         let expr = expr.trim();
         let expr = if expr.starts_with(open_delim) && expr.ends_with(close_delim) {
             &expr[open_delim.len()..expr.len() - close_delim.len()]
@@ -109,7 +107,7 @@ impl Opath {
     }
 
     pub fn json(json: String) -> Opath {
-        Opath::new(Expr::FuncCall(box FuncCall::new(FuncId::Json, vec![Expr::StringEnc(json)])))
+        Opath::new(Expr::FuncCall(Box::new(FuncCall::new(FuncId::Json, vec![Expr::StringEnc(json)]))))
     }
 
     pub fn apply(&self, root: &NodeRef, current: &NodeRef) -> NodeSet {
@@ -157,9 +155,14 @@ impl Opath {
                     }
                     while let Some(e) = it.next() {
                         match *e {
-                            Expr::Property(box Expr::String(_)) => pseq.push(e.clone()),
-                            Expr::Property(box Expr::StringEnc(_)) => pseq.push(e.clone()),
-                            Expr::Index(box Expr::Integer(_)) => pseq.push(e.clone()),
+                            Expr::Property(ref expr) => match **expr {
+                                Expr::String(_) | Expr::StringEnc(_) => pseq.push(e.clone()),
+                                _ => return None,
+                            }
+                            Expr::Index(ref expr) => match **expr {
+                                Expr::Integer(_) => pseq.push(e.clone()),
+                                _ => return None,
+                            }
                             _ => return None,
                         }
                     }

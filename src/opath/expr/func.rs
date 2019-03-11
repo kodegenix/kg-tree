@@ -362,7 +362,7 @@ impl FuncCallable for Func {
     }
 
     fn clone(&self) -> Box<FuncCallable> {
-        box Clone::clone(self)
+        Box::new(Clone::clone(self))
     }
 }
 
@@ -422,7 +422,7 @@ impl MethodCallable for Method {
     }
 
     fn clone(&self) -> Box<MethodCallable> {
-        box Clone::clone(self)
+        Box::new(Clone::clone(self))
     }
 }
 
