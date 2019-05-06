@@ -461,7 +461,7 @@ pub (super) fn apply_func_to(id: &FuncId,
             if args.count() == 0 {
                 out.add(NodeRef::object(Properties::new()));
             } else if args.count() == 1 {
-                let mut values = args.resolve_column(false, 0, env);
+                let values = args.resolve_column(false, 0, env);
                 let mut map = LinkedHashMap::with_capacity(values.len());
                 for value in values.into_iter() {
                     if let Value::Object(ref props) = value.data().value() {
@@ -473,8 +473,8 @@ pub (super) fn apply_func_to(id: &FuncId,
                 out.add(NodeRef::object(map));
             } else {
                 args.check_count_func(id, 2, 2)?;
-                let mut keys = args.resolve_column(false, 0, env);
-                let mut values = args.resolve_column(true, 1, env);
+                let keys = args.resolve_column(false, 0, env);
+                let values = args.resolve_column(true, 1, env);
                 let mut map = LinkedHashMap::with_capacity(std::cmp::min(keys.len(), values.len()));
                 for (k, v) in keys.into_iter().zip(values.into_iter()) {
                     map.insert(k.as_string().to_string().into(), v);
@@ -510,7 +510,7 @@ pub (super) fn apply_func_to(id: &FuncId,
         }
         FuncId::Json => {
             args.check_count_func(id, 1, 1)?;
-            let mut res = args.resolve_flat(false, env);
+            let res = args.resolve_flat(false, env);
             for n in res.into_iter() {
                 let n = n.data();
                 let s = n.as_string();
@@ -647,7 +647,7 @@ pub (super) fn apply_func_to(id: &FuncId,
         }
         FuncId::Sqrt => {
             args.check_count_func(id, 1, 1)?;
-            let mut res = args.resolve_flat(false, env);
+            let res = args.resolve_flat(false, env);
             for n in res.into_iter() {
                 out.add(NodeRef::float(n.as_float().sqrt()));
             }
@@ -778,7 +778,7 @@ pub (super) fn apply_method_to(id: &MethodId,
         }
         MethodId::Find => {
             args.check_count_method(id, kind, 1, 1)?;
-            let mut nres = args.resolve_column(false, 0, env);
+            let nres = args.resolve_column(false, 0, env);
             for n in nres.into_iter() {
                 let d = n.data();
                 let s = d.as_string();

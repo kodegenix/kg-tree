@@ -438,7 +438,7 @@ impl<'a, 'de> serde::de::SeqAccess<'de> for Array<'a> {
     {
         match self.iter.next() {
             Some(n) => {
-                let mut de = NodeDeserializer::new(n);
+                let de = NodeDeserializer::new(n);
                 seed.deserialize(de).map(Some)
             }
             None => Ok(None)

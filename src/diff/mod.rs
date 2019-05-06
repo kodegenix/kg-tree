@@ -307,8 +307,6 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<Change>, cache: &mut Op
                 }
             }
             (&Value::Array(ref elemsa), &Value::Array(ref elemsb)) => {
-                use std::cmp::Ordering;
-
                 for (a, b) in elemsa.iter().zip(elemsb.iter()) {
                     diff_node(a, b, changes, cache);
                 }

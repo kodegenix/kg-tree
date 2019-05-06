@@ -733,7 +733,7 @@ impl Parser {
                     Ok(Token::new(Terminal::Literal, p1, p2))
                 }
             }
-            Some(c) => {
+            Some(_c) => {
                 let p1 = r.position();
 
                 // (jc) do not report lex errors when parsing partial input
