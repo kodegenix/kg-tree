@@ -1,6 +1,5 @@
 use super::*;
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::hash::{Hash, Hasher};
 
 use serde::{ser, de};
@@ -9,14 +8,12 @@ use serde::{ser, de};
 #[derive(Debug)]
 pub struct Opath {
     expr: Expr,
-    hash: AtomicU64,
 }
 
 impl Opath {
     pub (super) fn new(e: Expr) -> Opath {
         Opath {
             expr: e,
-            hash: AtomicU64::new(0),
         }
     }
 
@@ -172,29 +169,17 @@ impl Opath {
             _ => None,
         }
     }
-
-    #[inline(always)]
-    fn _hash_get(&self) -> u64 {
-        self.hash.load(Ordering::SeqCst)
-    }
-
-    #[inline(always)]
-    fn _hash_set(&self, h: u64) {
-        self.hash.store(h, Ordering::SeqCst)
-    }
 }
 
 impl Clone for Opath {
     fn clone(&self) -> Self {
         Opath {
             expr: self.expr.clone(),
-            hash: AtomicU64::new(self._hash_get())
         }
     }
 
     fn clone_from(&mut self, source: &Self) {
         self.expr = source.expr.clone();
-        self.hash = AtomicU64::new(source._hash_get());
     }
 }
 
@@ -216,17 +201,7 @@ impl std::fmt::Display for Opath {
 
 impl Hash for Opath {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        match self._hash_get() {
-            0 => {
-                let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                self.expr.hash(&mut hasher);
-                let h = hasher.finish();
-                let h = if h == 0 { std::u64::MAX } else { h };
-                state.write_u64(h);
-                self._hash_set(h);
-            },
-            h => state.write_u64(h),
-        }
+        self.expr.hash(state)
     }
 }
 
