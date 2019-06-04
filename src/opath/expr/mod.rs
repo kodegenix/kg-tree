@@ -382,11 +382,11 @@ impl NodeBuf {
         }
     }
 
-    fn add(&mut self, n: NodeRef) {
+    pub fn add(&mut self, n: NodeRef) {
         self.elems.push(n);
     }
 
-    fn add_all(&mut self, n: &NodeSet) {
+    pub fn add_all(&mut self, n: &NodeSet) {
         match *n {
             NodeSet::Empty => {}
             NodeSet::One(ref n) => {
@@ -398,7 +398,7 @@ impl NodeBuf {
         }
     }
 
-    fn append<'a, I>(&mut self, iter: I)
+    pub fn append<'a, I>(&mut self, iter: I)
     where
         I: Iterator<Item = &'a NodeRef> + ExactSizeIterator,
     {
@@ -443,7 +443,7 @@ impl NodeBuf {
         }
     }
 
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.elems.clear();
         self.multiple = false;
     }

@@ -80,6 +80,7 @@ pub enum FuncId {
     Parse,
     ParseInt,
     ParseFloat,
+    ParseBinary,
     IsNaN,
     Sqrt,
     Json,
@@ -96,6 +97,7 @@ impl FuncId {
             "parse" => FuncId::Parse,
             "parseInt" => FuncId::ParseInt,
             "parseFloat" => FuncId::ParseFloat,
+            "parseBinary" => FuncId::ParseBinary,
             "isNaN" => FuncId::IsNaN,
             "sqrt" => FuncId::Sqrt,
             "json" => FuncId::Json,
@@ -112,6 +114,7 @@ impl FuncId {
             FuncId::Parse => "parse",
             FuncId::ParseInt => "parseInt",
             FuncId::ParseFloat => "parseFloat",
+            FuncId::ParseBinary => "parseBinary",
             FuncId::IsNaN => "isNaN",
             FuncId::Sqrt => "sqrt",
             FuncId::Json => "json",
@@ -630,6 +633,27 @@ pub (super) fn apply_func_to(id: &FuncId,
                 match f64::from_str(s) {
                     Ok(num) => out.add(NodeRef::float(num)),
                     Err(_) => out.add(NodeRef::float(std::f64::NAN)),
+                }
+            }
+            Ok(())
+        }
+        FuncId::ParseBinary => {
+            args.check_count_func(id, 2, 2)?;
+
+            let contents = args.resolve_column(false, 0, env);
+            let formats = args.resolve_column(false, 1, env);
+
+            for (c, f) in contents.into_iter().zip(formats.into_iter()) {
+                let f: NodeRef = f;
+                let c: NodeRef = c;
+                let format: FileFormat = f.data().as_string().as_ref().into();
+
+                // FIXME ws error handling
+                let bytes = c.as_binary().expect("Binary node expected");
+
+                match NodeRef::from_bytes(bytes.as_slice(), format) {
+                    Ok(n) => out.add(n),
+                    Err(_err) => {}, //FIXME (jc) errors should be reported to the user somehow?
                 }
             }
             Ok(())
