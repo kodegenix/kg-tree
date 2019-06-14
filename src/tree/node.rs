@@ -266,6 +266,13 @@ impl Node {
         }
     }
 
+    pub fn as_binary(&self) -> Option<&[u8]> {
+        match self.value {
+            Value::Binary(ref bytes) => Some(bytes.as_slice()),
+            _ => None,
+        }
+    }
+
     pub fn as_boolean(&self) -> bool {
         match self.value {
             Value::Null => false,

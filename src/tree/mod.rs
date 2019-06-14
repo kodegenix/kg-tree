@@ -315,6 +315,10 @@ impl NodeRef {
         self.data().as_float()
     }
 
+    pub fn as_binary(&self) -> Option<Vec<u8>> {
+        self.data().as_binary().map(|b| b.to_vec())
+    }
+
     pub fn as_boolean(&self) -> bool {
         self.data().as_boolean()
     }
@@ -341,6 +345,10 @@ impl NodeRef {
 
     pub fn is_array(&self) -> bool {
         self.data().is_array()
+    }
+
+    pub fn is_binary(&self) -> bool {
+        self.data().is_binary()
     }
 
     pub fn is_boolean(&self) -> bool {
