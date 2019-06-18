@@ -929,7 +929,7 @@ mod tests {
     }
 
     fn node_eq<'a>(n1: &NodeRef, n2: &NodeRef) -> bool {
-        diff::Diff::minimal(n1, n2).is_empty()
+        diff::ModelDiff::minimal(n1, n2).is_empty()
     }
 
     mod args {

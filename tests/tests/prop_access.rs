@@ -1,5 +1,5 @@
 use super::*;
-use kg_tree::diff::Diff;
+use kg_tree::diff::ModelDiff;
 
 mod simple {
     use super::*;
@@ -372,7 +372,7 @@ mod wildcards {
 
         let res = results.get(0).unwrap();
 
-        let diffs = Diff::minimal(res, &NodeRef::from_json(json).unwrap());
+        let diffs = ModelDiff::minimal(res, &NodeRef::from_json(json).unwrap());
 
         assert!(diffs.is_empty());
     }
@@ -415,7 +415,7 @@ mod wildcards {
 
         let res = results.get(0).unwrap();
 
-        let diffs = Diff::minimal(res, &NodeRef::from_json(nested1).unwrap());
+        let diffs = ModelDiff::minimal(res, &NodeRef::from_json(nested1).unwrap());
 
         assert!(diffs.is_empty());
     }
@@ -444,7 +444,7 @@ mod wildcards {
 
         //check that root is last element
         let root = results.get(results.len() - 1).unwrap();
-        let diffs = Diff::minimal(root, &NodeRef::from_json(json).unwrap());
+        let diffs = ModelDiff::minimal(root, &NodeRef::from_json(json).unwrap());
         assert!(diffs.is_empty());
     }
 
@@ -482,7 +482,7 @@ mod wildcards {
         assert_eq!(results.len(), 2);
 
         let n2 = results.get(0).unwrap();
-        let diffs = Diff::minimal(n2, &NodeRef::from_json(nested2).unwrap());
+        let diffs = ModelDiff::minimal(n2, &NodeRef::from_json(nested2).unwrap());
         assert!(diffs.is_empty());
     }
 
@@ -526,11 +526,11 @@ mod wildcards {
         assert_eq!(results.len(), 2);
 
         let n2 = results.get(1).unwrap();
-        let diffs = Diff::minimal(n2, &NodeRef::from_json(nested2).unwrap());
+        let diffs = ModelDiff::minimal(n2, &NodeRef::from_json(nested2).unwrap());
         assert!(diffs.is_empty());
 
         let n3 = results.get(0).unwrap();
-        let diffs = Diff::minimal(n3, &NodeRef::from_json(nested3).unwrap());
+        let diffs = ModelDiff::minimal(n3, &NodeRef::from_json(nested3).unwrap());
         assert!(diffs.is_empty());
     }
 
@@ -571,11 +571,11 @@ mod wildcards {
         assert_eq!(results.len(), 3);
 
         let n1 = results.get(1).unwrap();
-        let diffs = Diff::minimal(n1, &NodeRef::from_json(nested1).unwrap());
+        let diffs = ModelDiff::minimal(n1, &NodeRef::from_json(nested1).unwrap());
         assert!(diffs.is_empty());
 
         let root = results.get(2).unwrap();
-        let diffs = Diff::minimal(root, &NodeRef::from_json(json).unwrap());
+        let diffs = ModelDiff::minimal(root, &NodeRef::from_json(json).unwrap());
         assert!(diffs.is_empty());
     }
 }
