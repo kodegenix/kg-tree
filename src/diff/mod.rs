@@ -13,6 +13,7 @@ pub enum ChangeKind {
     Added = 1,
     Removed = 2,
     Updated = 4,
+    Renamed = 8,
 }
 
 impl ChangeKind {
@@ -21,6 +22,7 @@ impl ChangeKind {
             ChangeKind::Added => '+',
             ChangeKind::Removed => '-',
             ChangeKind::Updated => '*',
+            ChangeKind::Renamed => '~',
         }
     }
 
@@ -29,6 +31,7 @@ impl ChangeKind {
             ChangeKind::Added => "+",
             ChangeKind::Removed => "-",
             ChangeKind::Updated => "*",
+            ChangeKind::Renamed => "~",
         }
     }
 
@@ -37,6 +40,7 @@ impl ChangeKind {
             '+' => Some(ChangeKind::Added),
             '-' => Some(ChangeKind::Removed),
             '*' => Some(ChangeKind::Updated),
+            '~' => Some(ChangeKind::Renamed),
             _ => None,
         }
     }
@@ -46,6 +50,7 @@ impl ChangeKind {
             "+" | "add" | "added" => Some(ChangeKind::Added),
             "-" | "remove" | "removed" => Some(ChangeKind::Removed),
             "*" | "update" | "updated" => Some(ChangeKind::Updated),
+            "~" | "rename" | "renamed" => Some(ChangeKind::Renamed),
             _ => None,
         }
     }
@@ -137,15 +142,18 @@ impl ChangeKindMask {
             if mask.contains("*") || mask.contains("update") {
                 m = m + ChangeKind::Updated as u32;
             }
+            if mask.contains("~") || mask.contains("rename") {
+                m = m + ChangeKind::Renamed as u32;
+            }
             if m == 0 {
-                m = ChangeKind::Added as u32 + ChangeKind::Removed as u32 + ChangeKind::Updated as u32;
+                m = ChangeKind::Added as u32 + ChangeKind::Removed as u32 + ChangeKind::Renamed as u32 + ChangeKind::Updated as u32;
             }
         }
         ChangeKindMask(m)
     }
 
     pub fn all() -> ChangeKindMask {
-        ChangeKindMask(ChangeKind::Added as u32 | ChangeKind::Removed as u32 | ChangeKind::Removed as u32)
+        ChangeKindMask(ChangeKind::Added as u32 | ChangeKind::Removed as u32 | ChangeKind::Removed as u32 | ChangeKind::Renamed as u32)
     }
 
     pub fn has(&self, kind: ChangeKind) -> bool {
@@ -162,6 +170,10 @@ impl ChangeKindMask {
 
     pub fn has_updated(&self) -> bool {
         self.has(ChangeKind::Updated)
+    }
+
+    pub fn has_renamed(&self) -> bool {
+        self.has(ChangeKind::Renamed)
     }
 
     pub fn has_all(&self) -> bool {
@@ -188,6 +200,9 @@ impl std::fmt::Display for ChangeKindMask {
         }
         if self.has_updated() {
             write!(f, "{}", ChangeKind::Updated.mark())?;
+        }
+        if self.has_renamed() {
+            write!(f, "{}", ChangeKind::Renamed.mark())?;
         }
         Ok(())
     }
