@@ -1107,7 +1107,7 @@ impl Parser {
             Some(_) => unreachable!(),
             None => return ParseErr::unexpected_eoi_str(r, "string literal".into()),
         };
-        let mut enc = false;
+        let mut enc = true;
         while let Some(c) = r.peek_char(0)? {
             if c == sep {
                 r.next_char()?;
