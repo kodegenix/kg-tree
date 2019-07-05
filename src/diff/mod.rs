@@ -282,7 +282,7 @@ impl Ord for ModelChange {
 }
 
 
-fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<ModelChange>, cache: &mut OpathCache) {
+fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<ModelChange>, cache: &mut dyn OpathCache) {
     if !a.is_ref_eq(b) {
         match (a.data().value(), b.data().value()) {
             (&Value::Null, &Value::Null) => {}
@@ -383,7 +383,7 @@ impl ModelDiff {
         ModelDiff::minimal_cache(a, b, &mut cache)
     }
 
-    pub fn minimal_cache(a: &NodeRef, b: &NodeRef, cache: &mut OpathCache) -> ModelDiff {
+    pub fn minimal_cache(a: &NodeRef, b: &NodeRef, cache: &mut dyn OpathCache) -> ModelDiff {
         let mut changes = Vec::new();
         diff_node(a, b, &mut changes, cache);
         ModelDiff {
@@ -396,7 +396,7 @@ impl ModelDiff {
         ModelDiff::full_cache(a, b, &mut cache)
     }
 
-    pub fn full_cache(a: &NodeRef, b: &NodeRef, cache: &mut OpathCache) -> ModelDiff {
+    pub fn full_cache(a: &NodeRef, b: &NodeRef, cache: &mut dyn OpathCache) -> ModelDiff {
         let mut changes = Vec::new();
 
         diff_node(a, b, &mut changes, cache);

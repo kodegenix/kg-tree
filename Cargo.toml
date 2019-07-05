@@ -29,6 +29,7 @@ serde_yaml = "0.8.9"
 toml = "0.5.1"
 heapsize = "0.4.2"
 heapsize_derive = "0.1.4"
+regex = "1.1.8"
 
 [dev-dependencies]
 assert_approx_eq = "1.1.0"

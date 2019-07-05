@@ -26,7 +26,7 @@ pub enum FuncCallErr {
         supplied: u32,
         required_min: u32,
     },
-    #[display(fmt = "method '{id}' for type '{kind}' requires from {required_min} to {required_max}, but {supplied} were supplied")]
+    #[display(fmt = "method '{id}' for type '{kind}' requires from {required_min} to {required_max} parameters, but {supplied} were supplied")]
     MethodCallInvalidArgCountRange {
         id: MethodId,
         kind: Kind,
@@ -46,7 +46,7 @@ pub enum FuncCallErr {
         supplied: u32,
         required_min: u32,
     },
-    #[display(fmt = "function '{id}' requires from {required_min} to {required_max}, but {supplied} were supplied")]
+    #[display(fmt = "function '{id}' requires from {required_min} to {required_max} parameters, but {supplied} were supplied")]
     FuncCallInvalidArgCountRange {
         id: FuncId,
         supplied: u32,
@@ -57,12 +57,12 @@ pub enum FuncCallErr {
     MethodCallCustomErr {
         id: MethodId,
         kind: Kind,
-        err: Box<Diag>,
+        err: Box<dyn Diag>,
     },
     #[display(fmt = "error while calling function '{id}': {err}")]
     FuncCallCustomErr {
         id: FuncId,
-        err: Box<Diag>,
+        err: Box<dyn Diag>,
     },
 }
 
@@ -144,6 +144,8 @@ pub enum MethodId {
     Shift,
     Unshift,
     Join,
+    Replace,
+    Split,
     Custom(String)
 }
 
@@ -161,6 +163,8 @@ impl MethodId {
             "shift" => MethodId::Shift,
             "unshift" => MethodId::Unshift,
             "join" => MethodId::Join,
+            "replace" => MethodId::Replace,
+            "split" => MethodId::Split,
             _ => MethodId::Custom(f.to_string()),
         }
     }
@@ -178,6 +182,8 @@ impl MethodId {
             MethodId::Shift => "shift",
             MethodId::Unshift => "unshift",
             MethodId::Join => "join",
+            MethodId::Replace => "replace",
+            MethodId::Split => "split",
             MethodId::Custom(ref s) => s,
         }
     }
@@ -339,10 +345,10 @@ impl<'a> Args<'a> {
 pub trait FuncCallable: std::fmt::Debug + Sync + Send {
     fn call(&self, name: &str, args: Args, env: Env, out: &mut NodeBuf) -> FuncCallResult;
 
-    fn clone(&self) -> Box<FuncCallable>;
+    fn clone(&self) -> Box<dyn FuncCallable>;
 }
 
-impl Clone for Box<FuncCallable> {
+impl Clone for Box<dyn FuncCallable> {
     fn clone(&self) -> Self {
         self.as_ref().clone()
     }
@@ -367,7 +373,7 @@ impl FuncCallable for Func {
         (self.fn_ptr)(name, args, env, out)
     }
 
-    fn clone(&self) -> Box<FuncCallable> {
+    fn clone(&self) -> Box<dyn FuncCallable> {
         Box::new(Clone::clone(self))
     }
 }
@@ -393,10 +399,10 @@ pub trait MethodCallable: std::fmt::Debug + Sync + Send {
 
     fn mask(&self) -> KindMask;
 
-    fn clone(&self) -> Box<MethodCallable>;
+    fn clone(&self) -> Box<dyn MethodCallable>;
 }
 
-impl Clone for Box<MethodCallable> {
+impl Clone for Box<dyn MethodCallable> {
     fn clone(&self) -> Self {
         self.as_ref().clone()
     }
@@ -427,7 +433,7 @@ impl MethodCallable for Method {
         self.mask
     }
 
-    fn clone(&self) -> Box<MethodCallable> {
+    fn clone(&self) -> Box<dyn MethodCallable> {
         Box::new(Clone::clone(self))
     }
 }
@@ -591,15 +597,15 @@ pub (super) fn apply_func_to(id: &FuncId,
             let mut radixes_1;
             let mut radixes_2;
 
-            let radixes: &mut Iterator<Item = u32> = if args.count() == 2 {
+            let radixes: &mut dyn Iterator<Item = u32> = if args.count() == 2 {
                 radixes_1 = args.resolve_column(false, 1, env)
                     .into_iter()
                     .map(|r| r.as_integer().map_or(10, |base| base as u32))
                     .chain(std::iter::repeat(10u32));
-                &mut radixes_1 as &mut Iterator<Item = u32>
+                &mut radixes_1 as &mut dyn Iterator<Item = u32>
             } else {
                 radixes_2 = std::iter::repeat(10u32);
-                &mut radixes_2 as &mut Iterator<Item = u32>
+                &mut radixes_2 as &mut dyn Iterator<Item = u32>
             };
 
             for (s, r) in strs.into_iter().zip(radixes.into_iter()) {
@@ -747,26 +753,49 @@ pub (super) fn apply_method_to(id: &MethodId,
             Ok(())
         }
         MethodId::Length => {
-            if let Some(c) = env.current().data().children_count() {
-                out.add(NodeRef::integer(c as i64));
-                Ok(())
-            } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+            match env.current().data().value() {
+                Value::Binary(ref e) => {
+                    out.add(NodeRef::integer(e.len() as i64));
+                    Ok(())
+                }
+                Value::String(ref s) => {
+                    out.add(NodeRef::integer(s.len() as i64));
+                    Ok(())
+                }
+                Value::Array(ref e) => {
+                    out.add(NodeRef::integer(e.len() as i64));
+                    Ok(())
+                }
+                Value::Object(ref p) => {
+                    out.add(NodeRef::integer(p.len() as i64));
+                    Ok(())
+                }
+                _ => Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
             }
         }
         MethodId::Join => {
-            fn join(elems: &Vec<NodeRef>, sep: &str) -> String {
+            fn wrap(node: &NodeRef, wrap_open: &str, wrap_close: &str, buf: &mut String) {
+                if !wrap_open.is_empty(){
+                    buf.push_str(wrap_open);
+                }
+                buf.push_str(node.data().as_string().as_ref());
+                if !wrap_close.is_empty(){
+                    buf.push_str(wrap_close);
+                }
+            }
+
+            fn join(elems: &Vec<NodeRef>, sep: &str, wrap_open: &str, wrap_close: &str) -> String {
                 let mut s = String::new();
                 match sep.as_ref() {
                     "" => {
                         for e in elems.iter() {
-                            s.push_str(e.data().as_string().as_ref());
+                            wrap(e, wrap_open, wrap_close, &mut s);
                         }
                     }
                     _ => {
                         let mut elemi = elems.iter().peekable();
                         while let Some(e) = elemi.next() {
-                            s.push_str(e.data().as_string().as_ref());
+                            wrap(e, wrap_open, wrap_close, &mut s);
                             if elemi.peek().is_some() {
                                 s.push_str(sep.as_ref());
                             }
@@ -775,13 +804,29 @@ pub (super) fn apply_method_to(id: &MethodId,
                 }
                 s
             }
+
             if let Value::Array(ref elems) = *env.current().data().value() {
-                args.check_count_method(id, env.current().data().kind(), 1, 1)?;
-                let nsep = args.resolve_column(false, 0, env);
-                let s = match nsep.into_one() {
-                    Some(sep) => join(elems, sep.data().as_string().as_ref()),
-                    None => join(elems, ""),
+                args.check_count_method(id, env.current().data().kind(), 1, 2)?;
+                let sep = {
+                    let nsep = args.resolve_column(false, 0, env);
+                    match nsep.into_one() {
+                        Some(sep) => sep.data().as_string().to_string(),
+                        None => String::new(),
+                    }
                 };
+                let wrap = {
+                    if args.count() == 2 {
+                        let nwrap = args.resolve_column(false, 1, env);
+                        match nwrap.into_one() {
+                            Some(wrap) => wrap.data().as_string().to_string(),
+                            None => String::new(),
+                        }
+                    } else {
+                        String::new()
+                    }
+                };
+
+                let s = join(elems, &sep, &wrap, &wrap);
                 out.add(NodeRef::string(s));
                 Ok(())
             } else {
@@ -808,7 +853,18 @@ pub (super) fn apply_method_to(id: &MethodId,
                 let s = d.as_string();
                 if s.is_empty() {
                     out.add(env.current().clone());
+                } else if s.starts_with("@.") {
+                    match Opath::parse(&s) {
+                        Ok(opath) => {
+                            opath.expr().apply_to(env, Context::Expr, out);
+                        }
+                        Err(_) => {
+                            //FIXME (jc): how to handle parse errors here?
+                            unimplemented!()
+                        }
+                    }
                 } else {
+                    let s = String::with_capacity(256) + "@." + &s;
                     match Opath::parse(&s) {
                         Ok(opath) => {
                             opath.expr().apply_to(env, Context::Expr, out);
@@ -899,6 +955,49 @@ pub (super) fn apply_method_to(id: &MethodId,
                 }
             }
             Err(basic_diag!(FuncCallErr::UnknownMethod { name: name.to_string(), kind, }))
+        }
+        MethodId::Replace => {
+            use regex::Regex;
+
+            if kind == Kind::String {
+                args.check_count_method(id, kind, 1, 2)?;
+
+                let re = args.resolve_column(true, 0, env).into_one().unwrap();
+                let regex = Regex::new(&re.data().as_string()).expect("regex parse error"); //FIXME (jc) regex
+                let replacement = {
+                    if args.count() == 2 {
+                        args.resolve_column(true, 1, env).into_one().unwrap().data().as_string().to_string()
+                    } else {
+                        String::new()
+                    }
+                };
+
+                let value = env.current().data();
+                let s = value.as_string();
+                let result = regex.replace_all(&s, replacement.as_str());
+                out.add(NodeRef::string(result));
+                Ok(())
+            } else {
+                Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+            }
+        }
+        MethodId::Split => {
+            use regex::Regex;
+
+            if kind == Kind::String {
+                args.check_count_method(id, kind, 1, 2)?;
+                let re = args.resolve_column(true, 0, env).into_one().unwrap();
+                let regex = Regex::new(re.data().as_string().as_ref()).expect("regex parse error"); //FIXME (jc) regex
+
+                let value = env.current().data();
+                let s = value.as_string();
+                for s in regex.split(&s) {
+                    out.add(NodeRef::string(s));
+                }
+                Ok(())
+            } else {
+                Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+            }
         }
         //_ => unimplemented!()
     }

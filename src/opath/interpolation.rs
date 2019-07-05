@@ -188,7 +188,7 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self, r: &mut CharReader) -> Result<Interpolation, OpathParseError> {
+    pub fn parse(&mut self, r: &mut dyn CharReader) -> Result<Interpolation, OpathParseError> {
         let mut expr = Vec::new();
         let mut buf = String::new();
 

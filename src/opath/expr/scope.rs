@@ -9,8 +9,8 @@ use std::ops::Deref;
 
 #[derive(Debug)]
 struct Inner {
-    func_map: HashMap<Symbol, Box<FuncCallable>>,
-    method_map: HashMap<Symbol, Box<MethodCallable>>,
+    func_map: HashMap<Symbol, Box<dyn FuncCallable>>,
+    method_map: HashMap<Symbol, Box<dyn MethodCallable>>,
     var_map: HashMap<Symbol, NodeSet>,
     parent: Option<Scope>,
 }
@@ -70,7 +70,7 @@ impl std::fmt::Display for Inner {
 trait ScopeImpl: Sized {
     fn borrow(&self) -> Ref<Inner>;
 
-    fn get_func(&self, func: &'_ str) -> Option<Ref<Box<FuncCallable>>> {
+    fn get_func(&self, func: &'_ str) -> Option<Ref<Box<dyn FuncCallable>>> {
         if let Some(f) = self.borrow().func_map.get(func) {
             Some(Ref::map(self.borrow(), |_| unsafe { std::mem::transmute(f) }))
         } else {
@@ -82,7 +82,7 @@ trait ScopeImpl: Sized {
         }
     }
 
-    fn get_method(&self, method: &'_ str) -> Option<Ref<Box<MethodCallable>>> {
+    fn get_method(&self, method: &'_ str) -> Option<Ref<Box<dyn MethodCallable>>> {
         if let Some(m) = self.borrow().method_map.get(method) {
             Some(Ref::map(self.borrow(), |_| unsafe { std::mem::transmute(m) }))
         } else {
@@ -165,12 +165,12 @@ trait ScopeImpl: Sized {
 trait ScopeMutImpl: ScopeImpl + Sized {
     fn borrow_mut(&self) -> RefMut<Inner>;
 
-    fn with_func(self, name: Symbol, func: Box<FuncCallable>) -> Self {
+    fn with_func(self, name: Symbol, func: Box<dyn FuncCallable>) -> Self {
         self.set_func(name, func);
         self
     }
 
-    fn with_method(self, name: Symbol, method: Box<MethodCallable>) -> Self {
+    fn with_method(self, name: Symbol, method: Box<dyn MethodCallable>) -> Self {
         self.set_method(name, method);
         self
     }
@@ -181,11 +181,11 @@ trait ScopeMutImpl: ScopeImpl + Sized {
     }
 
 
-    fn set_func(&self, name: Symbol, func: Box<FuncCallable>) {
+    fn set_func(&self, name: Symbol, func: Box<dyn FuncCallable>) {
         self.borrow_mut().func_map.insert(name, func);
     }
 
-    fn set_method(&self, name: Symbol, method: Box<MethodCallable>) {
+    fn set_method(&self, name: Symbol, method: Box<dyn MethodCallable>) {
         self.borrow_mut().method_map.insert(name, method);
     }
 
@@ -215,11 +215,11 @@ trait ScopeMutImpl: ScopeImpl + Sized {
 pub struct Scope(Rc<RefCell<Inner>>);
 
 impl Scope {
-    pub fn get_func(&self, func: &'_ str) -> Option<Ref<Box<FuncCallable>>> {
+    pub fn get_func(&self, func: &'_ str) -> Option<Ref<Box<dyn FuncCallable>>> {
         ScopeImpl::get_func(self, func)
     }
 
-    pub fn get_method(&self, method: &'_ str) -> Option<Ref<Box<MethodCallable>>> {
+    pub fn get_method(&self, method: &'_ str) -> Option<Ref<Box<dyn MethodCallable>>> {
         ScopeImpl::get_method(self, method)
     }
 
@@ -291,11 +291,11 @@ impl ScopeMut {
         ScopeMut(Rc::new(RefCell::new(scope)))
     }
 
-    pub fn get_func(&self, func: &'_ str) -> Option<Ref<Box<FuncCallable>>> {
+    pub fn get_func(&self, func: &'_ str) -> Option<Ref<Box<dyn FuncCallable>>> {
         ScopeImpl::get_func(self, func)
     }
 
-    pub fn get_method(&self, method: &'_ str) -> Option<Ref<Box<MethodCallable>>> {
+    pub fn get_method(&self, method: &'_ str) -> Option<Ref<Box<dyn MethodCallable>>> {
         ScopeImpl::get_method(self, method)
     }
 
@@ -331,11 +331,11 @@ impl ScopeMut {
         ScopeImpl::var_names(self)
     }
 
-    pub fn with_func(self, name: Symbol, func: Box<FuncCallable>) -> Self {
+    pub fn with_func(self, name: Symbol, func: Box<dyn FuncCallable>) -> Self {
         ScopeMutImpl::with_func(self, name, func)
     }
 
-    pub fn with_method(self, name: Symbol, method: Box<MethodCallable>) -> Self {
+    pub fn with_method(self, name: Symbol, method: Box<dyn MethodCallable>) -> Self {
         ScopeMutImpl::with_method(self, name, method)
     }
 
@@ -344,11 +344,11 @@ impl ScopeMut {
     }
 
 
-    pub fn set_func(&self, name: Symbol, func: Box<FuncCallable>) {
+    pub fn set_func(&self, name: Symbol, func: Box<dyn FuncCallable>) {
         ScopeMutImpl::set_func(self, name, func)
     }
 
-    pub fn set_method(&self, name: Symbol, method: Box<MethodCallable>) {
+    pub fn set_method(&self, name: Symbol, method: Box<dyn MethodCallable>) {
         ScopeMutImpl::set_method(self, name, method)
     }
 

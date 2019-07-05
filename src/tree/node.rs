@@ -526,8 +526,8 @@ impl Node {
 
     pub fn file_path_components<'b>(&'b self) -> impl Iterator<Item = String> + 'b {
         match self.file() {
-            Some(f) => Box::new(f.file_path().components().map(|c| c.as_os_str().to_str().unwrap().to_string())) as Box<Iterator<Item = String>>,
-            None => Box::new(std::iter::empty()) as Box<Iterator<Item = String>>,
+            Some(f) => Box::new(f.file_path().components().map(|c| c.as_os_str().to_str().unwrap().to_string())) as Box<dyn Iterator<Item = String>>,
+            None => Box::new(std::iter::empty()) as Box<dyn Iterator<Item = String>>,
         }
     }
 

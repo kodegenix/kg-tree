@@ -10,6 +10,25 @@ pub struct Opath {
     expr: Expr,
 }
 
+fn expr_string<S: AsRef<str>>(value: S) -> Expr {
+    let v = value.as_ref();
+    if v.is_empty() {
+        Expr::String(String::new())
+    } else {
+        let mut first = true;
+        for c in v.chars() {
+            if first && c.is_digit(10) {
+                return Expr::StringEnc(v.to_string());
+            }
+            if !c.is_alphanumeric() && c != '_' {
+                return Expr::StringEnc(v.to_string());
+            }
+            first = false;
+        }
+        Expr::String(v.to_string())
+    }
+}
+
 impl Opath {
     pub (super) fn new(e: Expr) -> Opath {
         Opath {
@@ -50,7 +69,7 @@ impl Opath {
             if let Some(p) = p {
                 match *p.data().value() {
                     Value::Array(_) => seq.push(Expr::Index(Box::new(Expr::Integer(n.data().index() as i64)))),
-                    Value::Object(_) => seq.push(Expr::Property(Box::new(Expr::String(n.data().key().to_string())))),
+                    Value::Object(_) => seq.push(Expr::Property(Box::new(expr_string(n.data().key())))),
                     _ => unreachable!(),
                 }
                 n = p;
@@ -70,7 +89,7 @@ impl Opath {
             if let Some(p) = p {
                 match *p.data().value() {
                     Value::Array(_) => seq.push(Expr::Index(Box::new(Expr::Integer(n.data().index() as i64)))),
-                    Value::Object(_) => seq.push(Expr::Property(Box::new(Expr::String(n.data().key().to_string())))),
+                    Value::Object(_) => seq.push(Expr::Property(Box::new(expr_string(n.data().key())))),
                     _ => unreachable!(),
                 }
                 n = p;

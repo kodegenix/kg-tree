@@ -76,7 +76,7 @@ pub enum ParseErr {
 }
 
 impl ParseErr {
-    pub fn invalid_escape<T>(r: &mut CharReader) -> Result<T, Error> {
+    pub fn invalid_escape<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
             Some(_) => {
@@ -99,7 +99,7 @@ impl ParseErr {
         Err(err)
     }
 
-    pub fn invalid_input<T>(r: &mut CharReader) -> Result<T, Error> {
+    pub fn invalid_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
             Some(c) => {
@@ -123,7 +123,7 @@ impl ParseErr {
         Err(err)
     }
 
-    pub fn invalid_input_one<T>(r: &mut CharReader, expected: char) -> Result<T, Error> {
+    pub fn invalid_input_one<T>(r: &mut dyn CharReader, expected: char) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
             Some(c) => {
@@ -149,7 +149,7 @@ impl ParseErr {
         Err(err)
     }
 
-    pub fn invalid_input_many<T>(r: &mut CharReader, expected: Vec<char>) -> Result<T, Error> {
+    pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
             Some(c) => {
@@ -176,7 +176,7 @@ impl ParseErr {
     }
 
     #[inline]
-    pub fn unexpected_eoi_str<T>(r: &mut CharReader, expected: String) -> Result<T, Error> {
+    pub fn unexpected_eoi_str<T>(r: &mut dyn CharReader, expected: String) -> Result<T, Error> {
         let pos = r.position();
         Err(parse_diag!(ParseErr::UnexpectedEoiOneString {
             pos,
@@ -187,21 +187,21 @@ impl ParseErr {
     }
 
     #[inline]
-    pub fn unexpected_token<T>(token: Token, r: &mut CharReader) -> Result<T, Error> {
+    pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErr::UnexpectedToken { token }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
 
     #[inline]
-    pub fn unexpected_token_one<T>(token: Token, expected: Terminal, r: &mut CharReader) -> Result<T, Error> {
+    pub fn unexpected_token_one<T>(token: Token, expected: Terminal, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErr::UnexpectedTokenOne { token, expected }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
 
     #[inline]
-    pub fn unexpected_token_many<T>(token: Token, expected: Vec<Terminal>, r: &mut CharReader) -> Result<T, Error> {
+    pub fn unexpected_token_many<T>(token: Token, expected: Vec<Terminal>, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErr::UnexpectedTokenMany { token, expected }, r, {
             token.from(), token.to() => "unexpected token"
         }))
@@ -375,9 +375,9 @@ impl Parser {
         self.multiline = multiline
     }
 
-    fn lex(&mut self, r: &mut CharReader) -> Result<Token, Error> {
+    fn lex(&mut self, r: &mut dyn CharReader) -> Result<Token, Error> {
         #[inline]
-        fn process_scientific_notation(r: &mut CharReader, p1: Position) -> Result<Token, Error> {
+        fn process_scientific_notation(r: &mut dyn CharReader, p1: Position) -> Result<Token, Error> {
             r.next_char()?;
             match r.peek_char(0)? {
                 Some('-') | Some('+') => {
@@ -406,7 +406,7 @@ impl Parser {
             }
         }
 
-        fn consume(r: &mut CharReader, count: usize, term: Terminal) -> Result<Token, Error> {
+        fn consume(r: &mut dyn CharReader, count: usize, term: Terminal) -> Result<Token, Error> {
             let p1 = r.position();
             r.skip_chars(count)?;
             let p2 = r.position();
@@ -746,7 +746,7 @@ impl Parser {
         }
     }
 
-    fn next_token(&mut self, r: &mut CharReader) -> Result<Token, Error> {
+    fn next_token(&mut self, r: &mut dyn CharReader) -> Result<Token, Error> {
         if self.token_queue.is_empty() {
             let t = self.lex(r)?;
             self.prev_pos = self.next_pos;
@@ -764,7 +764,7 @@ impl Parser {
         self.token_queue.push_back(t);
     }
 
-    fn expect_token(&mut self, r: &mut CharReader, term: Terminal) -> Result<Token, Error> {
+    fn expect_token(&mut self, r: &mut dyn CharReader, term: Terminal) -> Result<Token, Error> {
         let t = self.next_token(r)?;
         if t.term() == term {
             Ok(t)
@@ -773,7 +773,7 @@ impl Parser {
         }
     }
 
-    pub fn parse(&mut self, r: &mut CharReader) -> Result<Opath, Error> {
+    pub fn parse(&mut self, r: &mut dyn CharReader) -> Result<Opath, Error> {
         let p = r.position();
         self.token_queue.clear();
         self.next_pos = p;
@@ -796,7 +796,7 @@ impl Parser {
         }
     }
 
-    fn parse_expr(&mut self, r: &mut CharReader, ctx: Context) -> Result<Expr, Error> {
+    fn parse_expr(&mut self, r: &mut dyn CharReader, ctx: Context) -> Result<Expr, Error> {
         let t = self.next_token(r)?;
 
         let mut e = match t.term() {
@@ -1085,7 +1085,7 @@ impl Parser {
     }
 
     #[inline]
-    fn parse_expr_opt(&mut self, r: &mut CharReader, ctx: Context) -> Result<Option<Expr>, Error> {
+    fn parse_expr_opt(&mut self, r: &mut dyn CharReader, ctx: Context) -> Result<Option<Expr>, Error> {
         let e = self.parse_expr(r, ctx)?;
         if let Expr::Sequence(ref elems) = e {
             if elems.is_empty() {
@@ -1095,7 +1095,7 @@ impl Parser {
         Ok(Some(e))
     }
 
-    fn parse_literal(&mut self, t: Token, r: &mut CharReader) -> Result<Expr, Error> {
+    fn parse_literal(&mut self, t: Token, r: &mut dyn CharReader) -> Result<Expr, Error> {
         let p = r.position();
         r.seek(t.from())?;
         let mut s = String::with_capacity(t.to().offset - t.from().offset);
@@ -1141,7 +1141,7 @@ impl Parser {
         })
     }
 
-    fn parse_func(&mut self, r: &mut CharReader, _ctx: Context) -> Result<Expr, Error> {
+    fn parse_func(&mut self, r: &mut dyn CharReader, _ctx: Context) -> Result<Expr, Error> {
         let mut args = Vec::new();
         let tname = self.expect_token(r, Terminal::Property)?;
         let id = func::FuncId::from(r.slice_pos(tname.from(), tname.to())?.as_ref());
@@ -1162,7 +1162,7 @@ impl Parser {
         Ok(Expr::FuncCall(Box::new(FuncCall::new(id, args))))
     }
 
-    fn parse_method(&mut self, r: &mut CharReader, _ctx: Context) -> Result<Expr, Error> {
+    fn parse_method(&mut self, r: &mut dyn CharReader, _ctx: Context) -> Result<Expr, Error> {
         let mut args = Vec::new();
         let tname = self.expect_token(r, Terminal::Property)?;
         let id = func::MethodId::from(r.slice_pos(tname.from(), tname.to())?.as_ref());
@@ -1183,7 +1183,7 @@ impl Parser {
         Ok(Expr::MethodCall(Box::new(MethodCall::new(id, args))))
     }
 
-    fn parse_sequence(&mut self, r: &mut CharReader, ctx: Context) -> Result<Expr, Error> {
+    fn parse_sequence(&mut self, r: &mut dyn CharReader, ctx: Context) -> Result<Expr, Error> {
         let mut elems = Vec::new();
 
         let t = self.next_token(r)?;
@@ -1303,7 +1303,7 @@ impl Parser {
         })
     }
 
-    fn parse_group(&mut self, r: &mut CharReader, ctx: Context) -> Result<Expr, Error> {
+    fn parse_group(&mut self, r: &mut dyn CharReader, ctx: Context) -> Result<Expr, Error> {
         let t = self.next_token(r)?;
         let tsep = match t.term() {
             Terminal::ParenLeft => Terminal::ParenRight,
@@ -1347,20 +1347,20 @@ impl Parser {
         })
     }
 
-    fn parse_var_expr(&mut self, r: &mut CharReader, _ctx: Context) -> Result<Expr, Error> {
+    fn parse_var_expr(&mut self, r: &mut dyn CharReader, _ctx: Context) -> Result<Expr, Error> {
         self.expect_token(r, Terminal::VarBegin)?;
         let e = self.parse_expr(r, Context::Expr)?;
         let _t = self.expect_token(r, Terminal::BraceRight)?;
         Ok(Expr::Var(Box::new(e)))
     }
 
-    fn parse_env_expr(&mut self, r: &mut CharReader, _ctx: Context) -> Result<Expr, Error> {
+    fn parse_env_expr(&mut self, r: &mut dyn CharReader, _ctx: Context) -> Result<Expr, Error> {
         self.expect_token(r, Terminal::Env)?;
         let e = self.parse_expr(r, Context::Env)?;
         Ok(Expr::Env(Box::new(e)))
     }
 
-    fn parse_level_range(&mut self, r: &mut CharReader) -> Result<Option<LevelRange>, Error> {
+    fn parse_level_range(&mut self, r: &mut dyn CharReader) -> Result<Option<LevelRange>, Error> {
         let t = self.next_token(r)?;
         if t.term() == Terminal::BraceLeft {
             let mut l = LevelRange::default();
@@ -1397,7 +1397,7 @@ impl Parser {
         }
     }
 
-    fn parse_number_range(&mut self, start: Option<Expr>, r: &mut CharReader) -> Result<NumberRange, Error> {
+    fn parse_number_range(&mut self, start: Option<Expr>, r: &mut dyn CharReader) -> Result<NumberRange, Error> {
         let mut range = NumberRange::default();
         range.set_start(start);
         let t = self.next_token(r)?;
@@ -1435,8 +1435,3 @@ impl Default for Parser {
         Parser::new()
     }
 }
-
-
-//FIXME (jc) parse test are broken because of error refactoring
-//#[cfg(test)]
-//mod tests;
