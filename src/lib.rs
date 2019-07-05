@@ -1,6 +1,7 @@
 #![feature(
     specialization,
     integer_atomics,
+    box_syntax,
 )]
 
 #[macro_use]

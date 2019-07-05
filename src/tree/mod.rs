@@ -422,6 +422,36 @@ impl NodeRef {
         Ok(n)
     }
 
+    pub fn set_child(&self, index: Option<usize>, key: Option<Symbol>, value: NodeRef) -> Result<Option<NodeRef>, ErrorKind> {
+        let n = match *self.data_mut().value_mut() {
+            Value::Array(ref mut elems) => {
+                match index {
+                    Some(i) => elems[i] = value,
+                    None => elems.push(value),
+                }
+                None
+            }
+            Value::Object(ref mut props) => {
+                if let Some(k) = key {
+                    match index {
+                        Some(i) => props.insert_at(i, k, value),
+                        None => props.insert(k, value),
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+        };
+
+        self.update_children_metadata();
+
+        if let Some(ref n) = n {
+            n.data_mut().metadata_mut().detach();
+        }
+        Ok(n)
+    }
+
     pub fn add_children<'a, I>(&self, drop: bool, mut items: I) -> Result<Vec<NodeRef>, ErrorKind>
         where I: Iterator<Item = (Option<usize>, Option<Symbol>, NodeRef)> {
         let mut res = Vec::new();
@@ -694,6 +724,93 @@ impl NodeRef {
         }
         size
     }
+
+    pub fn is_equal(&self, other: &NodeRef) -> bool {
+        if self.is_ref_eq(other) {
+            true
+        } else {
+            let a = self.data();
+            let b = other.data();
+            match (a.value(), b.value()) {
+                (&Value::Null, &Value::Null) => true,
+                (&Value::Null, _) => false,
+                (_, &Value::Null) => false,
+                (&Value::Object(_), &Value::Object(_)) => self.is_ref_eq(other),
+                (&Value::Array(_), &Value::Array(_)) => self.is_ref_eq(other),
+                (&Value::String(ref a), &Value::String(ref b)) => a == b,
+                (&Value::String(ref a), _) => a == b.as_string().as_ref(),
+                (_, &Value::String(ref b)) => a.as_string().as_ref() == b,
+                (&Value::Boolean(a), &Value::Boolean(b)) => a == b,
+                (&Value::Boolean(a), _) => a == b.as_boolean(),
+                (_, &Value::Boolean(b)) => a.as_boolean() == b,
+                (&Value::Float(a), &Value::Float(b)) => a == b,
+                (&Value::Float(a), _) => a == b.as_float(),
+                (_, &Value::Float(b)) => a.as_float() == b,
+                (&Value::Integer(a), &Value::Integer(b)) => a == b,
+                (_, _) => false,
+            }
+        }
+    }
+
+    pub fn is_identical(&self, other: &NodeRef) -> bool {
+        if self.is_ref_eq(other) {
+            true
+        } else {
+            let a = self.data();
+            let b = other.data();
+            match (a.value(), b.value()) {
+                (&Value::Null, &Value::Null) => true,
+                (&Value::Object(_), &Value::Object(_)) => self.is_ref_eq(other),
+                (&Value::Array(_), &Value::Array(_)) => self.is_ref_eq(other),
+                (&Value::String(ref a), &Value::String(ref b)) => a == b,
+                (&Value::Boolean(a), &Value::Boolean(b)) => a == b,
+                (&Value::Float(a), &Value::Float(b)) => a == b,
+                (&Value::Integer(a), &Value::Integer(b)) => a == b,
+                (_, _) => false,
+            }
+        }
+    }
+
+    pub fn is_identical_deep(&self, other: &NodeRef) -> bool {
+        if self.is_ref_eq(other) {
+            true
+        } else {
+            let a = self.data();
+            let b = other.data();
+            match (a.value(), b.value()) {
+                (&Value::Null, &Value::Null) => true,
+                (&Value::Object(ref ap), &Value::Object(ref bp)) => {
+                    if ap.len() != bp.len() {
+                        false
+                    } else {
+                        for ((ka, va), (kb, vb)) in ap.iter().zip(bp.iter()) {
+                            if ka != kb || !va.is_identical_deep(vb) {
+                                return false
+                            }
+                        }
+                        true
+                    }
+                }
+                (&Value::Array(ref ae), &Value::Array(ref be)) => {
+                    if ae.len() != be.len() {
+                        false
+                    } else {
+                        for (va, vb) in ae.iter().zip(be.iter()) {
+                            if !va.is_identical_deep(vb) {
+                                return false
+                            }
+                        }
+                        true
+                    }
+                }
+                (&Value::String(ref a), &Value::String(ref b)) => a == b,
+                (&Value::Boolean(a), &Value::Boolean(b)) => a == b,
+                (&Value::Float(a), &Value::Float(b)) => a == b,
+                (&Value::Integer(a), &Value::Integer(b)) => a == b,
+                (_, _) => false,
+            }
+        }
+    }
 }
 
 impl<'a> Clone for NodeRef {
@@ -704,26 +821,7 @@ impl<'a> Clone for NodeRef {
 
 impl<'a> PartialEq for NodeRef {
     fn eq(&self, other: &NodeRef) -> bool {
-        let a = self.data();
-        let b = other.data();
-        match (a.value(), b.value()) {
-            (&Value::Null, &Value::Null) => true,
-            (&Value::Null, _) => false,
-            (_, &Value::Null) => false,
-            (&Value::Object(_), &Value::Object(_)) => self.is_ref_eq(other),
-            (&Value::Array(_), &Value::Array(_)) => self.is_ref_eq(other),
-            (&Value::String(ref a), &Value::String(ref b)) => a == b,
-            (&Value::String(ref a), _) => a == b.as_string().as_ref(),
-            (_, &Value::String(ref b)) => a.as_string().as_ref() == b,
-            (&Value::Boolean(a), &Value::Boolean(b)) => a == b,
-            (&Value::Boolean(a), _) => a == b.as_boolean(),
-            (_, &Value::Boolean(b)) => a.as_boolean() == b,
-            (&Value::Float(a), &Value::Float(b)) => a == b,
-            (&Value::Float(a), _) => a == b.as_float(),
-            (_, &Value::Float(b)) => a.as_float() == b,
-            (&Value::Integer(a), &Value::Integer(b)) => a == b,
-            (_, _) => false,
-        }
+        self.is_equal(other)
     }
 }
 

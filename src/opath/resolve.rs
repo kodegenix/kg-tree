@@ -55,51 +55,71 @@ impl TreeResolver {
     }
 
     pub fn resolve_custom<P>(&mut self, mut strategy: P, root: &NodeRef) where P: ResolveStrategy {
-        let mut exprs: HashMap<Symbol, Interpolation> = HashMap::new();
         let mut replacements = Vec::new();
         let mut iter = 0;
+
+        root.visit_recursive(|_r, p, n| {
+            if n.is_string() {
+                let i = self.parser.parse_str(&n.data().as_string()).unwrap_or(Interpolation::Empty);
+                if !i.is_empty() {
+                    let index = n.data().metadata().index();
+                    let key = Symbol::from(n.data().metadata().key());
+                    replacements.push((i, p.clone(), index, key));
+                }
+            }
+            true
+        });
+
+        if replacements.is_empty() {
+            return;
+        }
 
         loop {
             iter += 1;
             if iter == 100 {
-                panic!("too many iterations while resolving interpolations"); //FIXME (jc) add proper multi.rs handling
+                panic!("too many iterations while resolving interpolations"); //FIXME (jc) add proper error handling
             }
 
-            root.visit_recursive(|r, p, n| {
-                if n.is_string() {
-                    let nd = n.data();
-                    let s = nd.as_string();
-                    let i = exprs.entry(s.as_ref().into()).or_insert_with(|| {
-                        self.parser.parse_str(&s).unwrap_or(Interpolation::Empty)
-                    });
-                    if let Some(nn) = strategy.resolve_interpolation(i, n, p, r) {
-                        let nn = if !nn.is_consumable() {
-                            nn.deep_copy()
-                        } else {
-                            nn
-                        };
-                        replacements.push((p.clone(), n.clone(), nn));
+            let mut change = false;
+            for (i, p, index, key) in replacements.iter() {
+                if let Some(nn) = strategy.resolve_interpolation(&i, &p, &p, root) {
+                    let n = p.get_child_index(*index).unwrap();
+                    if !n.is_identical_deep(&nn) {
+                        change = true;
+                        p.set_child(Some(*index), Some(key.clone()), nn.into_consumable());
                     }
                 }
-                true
-            });
-
-            if replacements.is_empty() {
-                break;
             }
 
-            for (p, o, n) in replacements.drain(..) {
-                let (index, key) = {
-                    let od = o.data();
-                    if n.data().file().is_none() {
-                        n.data_mut().set_file(od.metadata().file());
-                    }
-                    (od.index(), od.key().to_string())
-                };
-                p.add_child(Some(index), Some(key.into()), n).unwrap();
+            if !change {
+                break;
             }
         }
     }
 }
 
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_interpolate_recursively() {
+        let n = NodeRef::from_json(r#"
+            {
+                "child1": {
+                    "my_key": "<% @key %>",
+                    "sub2": "<% @.subchild %>",
+                    "subchild": {
+                        "my_key": "<% @^.my_key %>"
+                    }
+                }
+            }
+        "#).unwrap();
+
+        let mut r = TreeResolver::new();
+        r.resolve(&n);
+
+        assert_eq!(n.to_json(), r#"{"child1":{"my_key":"child1","sub2":{"my_key":"child1"},"subchild":{"my_key":"child1"}}}"#);
+    }
+}
