@@ -1,8 +1,5 @@
 use super::*;
 
-use std::collections::HashMap;
-
-
 pub trait ResolveStrategy {
     fn resolve_interpolation(&mut self, interpolation: &Interpolation, node: &NodeRef, parent: &NodeRef, root: &NodeRef) -> Option<NodeRef>;
 }
@@ -86,7 +83,7 @@ impl TreeResolver {
                     let n = p.get_child_index(*index).unwrap();
                     if !n.is_identical_deep(&nn) {
                         change = true;
-                        p.set_child(Some(*index), Some(key.clone()), nn.into_consumable());
+                        p.set_child(Some(*index), Some(key.clone()), nn.into_consumable()).unwrap();
                     }
                 }
             }

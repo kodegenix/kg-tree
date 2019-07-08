@@ -1,7 +1,7 @@
-use super::*;
-
-use std::f64;
 use std::borrow::Cow;
+use std::f64;
+
+use super::*;
 
 mod as_string {
     // TODO ws

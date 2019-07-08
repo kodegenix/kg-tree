@@ -1,6 +1,6 @@
+use opath::*;
 use opath::Expr::*;
 use opath::NumberRange;
-use opath::*;
 
 #[test]
 fn _int() {

@@ -5,34 +5,31 @@
 )]
 
 #[macro_use]
-extern crate serde_derive;
+extern crate kg_diag_derive;
 #[macro_use]
 extern crate kg_display_derive;
 #[macro_use]
-extern crate kg_diag_derive;
+extern crate serde_derive;
 
-
-use kg_symbol::Symbol;
-use kg_diag::*;
-use kg_io::{MemCharReader, CharReader};
-use kg_utils::collections::LinkedHashMap;
-
-mod tree;
-
-pub use tree::{NodeRef, ErrorKind};
-pub use tree::metadata::{FileInfo, FileFormat};
-pub use tree::node::{Kind, KindMask, Value, Node};
-pub use tree::convert::Primitive;
-pub use kg_io::FileType;
-
-use tree::metadata::Metadata;
 
 use std::borrow::Cow;
-use std::path::{Path, PathBuf};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use heapsize::HeapSizeOf;
+use kg_diag::*;
+use kg_io::{CharReader, MemCharReader};
+pub use kg_io::FileType;
+use kg_symbol::Symbol;
+use kg_utils::collections::LinkedHashMap;
+pub use tree::{ErrorKind, NodeRef};
+pub use tree::convert::Primitive;
+pub use tree::metadata::{FileFormat, FileInfo};
+use tree::metadata::Metadata;
+pub use tree::node::{Kind, KindMask, Node, Value};
+
+mod tree;
 
 pub type Properties = LinkedHashMap<Symbol, NodeRef>;
 pub type Elements = Vec<NodeRef>;

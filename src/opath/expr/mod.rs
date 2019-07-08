@@ -1,14 +1,14 @@
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+
 use super::*;
+
+pub use self::scope::{Scope, ScopeMut};
 
 pub(super) mod func;
 pub(super) mod parse;
 
 mod scope;
-
-pub use self::scope::{Scope, ScopeMut};
-
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 
 //FIXME (jc)
 #[derive(Debug)]

@@ -1,7 +1,6 @@
+use serde::{de, ser};
+
 use super::*;
-
-use serde::{ser, de};
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Interpolation {

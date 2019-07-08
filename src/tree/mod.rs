@@ -1,21 +1,18 @@
-use super::*;
+use std::cell::{Ref, RefCell, RefMut};
+use std::cmp::{Ordering, PartialEq, PartialOrd};
+use std::path::Path;
+use std::rc::Rc;
 
+use serde::de;
+use serde::ser;
+use serde::ser::{SerializeMap, SerializeSeq};
+
+use super::*;
 use super::opath::Opath;
 
 pub mod node;
 pub mod metadata;
 pub mod convert;
-
-use std::rc::Rc;
-use std::cell::{RefCell, Ref, RefMut};
-use std::cmp::{PartialEq, PartialOrd, Ordering};
-use std::path::Path;
-
-use serde::ser;
-use serde::ser::{SerializeSeq, SerializeMap};
-use serde::de;
-
-
 
 //FIXME (jc) error handling
 #[derive(Debug)]

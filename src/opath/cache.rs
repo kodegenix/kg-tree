@@ -1,9 +1,8 @@
-use super::*;
-
 use std::collections::HashMap;
 
 use kg_utils::collections::LruCache;
 
+use super::*;
 
 pub trait OpathCache {
     fn get(&mut self, n: &NodeRef) -> &Opath;

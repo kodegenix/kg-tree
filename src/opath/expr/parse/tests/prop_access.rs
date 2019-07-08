@@ -1,5 +1,5 @@
-use opath::Expr::*;
 use opath::*;
+use opath::Expr::*;
 use std::string;
 
 mod simple {
@@ -166,8 +166,9 @@ mod simple {
 }
 
 mod wildcards {
-    use super::*;
     use std::i64;
+
+    use super::*;
 
     #[test]
     fn dot_star() {

@@ -1,6 +1,5 @@
 use super::*;
 
-
 pub fn to_tree<T>(value: &T) -> self::error::Result<NodeRef>
     where T: serde::Serialize
 {

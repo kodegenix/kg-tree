@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 100)]
+#[allow(dead_code)]
 pub enum FuncCallErr {
     #[display(fmt = "unknown function '{name}'")]
     UnknownFunc {

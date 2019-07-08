@@ -1,11 +1,9 @@
-use super::*;
-
-use std::rc::Rc;
-use std::cell::{RefCell, Ref, RefMut};
+use std::cell::{Ref, RefCell, RefMut};
 use std::convert::From;
 use std::ops::Deref;
+use std::rc::Rc;
 
-
+use super::*;
 
 #[derive(Debug)]
 struct Inner {

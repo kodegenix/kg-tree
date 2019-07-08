@@ -1,7 +1,8 @@
 use super::*;
-mod common;
+
 use self::common::*;
 
+mod common;
 mod math_ops;
 mod convert;
 mod prop_access;

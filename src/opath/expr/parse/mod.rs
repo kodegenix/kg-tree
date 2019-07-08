@@ -1,9 +1,8 @@
-use super::*;
+use std::collections::VecDeque;
 
 use kg_display::ListDisplay;
 
-use std::collections::VecDeque;
-
+use super::*;
 
 pub type Error = ParseDiag;
 

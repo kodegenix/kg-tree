@@ -1,9 +1,8 @@
-use super::*;
-
 use std::hash::{Hash, Hasher};
 
-use serde::{ser, de};
+use serde::{de, ser};
 
+use super::*;
 
 #[derive(Debug)]
 pub struct Opath {

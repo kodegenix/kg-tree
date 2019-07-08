@@ -1,5 +1,6 @@
-use super::*;
 use std::f64;
+
+use super::*;
 
 #[test]
 fn integer_integer() {

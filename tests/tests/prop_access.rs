@@ -1,5 +1,6 @@
-use super::*;
 use kg_tree::diff::ModelDiff;
+
+use super::*;
 
 mod simple {
     use super::*;

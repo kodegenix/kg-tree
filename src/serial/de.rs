@@ -1,9 +1,8 @@
-use super::*;
-
 use serde::de::Error as DeError;
-use serde::de::Unexpected;
 use serde::de::IntoDeserializer;
+use serde::de::Unexpected;
 
+use super::*;
 
 pub fn from_tree<'de, T>(node: &NodeRef) -> self::error::Result<T>
     where T: serde::Deserialize<'de>

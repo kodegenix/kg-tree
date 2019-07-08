@@ -1,12 +1,11 @@
 use std::cmp::Ordering;
+use std::ops::{BitAnd, BitOr};
 
-use serde::ser::{Serializer, Serialize};
-use serde::de::{Deserializer, Deserialize};
-use std::ops::{BitOr, BitAnd};
+use serde::de::{Deserialize, Deserializer};
+use serde::ser::{Serialize, Serializer};
 
 use super::*;
-use super::opath::{Opath, OpathCache, NodePathCache};
-
+use super::opath::{NodePathCache, Opath, OpathCache};
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum ChangeKind {

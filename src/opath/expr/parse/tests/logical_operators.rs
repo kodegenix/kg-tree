@@ -1,5 +1,5 @@
-use opath::Expr::*;
 use opath::*;
+use opath::Expr::*;
 
 mod alternative {
     use super::*;

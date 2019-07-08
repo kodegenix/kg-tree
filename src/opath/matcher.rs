@@ -1,7 +1,6 @@
-use super::*;
-
 use std::collections::HashSet;
 
+use super::*;
 
 #[derive(Debug)]
 pub struct NodePathMatcher {

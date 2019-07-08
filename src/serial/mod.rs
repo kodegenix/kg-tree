@@ -1,13 +1,12 @@
 use super::*;
 
+pub use self::de::from_tree;
+pub use self::error::Error;
+pub use self::ser::to_tree;
+
 mod error;
 mod ser;
 mod de;
-
-pub use self::error::Error;
-pub use self::ser::to_tree;
-pub use self::de::from_tree;
-
 
 #[cfg(test)]
 mod tests {

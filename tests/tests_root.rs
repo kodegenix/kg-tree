@@ -1,6 +1,6 @@
-extern crate kg_tree;
 #[macro_use]
 extern crate assert_approx_eq;
+extern crate kg_tree;
 
 use kg_tree::*;
 

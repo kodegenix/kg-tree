@@ -1,12 +1,11 @@
-use std::rc::{Rc, Weak};
-use std::path::Path;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
-
-use super::*;
+use std::path::Path;
+use std::rc::{Rc, Weak};
 
 use kg_io::FileType;
 
+use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
