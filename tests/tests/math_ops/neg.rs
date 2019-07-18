@@ -70,4 +70,3 @@ fn object() {
 fn undefined() {
     assert_negation("undefined", true);
 }
-

@@ -4,8 +4,8 @@ use std::ops::{BitAnd, BitOr};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
-use super::*;
 use super::opath::{NodePathCache, Opath, OpathCache};
+use super::*;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum ChangeKind {
@@ -99,10 +99,10 @@ impl BitAnd<ChangeKind> for u32 {
     }
 }
 
-
 impl Serialize for ChangeKind {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         serializer.serialize_str(self.mark_str())
     }
@@ -110,18 +110,21 @@ impl Serialize for ChangeKind {
 
 impl<'de> Deserialize<'de> for ChangeKind {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         use serde::de::{Error, Unexpected};
 
         let s = <(&str)>::deserialize(deserializer)?;
         match ChangeKind::from_mark_str(s) {
             Some(k) => Ok(k),
-            None => Err(D::Error::invalid_value(Unexpected::Str(s), &"either '-', '+', or '*'")),
+            None => Err(D::Error::invalid_value(
+                Unexpected::Str(s),
+                &"either '-', '+', or '*'",
+            )),
         }
     }
 }
-
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct ChangeKindMask(u32);
@@ -145,14 +148,22 @@ impl ChangeKindMask {
                 m = m + ChangeKind::Renamed as u32;
             }
             if m == 0 {
-                m = ChangeKind::Added as u32 + ChangeKind::Removed as u32 + ChangeKind::Renamed as u32 + ChangeKind::Updated as u32;
+                m = ChangeKind::Added as u32
+                    + ChangeKind::Removed as u32
+                    + ChangeKind::Renamed as u32
+                    + ChangeKind::Updated as u32;
             }
         }
         ChangeKindMask(m)
     }
 
     pub fn all() -> ChangeKindMask {
-        ChangeKindMask(ChangeKind::Added as u32 | ChangeKind::Removed as u32 | ChangeKind::Removed as u32 | ChangeKind::Renamed as u32)
+        ChangeKindMask(
+            ChangeKind::Added as u32
+                | ChangeKind::Removed as u32
+                | ChangeKind::Removed as u32
+                | ChangeKind::Renamed as u32,
+        )
     }
 
     pub fn has(&self, kind: ChangeKind) -> bool {
@@ -209,7 +220,8 @@ impl std::fmt::Display for ChangeKindMask {
 
 impl Serialize for ChangeKindMask {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         serializer.serialize_str(&self.to_string())
     }
@@ -217,7 +229,8 @@ impl Serialize for ChangeKindMask {
 
 impl<'de> Deserialize<'de> for ChangeKindMask {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         let s = <(&str)>::deserialize(deserializer)?;
         Ok(ChangeKindMask::parse(s))
@@ -233,10 +246,7 @@ pub struct ModelChange {
 
 impl ModelChange {
     fn new(path: Opath, kind: ChangeKind) -> ModelChange {
-        ModelChange {
-            path,
-            kind,
-        }
+        ModelChange { path, kind }
     }
 
     pub fn path(&self) -> &Opath {
@@ -280,28 +290,39 @@ impl Ord for ModelChange {
     }
 }
 
-
 fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<ModelChange>, cache: &mut dyn OpathCache) {
     if !a.is_ref_eq(b) {
         match (a.data().value(), b.data().value()) {
             (&Value::Null, &Value::Null) => {}
-            (&Value::Boolean(ba), &Value::Boolean(bb)) => if ba != bb {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+            (&Value::Boolean(ba), &Value::Boolean(bb)) => {
+                if ba != bb {
+                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                }
             }
-            (&Value::Integer(na), &Value::Integer(nb)) => if na != nb {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+            (&Value::Integer(na), &Value::Integer(nb)) => {
+                if na != nb {
+                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                }
             }
-            (&Value::Float(na), &Value::Float(nb)) => if na.to_bits() != nb.to_bits() {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+            (&Value::Float(na), &Value::Float(nb)) => {
+                if na.to_bits() != nb.to_bits() {
+                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                }
             }
-            (&Value::Integer(na), &Value::Float(nb)) => if na as f64 != nb {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+            (&Value::Integer(na), &Value::Float(nb)) => {
+                if na as f64 != nb {
+                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                }
             }
-            (&Value::Float(na), &Value::Integer(nb)) => if na != nb as f64 {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+            (&Value::Float(na), &Value::Integer(nb)) => {
+                if na != nb as f64 {
+                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                }
             }
-            (&Value::String(ref sa), &Value::String(ref sb)) => if sa != sb {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+            (&Value::String(ref sa), &Value::String(ref sb)) => {
+                if sa != sb {
+                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                }
             }
             (&Value::Object(ref propsa), &Value::Object(ref propsb)) => {
                 let mut keys: LinkedHashMap<&str, ()> = LinkedHashMap::with_capacity(propsa.len());
@@ -314,8 +335,11 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<ModelChange>, cache: &m
                 for &k in keys.keys() {
                     match (propsa.get(k), propsb.get(k)) {
                         (Some(a), Some(b)) => diff_node(a, b, changes, cache),
-                        (Some(a), None) => changes.push(ModelChange::new(cache.get(a).clone(), ChangeKind::Removed)),
-                        (None, Some(b)) => changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Added)),
+                        (Some(a), None) => changes
+                            .push(ModelChange::new(cache.get(a).clone(), ChangeKind::Removed)),
+                        (None, Some(b)) => {
+                            changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Added))
+                        }
                         (None, None) => unreachable!(),
                     }
                 }
@@ -333,7 +357,8 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<ModelChange>, cache: &m
                     }
                     Ordering::Greater => {
                         for a in elemsa[elemsb.len()..].iter() {
-                            changes.push(ModelChange::new(cache.get(a).clone(), ChangeKind::Removed));
+                            changes
+                                .push(ModelChange::new(cache.get(a).clone(), ChangeKind::Removed));
                         }
                     }
                 }
@@ -369,7 +394,6 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<ModelChange>, cache: &m
     }
 }
 
-
 /// Struct representing logical model changes. Operates on in-memory model representation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModelDiff {
@@ -385,9 +409,7 @@ impl ModelDiff {
     pub fn minimal_cache(a: &NodeRef, b: &NodeRef, cache: &mut dyn OpathCache) -> ModelDiff {
         let mut changes = Vec::new();
         diff_node(a, b, &mut changes, cache);
-        ModelDiff {
-            changes,
-        }
+        ModelDiff { changes }
     }
 
     pub fn full(a: &NodeRef, b: &NodeRef) -> ModelDiff {
@@ -408,7 +430,10 @@ impl ModelDiff {
             loop {
                 if let Some(pb) = ppath.apply(b, b).into_one() {
                     if !cache.contains(&pb) {
-                        res.insert(i, ModelChange::new(cache.get(&pb).clone(), ChangeKind::Updated));
+                        res.insert(
+                            i,
+                            ModelChange::new(cache.get(&pb).clone(), ChangeKind::Updated),
+                        );
                     } else {
                         break;
                     }
@@ -448,9 +473,7 @@ impl ModelDiff {
             }
         }
 
-        ModelDiff {
-            changes: res,
-        }
+        ModelDiff { changes: res }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -475,7 +498,6 @@ impl std::fmt::Display for ModelDiff {
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {

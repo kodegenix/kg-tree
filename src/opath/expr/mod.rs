@@ -10,10 +10,18 @@ pub(super) mod parse;
 
 mod scope;
 
+pub type OpathError = BasicDiag;
+
 //FIXME (jc)
-#[derive(Debug)]
-pub enum Error {
+#[derive(Debug, Display, Detail)]
+#[diag(code_offset = 600)]
+pub enum OpathErrorDetail {
+    #[display(fmt = "Unknown error in line: '{a0}'")]
     Undef(u32),
+    //    #[display(fmt = "unknown function '{name}'")]
+    //    UnknownFunc {
+    //        name: String,
+    //    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1704,8 +1712,14 @@ mod tests {
             assert_eq!(32, Expr::Range(box NumberRange::default()).tag());
             assert_eq!(33, Expr::Group(Vec::new()).tag());
             assert_eq!(34, Expr::Sequence(Vec::new()).tag());
-            assert_eq!(35, Expr::MethodCall(box MethodCall::new(MethodId::ToString, Vec::new())).tag());
-            assert_eq!(36, Expr::FuncCall(box FuncCall::new(FuncId::Sqrt, Vec::new())).tag());
+            assert_eq!(
+                35,
+                Expr::MethodCall(box MethodCall::new(MethodId::ToString, Vec::new())).tag()
+            );
+            assert_eq!(
+                36,
+                Expr::FuncCall(box FuncCall::new(FuncId::Sqrt, Vec::new())).tag()
+            );
             assert_eq!(37, Expr::Var(box Expr::String("var1".to_string())).tag());
         }
 

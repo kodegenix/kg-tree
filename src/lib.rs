@@ -1,8 +1,4 @@
-#![feature(
-    specialization,
-    integer_atomics,
-    box_syntax,
-)]
+#![feature(specialization, integer_atomics, box_syntax)]
 
 #[macro_use]
 extern crate kg_diag_derive;
@@ -11,7 +7,6 @@ extern crate kg_display_derive;
 #[macro_use]
 extern crate serde_derive;
 
-
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -19,26 +14,25 @@ use std::path::{Path, PathBuf};
 
 use heapsize::HeapSizeOf;
 use kg_diag::*;
-use kg_io::{CharReader, MemCharReader};
 pub use kg_io::FileType;
+use kg_io::{CharReader, MemCharReader};
 use kg_symbol::Symbol;
 use kg_utils::collections::LinkedHashMap;
-pub use tree::{ErrorKind, NodeRef};
 pub use tree::convert::Primitive;
-pub use tree::metadata::{FileFormat, FileInfo};
 use tree::metadata::Metadata;
+pub use tree::metadata::{FileFormat, FileInfo};
 pub use tree::node::{Kind, KindMask, Node, Value};
+pub use tree::{ErrorKind, NodeRef};
 
 mod tree;
 
 pub type Properties = LinkedHashMap<Symbol, NodeRef>;
 pub type Elements = Vec<NodeRef>;
 
-pub mod opath;
 pub mod diff;
+pub mod opath;
 
 pub mod serial;
-
 
 thread_local! {
     static BASE_PATH: RefCell<PathBuf> = RefCell::new(std::env::current_dir().unwrap());
@@ -58,14 +52,18 @@ pub fn push_base_path<P: AsRef<Path> + Into<PathBuf>>(base_path: P) {
 }
 
 pub fn pop_base_path() -> PathBuf {
-    let path = BASE_PATH_STACK.with(|s| s.borrow_mut().pop().expect("kg_tree::pop_base_path() called on an empty stack"));
+    let path = BASE_PATH_STACK.with(|s| {
+        s.borrow_mut()
+            .pop()
+            .expect("kg_tree::pop_base_path() called on an empty stack")
+    });
     BASE_PATH.with(|b| b.replace(path))
 }
 
 pub fn relative_path(path: &Path) -> &Path {
     debug_assert!(path.is_absolute());
-    BASE_PATH.with(|b| {
-        unsafe { std::mem::transmute(path.strip_prefix(b.borrow().as_path()).unwrap_or(path)) }
+    BASE_PATH.with(|b| unsafe {
+        std::mem::transmute(path.strip_prefix(b.borrow().as_path()).unwrap_or(path))
     })
 }
 
@@ -81,7 +79,6 @@ pub fn resolve_path_str(path: &str) -> Cow<Path> {
     resolve_path(Path::new(path))
 }
 
-
 struct PathBufHeapSize<'a>(&'a PathBuf);
 
 impl<'a> HeapSizeOf for PathBufHeapSize<'a> {
@@ -89,7 +86,6 @@ impl<'a> HeapSizeOf for PathBufHeapSize<'a> {
         unsafe { std::mem::transmute::<&PathBuf, &Vec<u8>>(self.0).heap_size_of_children() }
     }
 }
-
 
 pub type NodeMap = HashMap<*const Node, NodeRef>;
 

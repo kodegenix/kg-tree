@@ -138,7 +138,7 @@ mod colon {
 
     #[test]
     fn int_float_int() {
-        let expected: Vec<f64> = vec![0.0, 2.0, 5.0,7.0, 10.0];
+        let expected: Vec<f64> = vec![0.0, 2.0, 5.0, 7.0, 10.0];
 
         let results = query("[0:2.5:10]", ARRAY);
 
@@ -147,10 +147,7 @@ mod colon {
         results
             .iter()
             .zip(expected)
-            .for_each(|(res, exp)| {
-                assert_eq!(res.as_float(), exp)
-            })
-
+            .for_each(|(res, exp)| assert_eq!(res.as_float(), exp))
     }
 
     #[test]
@@ -164,9 +161,7 @@ mod colon {
         results
             .iter()
             .zip(expected)
-            .for_each(|(res, exp)| {
-                assert_eq!(res.as_float(), exp)
-            })
+            .for_each(|(res, exp)| assert_eq!(res.as_float(), exp))
     }
 
     #[test]
@@ -180,8 +175,6 @@ mod colon {
         results
             .iter()
             .zip(expected)
-            .for_each(|(res, exp)| {
-                assert_eq!(res.as_float(), exp)
-            })
+            .for_each(|(res, exp)| assert_eq!(res.as_float(), exp))
     }
 }

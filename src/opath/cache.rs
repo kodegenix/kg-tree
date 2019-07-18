@@ -12,7 +12,6 @@ pub trait OpathCache {
     fn len(&self) -> usize;
 }
 
-
 #[derive(Debug)]
 pub struct NodePathLruCache {
     cache: LruCache<*const Node, Opath>,
@@ -44,7 +43,6 @@ impl OpathCache for NodePathLruCache {
         self.cache.len()
     }
 }
-
 
 #[derive(Debug)]
 pub struct NodePathCache {

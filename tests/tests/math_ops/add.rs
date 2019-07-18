@@ -104,7 +104,6 @@ fn integer_object() {
     assert_eq!(res.as_string(), "2[object]");
 }
 
-
 #[test]
 fn float_float() {
     let results = query("3.1 + 2.1", EXAMPLE_JSON);
@@ -151,7 +150,6 @@ fn float_undefined() {
     assert!(res.is_float());
     assert!(f64::is_nan(res.as_float()));
 }
-
 
 #[test]
 fn float_bool() {
@@ -202,7 +200,6 @@ fn float_null() {
     assert!(res.is_number());
     assert_approx_eq!(res.as_float(), 1.1);
 }
-
 
 #[test]
 fn bool_integer() {
@@ -637,7 +634,6 @@ fn string_bool() {
     assert!(res.data().is_string());
     assert_eq!(res.as_string(), "3true");
 }
-
 
 #[test]
 fn string_float() {

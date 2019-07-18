@@ -59,7 +59,6 @@ impl std::fmt::Display for FileFormat {
     }
 }
 
-
 #[derive(Debug)]
 pub struct FileInfo {
     file_path: PathBuf,
@@ -68,7 +67,11 @@ pub struct FileInfo {
 }
 
 impl FileInfo {
-    pub fn new<P: Into<PathBuf> + AsRef<Path>>(file_path: P, file_type: FileType, file_format: FileFormat) -> Rc<FileInfo> {
+    pub fn new<P: Into<PathBuf> + AsRef<Path>>(
+        file_path: P,
+        file_type: FileType,
+        file_format: FileFormat,
+    ) -> Rc<FileInfo> {
         debug_assert!(file_path.as_ref().is_absolute());
 
         Rc::new(FileInfo {
@@ -104,13 +107,30 @@ impl std::fmt::Display for FileInfo {
         if f.alternate() {
             match self.file_type {
                 FileType::Dir => write!(f, "{}:{}", self.file_type, self.file_path.display()),
-                FileType::File => write!(f, "{}<{}>:{}", self.file_type, self.file_format, self.file_path.display()),
+                FileType::File => write!(
+                    f,
+                    "{}<{}>:{}",
+                    self.file_type,
+                    self.file_format,
+                    self.file_path.display()
+                ),
                 _ => unreachable!(),
             }
         } else {
             match self.file_type {
-                FileType::Dir => write!(f, "{}:{}", self.file_type, crate::relative_path(&self.file_path).display()),
-                FileType::File => write!(f, "{}<{}>:{}", self.file_type, self.file_format, crate::relative_path(&self.file_path).display()),
+                FileType::Dir => write!(
+                    f,
+                    "{}:{}",
+                    self.file_type,
+                    crate::relative_path(&self.file_path).display()
+                ),
+                FileType::File => write!(
+                    f,
+                    "{}<{}>:{}",
+                    self.file_type,
+                    self.file_format,
+                    crate::relative_path(&self.file_path).display()
+                ),
                 _ => unreachable!(),
             }
         }
@@ -123,7 +143,7 @@ impl PartialEq<FileInfo> for FileInfo {
     }
 }
 
-impl Eq for FileInfo { }
+impl Eq for FileInfo {}
 
 impl PartialOrd<FileInfo> for FileInfo {
     fn partial_cmp(&self, other: &FileInfo) -> Option<Ordering> {
@@ -149,7 +169,6 @@ impl HeapSizeOf for FileInfo {
     }
 }
 
-
 #[derive(Debug)]
 pub struct Metadata {
     parent: Option<Weak<RefCell<Node>>>,
@@ -159,7 +178,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub (super) fn new() -> Metadata {
+    pub(super) fn new() -> Metadata {
         Metadata {
             parent: None,
             index: 0,
@@ -207,13 +226,13 @@ impl Metadata {
         self.file = file;
     }
 
-    pub (super) fn detach(&mut self) {
+    pub(super) fn detach(&mut self) {
         self.parent = None;
         self.index = 0;
         self.key = Symbol::default();
     }
 
-    pub (super) fn deep_copy(&self) -> Metadata {
+    pub(super) fn deep_copy(&self) -> Metadata {
         Metadata {
             parent: None,
             index: 0,

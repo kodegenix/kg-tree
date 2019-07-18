@@ -4,9 +4,9 @@ pub use self::de::from_tree;
 pub use self::error::Error;
 pub use self::ser::to_tree;
 
+mod de;
 mod error;
 mod ser;
-mod de;
 
 #[cfg(test)]
 mod tests {

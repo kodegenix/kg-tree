@@ -31,7 +31,13 @@ impl NodePathMatcher {
         }
     }
 
-    pub fn resolve_cache(&mut self, expr: &Opath, root: &NodeRef, current: &NodeRef, cache: &mut dyn OpathCache) {
+    pub fn resolve_cache(
+        &mut self,
+        expr: &Opath,
+        root: &NodeRef,
+        current: &NodeRef,
+        cache: &mut dyn OpathCache,
+    ) {
         let res = expr.apply(root, current);
         for ref n in res {
             self.insert_cache(n, cache);
@@ -45,7 +51,14 @@ impl NodePathMatcher {
         }
     }
 
-    pub fn resolve_ext_cache(&mut self, expr: &Opath, root: &NodeRef, current: &NodeRef, scope: &Scope, cache: &mut dyn OpathCache) {
+    pub fn resolve_ext_cache(
+        &mut self,
+        expr: &Opath,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+        cache: &mut dyn OpathCache,
+    ) {
         let res = expr.apply_ext(root, current, scope);
         for ref n in res {
             self.insert_cache(n, cache);
@@ -60,7 +73,6 @@ impl NodePathMatcher {
         self.paths.clear();
     }
 }
-
 
 #[cfg(test)]
 mod tests {

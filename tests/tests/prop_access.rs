@@ -25,7 +25,6 @@ mod simple {
         assert_eq!(res.as_integer().unwrap(), 1);
     }
 
-
     #[test]
     fn current_bracket_at() {
         let results = query("@['one']", EXAMPLE_JSON);
@@ -76,7 +75,6 @@ mod simple {
         assert_eq!(res.as_integer().unwrap(), 1);
     }
 
-
     #[test]
     fn root() {
         let results = query("$.one", EXAMPLE_JSON);
@@ -86,7 +84,6 @@ mod simple {
         assert!(res.data().is_integer());
         assert_eq!(res.as_integer().unwrap(), 1);
     }
-
 
     #[test]
     fn root_bracket() {
@@ -344,7 +341,6 @@ mod wildcards {
                                 }
                             }"#;
 
-
         let results = query("@.**{3}", json);
 
         assert_eq!(results.len(), 5)
@@ -377,7 +373,6 @@ mod wildcards {
 
         assert!(diffs.is_empty());
     }
-
 
     #[test]
     fn nested_property_parent() {
@@ -477,7 +472,6 @@ mod wildcards {
                                         }
                                     }
                                  }"#;
-
 
         let results = query("nested1.nested2.nested3.nested4^**{2,3}", json);
         assert_eq!(results.len(), 2);

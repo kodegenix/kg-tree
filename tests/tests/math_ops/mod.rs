@@ -24,16 +24,13 @@ fn int_plus_many() {
                         "two" :2
                     }"#;
 
-
     let results = query("2 + @.(one, two)", json);
-
 
     assert_eq!(results.len(), 2);
 
     assert_eq!(results.get(0).unwrap().as_integer().unwrap(), 3);
     assert_eq!(results.get(1).unwrap().as_integer().unwrap(), 4);
 }
-
 
 #[test]
 fn many_plus_int() {
@@ -43,9 +40,7 @@ fn many_plus_int() {
                         "two" :2
                     }"#;
 
-
     let results = query("@.(one, two) + 2 ", json);
-
 
     assert_eq!(results.len(), 2);
 
@@ -62,9 +57,7 @@ fn many_plus_many() {
                         "xx": "aa"
                     }"#;
 
-
     let results = query("@.(one, two) + @.(one, two, xx) ", json);
-
 
     assert_eq!(results.len(), 2);
 

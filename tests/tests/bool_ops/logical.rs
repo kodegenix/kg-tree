@@ -58,7 +58,6 @@ mod conjunction {
     }
 }
 
-
 mod negation {
     use super::*;
 

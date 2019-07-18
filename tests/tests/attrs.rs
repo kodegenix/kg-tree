@@ -14,7 +14,6 @@ fn index() {
                             }
                         }"#;
 
-
     let results = query("child0.child0_2.@index", json);
 
     let res = results.get(0).unwrap();
@@ -35,7 +34,6 @@ fn array_index() {
     assert_eq!(res.as_integer().unwrap(), 1)
 }
 
-
 #[test]
 fn key() {
     let json: &str = r#"
@@ -49,7 +47,6 @@ fn key() {
                                 "child1_0":"child1_0 string val"
                             }
                         }"#;
-
 
     let results = query("child0.child0_2.@key", json);
 
@@ -85,7 +82,6 @@ fn level() {
                             }
                         }"#;
 
-
     let results = query("child0.child0_0.@level", json);
 
     let res = results.get(0).unwrap();
@@ -107,7 +103,6 @@ fn level_root() {
                                 "child1_0":"child1_0 string val"
                             }
                         }"#;
-
 
     let results = query("$.@level", json);
 
