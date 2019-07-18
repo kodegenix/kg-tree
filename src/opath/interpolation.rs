@@ -54,28 +54,31 @@ impl Interpolation {
         }
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef) -> Option<NodeRef> {
-        match *self {
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef) -> OpathResult<Option<NodeRef>> {
+        let res = match *self {
             Interpolation::Empty => None,
             Interpolation::Simple(ref s) => Some(NodeRef::string(s.as_str())),
-            Interpolation::Expr(ref e) => Some(e.apply_one(root, current)),
-        }
+            Interpolation::Expr(ref e) => Some(e.apply_one(root, current)?),
+        };
+        Ok(res)
     }
 
-    pub fn resolve_into(self, root: &NodeRef, current: &NodeRef) -> Option<NodeRef> {
-        match self {
+    pub fn resolve_into(self, root: &NodeRef, current: &NodeRef) -> OpathResult<Option<NodeRef>> {
+        let res = match self {
             Interpolation::Empty => None,
             Interpolation::Simple(s) => Some(NodeRef::string(s.as_str())),
-            Interpolation::Expr(e) => Some(e.apply_one(root, current)),
-        }
+            Interpolation::Expr(e) => Some(e.apply_one(root, current)?),
+        };
+        Ok(res)
     }
 
-    pub fn resolve_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> Option<NodeRef> {
-        match *self {
+    pub fn resolve_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> OpathResult<Option<NodeRef>> {
+        let res = match *self {
             Interpolation::Empty => None,
             Interpolation::Simple(ref s) => Some(NodeRef::string(s.as_str())),
-            Interpolation::Expr(ref e) => Some(e.apply_one_ext(root, current, scope)),
-        }
+            Interpolation::Expr(ref e) => Some(e.apply_one_ext(root, current, scope)?),
+        };
+        Ok(res)
     }
 
     pub fn resolve_ext_into(
@@ -83,12 +86,13 @@ impl Interpolation {
         root: &NodeRef,
         current: &NodeRef,
         scope: &Scope,
-    ) -> Option<NodeRef> {
-        match self {
+    ) -> OpathResult<Option<NodeRef>> {
+        let res = match self {
             Interpolation::Empty => None,
             Interpolation::Simple(s) => Some(NodeRef::string(s)),
-            Interpolation::Expr(e) => Some(e.apply_one_ext(root, current, scope)),
-        }
+            Interpolation::Expr(e) => Some(e.apply_one_ext(root, current, scope)?),
+        };
+        Ok(res)
     }
 
     pub fn is_empty(&self) -> bool {

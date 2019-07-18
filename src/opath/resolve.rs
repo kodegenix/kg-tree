@@ -7,7 +7,7 @@ pub trait ResolveStrategy {
         node: &NodeRef,
         parent: &NodeRef,
         root: &NodeRef,
-    ) -> Option<NodeRef>;
+    ) -> OpathResult<Option<NodeRef>>;
 }
 
 #[derive(Debug)]
@@ -20,7 +20,7 @@ impl ResolveStrategy for DefaultResolveStrategy {
         _node: &NodeRef,
         parent: &NodeRef,
         root: &NodeRef,
-    ) -> Option<NodeRef> {
+    ) -> OpathResult<Option<NodeRef>> {
         interpolation.resolve(root, parent)
     }
 }
@@ -35,7 +35,7 @@ impl ResolveStrategy for RootedResolveStrategy {
         _node: &NodeRef,
         _parent: &NodeRef,
         root: &NodeRef,
-    ) -> Option<NodeRef> {
+    ) -> OpathResult<Option<NodeRef>> {
         interpolation.resolve(root, root)
     }
 }
@@ -64,11 +64,11 @@ impl TreeResolver {
         TreeResolver { parser }
     }
 
-    pub fn resolve(&mut self, root: &NodeRef) {
+    pub fn resolve(&mut self, root: &NodeRef) -> OpathResult<()>{
         self.resolve_custom(DefaultResolveStrategy, root)
     }
 
-    pub fn resolve_custom<P>(&mut self, mut strategy: P, root: &NodeRef)
+    pub fn resolve_custom<P>(&mut self, mut strategy: P, root: &NodeRef) -> OpathResult<()>
     where
         P: ResolveStrategy,
     {
@@ -91,7 +91,7 @@ impl TreeResolver {
         });
 
         if replacements.is_empty() {
-            return;
+            return Ok(());
         }
 
         loop {
@@ -102,7 +102,7 @@ impl TreeResolver {
 
             let mut change = false;
             for (i, p, index, key) in replacements.iter() {
-                if let Some(nn) = strategy.resolve_interpolation(&i, &p, &p, root) {
+                if let Some(nn) = strategy.resolve_interpolation(&i, &p, &p, root)? {
                     let n = p.get_child_index(*index).unwrap();
                     if !n.is_identical_deep(&nn) {
                         change = true;
@@ -111,11 +111,11 @@ impl TreeResolver {
                     }
                 }
             }
-
             if !change {
                 break;
             }
         }
+        Ok(())
     }
 }
 

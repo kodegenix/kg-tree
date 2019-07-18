@@ -109,13 +109,18 @@ trait ScopeImpl: Sized {
         }
     }
 
-    fn get_var_value<T: Primitive>(&self, var: &str) -> Result<T, OpathErrorDetail> {
+    fn get_var_value<T: Primitive>(&self, var: &str) -> OpathResult<T> {
         match self.get_var(var) {
             Some(v) => match *v {
                 NodeSet::One(ref n) => Ok(T::get(n)),
-                _ => Err(OpathErrorDetail::Undef(line!())), //FIXME (jc): expected single result
+                _ => {
+                    Err(OpathErrorDetail::Undef(line!()))
+                }, //FIXME (jc): expected single result
             },
-            None => Err(OpathErrorDetail::Undef(line!())), //FIXME (jc): variable not found
+            None => {
+
+                Err(OpathErrorDetail::Undef(line!()))
+            }, //FIXME (jc): variable not found
         }
     }
 

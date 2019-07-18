@@ -138,40 +138,42 @@ impl Opath {
         ))))
     }
 
-    pub fn apply(&self, root: &NodeRef, current: &NodeRef) -> NodeSet {
+    pub fn apply(&self, root: &NodeRef, current: &NodeRef) -> OpathResult<NodeSet> {
         let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
         self.expr
             .apply(Env::new(root, current, None), Context::Expr)
     }
 
-    pub fn apply_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> NodeSet {
+    pub fn apply_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> OpathResult<NodeSet> {
         let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
         self.expr
             .apply(Env::new(root, current, Some(scope)), Context::Expr)
     }
 
-    pub fn apply_one(&self, root: &NodeRef, current: &NodeRef) -> NodeRef {
+    pub fn apply_one(&self, root: &NodeRef, current: &NodeRef) -> OpathResult<NodeRef> {
         let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
         let res = self
             .expr
-            .apply(Env::new(root, current, None), Context::Expr);
-        match res {
+            .apply(Env::new(root, current, None), Context::Expr)?;
+        let res = match res {
             NodeSet::Empty => NodeRef::null(),
             NodeSet::One(a) => a,
             NodeSet::Many(_) => unimplemented!(),
-        }
+        };
+        Ok(res)
     }
 
-    pub fn apply_one_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> NodeRef {
+    pub fn apply_one_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> OpathResult<NodeRef> {
         let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
         let res = self
             .expr
-            .apply(Env::new(root, current, Some(scope)), Context::Expr);
-        match res {
+            .apply(Env::new(root, current, Some(scope)), Context::Expr)?;
+        let res = match res {
             NodeSet::Empty => NodeRef::null(),
             NodeSet::One(a) => a,
             NodeSet::Many(_) => unimplemented!(),
-        }
+        };
+        Ok(res)
     }
 
     pub fn parent_path(&self) -> Option<Opath> {

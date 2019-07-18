@@ -5,6 +5,7 @@ use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
 use super::opath::{NodePathCache, Opath, OpathCache};
+use crate::opath::OpathResult;
 use super::*;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -412,12 +413,12 @@ impl ModelDiff {
         ModelDiff { changes }
     }
 
-    pub fn full(a: &NodeRef, b: &NodeRef) -> ModelDiff {
+    pub fn full(a: &NodeRef, b: &NodeRef) -> OpathResult<ModelDiff> {
         let mut cache = NodePathCache::new();
         ModelDiff::full_cache(a, b, &mut cache)
     }
 
-    pub fn full_cache(a: &NodeRef, b: &NodeRef, cache: &mut dyn OpathCache) -> ModelDiff {
+    pub fn full_cache(a: &NodeRef, b: &NodeRef, cache: &mut dyn OpathCache) -> OpathResult<ModelDiff> {
         let mut changes = Vec::new();
 
         diff_node(a, b, &mut changes, cache);
@@ -428,7 +429,7 @@ impl ModelDiff {
             let mut ppath = c.path.parent_path().unwrap();
             let i = res.len();
             loop {
-                if let Some(pb) = ppath.apply(b, b).into_one() {
+                if let Some(pb) = ppath.apply(b, b)?.into_one() {
                     if !cache.contains(&pb) {
                         res.insert(
                             i,
@@ -449,7 +450,7 @@ impl ModelDiff {
             res.push(c.clone());
             let kind = c.kind;
             if kind == ChangeKind::Removed {
-                if let Some(a) = c.path.apply(a, a).into_one() {
+                if let Some(a) = c.path.apply(a, a)?.into_one() {
                     a.visit_recursive(|_r, _p, n| {
                         if !a.is_ref_eq(n) {
                             res.push(ModelChange::new(cache.get(n).clone(), ChangeKind::Removed));
@@ -460,7 +461,7 @@ impl ModelDiff {
                     unreachable!()
                 }
             } else if kind == ChangeKind::Added {
-                if let Some(b) = c.path.apply(b, b).into_one() {
+                if let Some(b) = c.path.apply(b, b)?.into_one() {
                     b.visit_recursive(|_r, _p, n| {
                         if !b.is_ref_eq(n) {
                             res.push(ModelChange::new(cache.get(n).clone(), ChangeKind::Added));
@@ -473,7 +474,7 @@ impl ModelDiff {
             }
         }
 
-        ModelDiff { changes: res }
+        Ok(ModelDiff { changes: res })
     }
 
     pub fn is_empty(&self) -> bool {
