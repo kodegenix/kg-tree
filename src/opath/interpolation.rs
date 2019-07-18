@@ -72,7 +72,12 @@ impl Interpolation {
         Ok(res)
     }
 
-    pub fn resolve_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> OpathResult<Option<NodeRef>> {
+    pub fn resolve_ext(
+        &self,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+    ) -> OpathResult<Option<NodeRef>> {
         let res = match *self {
             Interpolation::Empty => None,
             Interpolation::Simple(ref s) => Some(NodeRef::string(s.as_str())),

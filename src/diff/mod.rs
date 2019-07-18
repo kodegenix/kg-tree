@@ -5,8 +5,8 @@ use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
 use super::opath::{NodePathCache, Opath, OpathCache};
-use crate::opath::OpathResult;
 use super::*;
+use crate::opath::OpathResult;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum ChangeKind {
@@ -418,7 +418,11 @@ impl ModelDiff {
         ModelDiff::full_cache(a, b, &mut cache)
     }
 
-    pub fn full_cache(a: &NodeRef, b: &NodeRef, cache: &mut dyn OpathCache) -> OpathResult<ModelDiff> {
+    pub fn full_cache(
+        a: &NodeRef,
+        b: &NodeRef,
+        cache: &mut dyn OpathCache,
+    ) -> OpathResult<ModelDiff> {
         let mut changes = Vec::new();
 
         diff_node(a, b, &mut changes, cache);

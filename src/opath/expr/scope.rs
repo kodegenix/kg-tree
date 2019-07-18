@@ -114,14 +114,18 @@ trait ScopeImpl: Sized {
             Some(v) => match *v {
                 NodeSet::One(ref n) => Ok(T::get(n)),
                 _ => {
-                    let diag = BasicDiag::new(OpathErrorDetail::MultipleVarValues {var_name: var.to_string()});
+                    let diag = BasicDiag::new(OpathErrorDetail::MultipleVarValues {
+                        var_name: var.to_string(),
+                    });
                     Err(diag)
-                },
+                }
             },
             None => {
-                let diag = BasicDiag::new(OpathErrorDetail::VariableNotFound {var_name: var.to_string()});
+                let diag = BasicDiag::new(OpathErrorDetail::VariableNotFound {
+                    var_name: var.to_string(),
+                });
                 Err(diag)
-            },
+            }
         }
     }
 

@@ -64,7 +64,7 @@ impl TreeResolver {
         TreeResolver { parser }
     }
 
-    pub fn resolve(&mut self, root: &NodeRef) -> OpathResult<()>{
+    pub fn resolve(&mut self, root: &NodeRef) -> OpathResult<()> {
         self.resolve_custom(DefaultResolveStrategy, root)
     }
 

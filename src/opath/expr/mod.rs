@@ -20,23 +20,15 @@ pub type ApplyResult = OpathResult<()>;
 #[diag(code_offset = 600)]
 pub enum OpathErrorDetail {
     #[display(fmt = "Error calling method '{name}'")]
-    MethodCallError {
-        name: MethodId,
-    },
+    MethodCallError { name: MethodId },
     #[display(fmt = "Error calling function '{name}'")]
-    FunctionCallError {
-        name: FuncId,
-    },
+    FunctionCallError { name: FuncId },
 
     #[display(fmt = "Expected single value in variable: '{var_name}'")]
-    MultipleVarValues {
-        var_name: String,
-    },
+    MultipleVarValues { var_name: String },
 
     #[display(fmt = "Variable not found: '{var_name}'")]
-    VariableNotFound {
-        var_name: String,
-    },
+    VariableNotFound { var_name: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -651,7 +643,8 @@ impl Expr {
             b: &Expr,
             op: F,
             out: &mut NodeBuf,
-        )  -> ApplyResult where
+        ) -> ApplyResult
+        where
             F: Fn(&NodeRef, Context, &NodeRef, &NodeRef, &mut NodeBuf) -> ApplyResult,
         {
             let a = a.apply(env, Context::Expr)?;
@@ -661,9 +654,7 @@ impl Expr {
                 (NodeSet::Empty, NodeSet::Empty) | (NodeSet::Empty, _) | (_, NodeSet::Empty) => {
                     apply_float(current, ctx, f64::NAN, out)
                 }
-                (NodeSet::One(a), NodeSet::One(b)) => {
-                    op(current, ctx, &a, &b, out)
-                }
+                (NodeSet::One(a), NodeSet::One(b)) => op(current, ctx, &a, &b, out),
                 (NodeSet::One(a), NodeSet::Many(b)) => {
                     for b in b {
                         op(current, ctx, &a, &b, out)?;
@@ -693,11 +684,19 @@ impl Expr {
             b: &Expr,
             op: F,
             out: &mut NodeBuf,
-        )  -> ApplyResult where
+        ) -> ApplyResult
+        where
             F: Fn(&NodeRef, &NodeRef) -> bool,
         {
             #[inline]
-            fn bool_op<F>(env: Env<'_>, ctx: Context, a: &Expr, b: &Expr, op: &F, out: &mut NodeBuf) -> ApplyResult
+            fn bool_op<F>(
+                env: Env<'_>,
+                ctx: Context,
+                a: &Expr,
+                b: &Expr,
+                op: &F,
+                out: &mut NodeBuf,
+            ) -> ApplyResult
             where
                 F: Fn(&NodeRef, &NodeRef) -> bool,
             {
@@ -746,7 +745,7 @@ impl Expr {
                         }
                         Ok(())
                     }
-                    _ => {Ok(())}
+                    _ => Ok(()),
                 }
             } else {
                 bool_op(env, ctx, a, b, &op, out)
@@ -754,9 +753,21 @@ impl Expr {
         }
 
         #[inline]
-        fn bool_or_op(env: Env<'_>, ctx: Context, a: &Expr, b: &Expr, out: &mut NodeBuf) -> ApplyResult {
+        fn bool_or_op(
+            env: Env<'_>,
+            ctx: Context,
+            a: &Expr,
+            b: &Expr,
+            out: &mut NodeBuf,
+        ) -> ApplyResult {
             #[inline]
-            fn bool_or(env: Env<'_>, ctx: Context, a: &Expr, b: &Expr, out: &mut NodeBuf) -> ApplyResult {
+            fn bool_or(
+                env: Env<'_>,
+                ctx: Context,
+                a: &Expr,
+                b: &Expr,
+                out: &mut NodeBuf,
+            ) -> ApplyResult {
                 let na = a.apply(env, Context::Expr)?;
                 match na {
                     NodeSet::Empty => {
@@ -825,7 +836,7 @@ impl Expr {
                         }
                         Ok(())
                     }
-                    _ => {Ok(())}
+                    _ => Ok(()),
                 }
             } else {
                 bool_or(env, ctx, a, b, out)
@@ -833,17 +844,13 @@ impl Expr {
         }
 
         #[inline]
-        fn bool_not_op(env: Env<'_>, ctx: Context, a: &Expr, out: &mut NodeBuf)  -> ApplyResult {
+        fn bool_not_op(env: Env<'_>, ctx: Context, a: &Expr, out: &mut NodeBuf) -> ApplyResult {
             #[inline]
-            fn not_op(env: Env<'_>, ctx: Context, a: &Expr, out: &mut NodeBuf)  -> ApplyResult{
+            fn not_op(env: Env<'_>, ctx: Context, a: &Expr, out: &mut NodeBuf) -> ApplyResult {
                 let a = a.apply(env, Context::Expr)?;
                 match a {
-                    NodeSet::Empty => {
-                        apply_boolean(env.current(), ctx, true, out)
-                    }
-                    NodeSet::One(a) => {
-                        apply_boolean(env.current(), ctx, !a.as_boolean(), out)
-                    }
+                    NodeSet::Empty => apply_boolean(env.current(), ctx, true, out),
+                    NodeSet::One(a) => apply_boolean(env.current(), ctx, !a.as_boolean(), out),
                     NodeSet::Many(a) => {
                         for a in a {
                             apply_boolean(env.current(), ctx, !a.as_boolean(), out)?
@@ -867,7 +874,7 @@ impl Expr {
                         }
                         Ok(())
                     }
-                    _ => {Ok(())}
+                    _ => Ok(()),
                 }
             } else {
                 not_op(env, ctx, a, out)
@@ -875,7 +882,12 @@ impl Expr {
         }
 
         #[inline]
-        fn apply_string(current: &NodeRef, ctx: Context, s: Cow<str>, out: &mut NodeBuf) -> ApplyResult {
+        fn apply_string(
+            current: &NodeRef,
+            ctx: Context,
+            s: Cow<str>,
+            out: &mut NodeBuf,
+        ) -> ApplyResult {
             match ctx {
                 Context::Property | Context::Index => get_child_key(current, &s, out),
                 _ => out.add(NodeRef::string(s)),
@@ -884,7 +896,12 @@ impl Expr {
         }
 
         #[inline]
-        fn apply_integer(current: &NodeRef, ctx: Context, n: i64, out: &mut NodeBuf) -> ApplyResult{
+        fn apply_integer(
+            current: &NodeRef,
+            ctx: Context,
+            n: i64,
+            out: &mut NodeBuf,
+        ) -> ApplyResult {
             match ctx {
                 Context::Property | Context::Index => get_child_index(current, n, out),
                 _ => out.add(NodeRef::integer(n)),
@@ -902,7 +919,12 @@ impl Expr {
         }
 
         #[inline]
-        fn apply_boolean(current: &NodeRef, ctx: Context, b: bool, out: &mut NodeBuf)  -> ApplyResult{
+        fn apply_boolean(
+            current: &NodeRef,
+            ctx: Context,
+            b: bool,
+            out: &mut NodeBuf,
+        ) -> ApplyResult {
             match ctx {
                 Context::Property | Context::Index => {
                     if b {
@@ -924,7 +946,12 @@ impl Expr {
         }
 
         #[inline]
-        fn apply_node(current: &NodeRef, ctx: Context, n: NodeRef, out: &mut NodeBuf)  -> ApplyResult{
+        fn apply_node(
+            current: &NodeRef,
+            ctx: Context,
+            n: NodeRef,
+            out: &mut NodeBuf,
+        ) -> ApplyResult {
             match ctx {
                 Context::Property | Context::Index => match *n.data().value() {
                     Value::Null => {}
@@ -948,7 +975,13 @@ impl Expr {
         }
 
         #[inline]
-        fn add(current: &NodeRef, ctx: Context, a: &NodeRef, b: &NodeRef, out: &mut NodeBuf) -> ApplyResult {
+        fn add(
+            current: &NodeRef,
+            ctx: Context,
+            a: &NodeRef,
+            b: &NodeRef,
+            out: &mut NodeBuf,
+        ) -> ApplyResult {
             let a = a.data();
             let b = b.data();
             match (a.value(), b.value()) {
@@ -967,9 +1000,7 @@ impl Expr {
                     s.push_str(b.as_ref());
                     apply_string(current, ctx, s.into(), out)
                 }
-                (&Value::Object(_), _) => {
-                    apply_float(current, ctx, 0f64 + b.as_float(), out)
-                }
+                (&Value::Object(_), _) => apply_float(current, ctx, 0f64 + b.as_float(), out),
                 (&Value::String(ref a), &Value::String(ref b)) => {
                     let mut s = String::with_capacity(a.len() + b.len());
                     s.push_str(a);
@@ -994,23 +1025,21 @@ impl Expr {
                     Some(res) => apply_integer(current, ctx, res, out),
                     None => apply_float(current, ctx, a as f64 + b as f64, out),
                 },
-                (&Value::Float(a), &Value::Float(b)) => {
-                    apply_float(current, ctx, a + b, out)
-                }
-                (&Value::Float(a), _) => {
-                    apply_float(current, ctx, a + b.as_float(), out)
-                }
-                (_, &Value::Float(b)) => {
-                    apply_float(current, ctx, a.as_float() + b, out)
-                }
-                (_, _) => {
-                    apply_float(current, ctx, a.as_float() + b.as_float(), out)
-                }
+                (&Value::Float(a), &Value::Float(b)) => apply_float(current, ctx, a + b, out),
+                (&Value::Float(a), _) => apply_float(current, ctx, a + b.as_float(), out),
+                (_, &Value::Float(b)) => apply_float(current, ctx, a.as_float() + b, out),
+                (_, _) => apply_float(current, ctx, a.as_float() + b.as_float(), out),
             }
         }
 
         #[inline]
-        fn sub(current: &NodeRef, ctx: Context, a: &NodeRef, b: &NodeRef, out: &mut NodeBuf) -> ApplyResult {
+        fn sub(
+            current: &NodeRef,
+            ctx: Context,
+            a: &NodeRef,
+            b: &NodeRef,
+            out: &mut NodeBuf,
+        ) -> ApplyResult {
             let a = a.data();
             let b = b.data();
             match (a.value(), b.value()) {
@@ -1053,23 +1082,21 @@ impl Expr {
                         apply_float(current, ctx, f64::NAN, out)
                     }
                 }
-                (&Value::Float(a), &Value::Float(b)) => {
-                    apply_float(current, ctx, a - b, out)
-                }
-                (&Value::Float(a), _) => {
-                    apply_float(current, ctx, a - b.as_float(), out)
-                }
-                (_, &Value::Float(b)) => {
-                    apply_float(current, ctx, a.as_float() - b, out)
-                }
-                (_, _) => {
-                    apply_float(current, ctx, a.as_float() - b.as_float(), out)
-                }
+                (&Value::Float(a), &Value::Float(b)) => apply_float(current, ctx, a - b, out),
+                (&Value::Float(a), _) => apply_float(current, ctx, a - b.as_float(), out),
+                (_, &Value::Float(b)) => apply_float(current, ctx, a.as_float() - b, out),
+                (_, _) => apply_float(current, ctx, a.as_float() - b.as_float(), out),
             }
         }
 
         #[inline]
-        fn mul(current: &NodeRef, ctx: Context, a: &NodeRef, b: &NodeRef, out: &mut NodeBuf) -> ApplyResult {
+        fn mul(
+            current: &NodeRef,
+            ctx: Context,
+            a: &NodeRef,
+            b: &NodeRef,
+            out: &mut NodeBuf,
+        ) -> ApplyResult {
             let a = a.data();
             let b = b.data();
             match (a.value(), b.value()) {
@@ -1098,23 +1125,21 @@ impl Expr {
                         apply_float(current, ctx, f64::NAN, out)
                     }
                 }
-                (&Value::Float(a), &Value::Float(b)) => {
-                    apply_float(current, ctx, a * b, out)
-                }
-                (&Value::Float(a), _) => {
-                    apply_float(current, ctx, a * b.as_float(), out)
-                }
-                (_, &Value::Float(b)) => {
-                    apply_float(current, ctx, a.as_float() * b, out)
-                }
-                (_, _) => {
-                    apply_float(current, ctx, a.as_float() * b.as_float(), out)
-                }
+                (&Value::Float(a), &Value::Float(b)) => apply_float(current, ctx, a * b, out),
+                (&Value::Float(a), _) => apply_float(current, ctx, a * b.as_float(), out),
+                (_, &Value::Float(b)) => apply_float(current, ctx, a.as_float() * b, out),
+                (_, _) => apply_float(current, ctx, a.as_float() * b.as_float(), out),
             }
         }
 
         #[inline]
-        fn div(current: &NodeRef, ctx: Context, a: &NodeRef, b: &NodeRef, out: &mut NodeBuf) -> ApplyResult {
+        fn div(
+            current: &NodeRef,
+            ctx: Context,
+            a: &NodeRef,
+            b: &NodeRef,
+            out: &mut NodeBuf,
+        ) -> ApplyResult {
             let a = a.data();
             let b = b.data();
             match (a.value(), b.value()) {
@@ -1132,18 +1157,10 @@ impl Expr {
                         apply_float(current, ctx, f64::NAN, out)
                     }
                 }
-                (&Value::Float(a), &Value::Float(b)) => {
-                    apply_float(current, ctx, a / b, out)
-                }
-                (&Value::Float(a), _) => {
-                    apply_float(current, ctx, a / b.as_float(), out)
-                }
-                (_, &Value::Float(b)) => {
-                    apply_float(current, ctx, a.as_float() / b, out)
-                }
-                (_, _) => {
-                    apply_float(current, ctx, a.as_float() / b.as_float(), out)
-                }
+                (&Value::Float(a), &Value::Float(b)) => apply_float(current, ctx, a / b, out),
+                (&Value::Float(a), _) => apply_float(current, ctx, a / b.as_float(), out),
+                (_, &Value::Float(b)) => apply_float(current, ctx, a.as_float() / b, out),
+                (_, _) => apply_float(current, ctx, a.as_float() / b.as_float(), out),
             }
         }
 
@@ -1229,10 +1246,14 @@ impl Expr {
                 },
                 out,
             ),
-            Expr::Root => {out.add(env.root().clone());
-            Ok(())},
-            Expr::Current => {out.add(env.current().clone());
-            Ok(())},
+            Expr::Root => {
+                out.add(env.root().clone());
+                Ok(())
+            }
+            Expr::Current => {
+                out.add(env.current().clone());
+                Ok(())
+            }
             Expr::Parent => {
                 if let Some(p) = env.current().data().parent() {
                     out.add(p);
@@ -1286,12 +1307,8 @@ impl Expr {
                 }
                 _ => unreachable!(),
             },
-            Expr::Property(ref e) => {
-                e.apply_to(env, Context::Property, out)
-            }
-            Expr::Index(ref e) => {
-                e.apply_to(env, Context::Index, out)
-            }
+            Expr::Property(ref e) => e.apply_to(env, Context::Property, out),
+            Expr::Index(ref e) => e.apply_to(env, Context::Index, out),
             Expr::Range(ref r) => {
                 fn get_opt_float(env: Env<'_>, e: Option<&Expr>) -> OpathResult<Option<f64>> {
                     match e {
@@ -1409,19 +1426,23 @@ impl Expr {
             }
             Expr::MethodCall(ref call) => {
                 match func::apply_method_to(call.id(), call.args(), env, ctx, out) {
-                    Ok(()) => {Ok(())}
+                    Ok(()) => Ok(()),
                     Err(e) => {
-                        let detail = OpathErrorDetail::MethodCallError { name: call.id().clone()};
+                        let detail = OpathErrorDetail::MethodCallError {
+                            name: call.id().clone(),
+                        };
                         let diag = BasicDiag::with_cause(detail, e);
                         return Err(diag);
-                    },
+                    }
                 }
             }
             Expr::FuncCall(ref call) => {
                 match func::apply_func_to(call.id(), call.args(), env, ctx, out) {
-                    Ok(()) => {Ok(())}
+                    Ok(()) => Ok(()),
                     Err(e) => {
-                        let detail = OpathErrorDetail::FunctionCallError { name: call.id().clone()};
+                        let detail = OpathErrorDetail::FunctionCallError {
+                            name: call.id().clone(),
+                        };
                         let diag = BasicDiag::with_cause(detail, e);
                         return Err(diag);
                     }
@@ -1431,14 +1452,14 @@ impl Expr {
                 if let Some(scope) = env.scope() {
                     let res = e.apply(env, Context::Expr)?;
                     match res {
-                        NodeSet::Empty => {Ok(())}
+                        NodeSet::Empty => Ok(()),
                         NodeSet::One(n) => {
                             if let Some(var) = scope.get_var(&n.data().as_string()) {
                                 out.add_all(&var);
                             }
                             Ok(())
                         }
-                        _ => {unimplemented!()} //FIXME (jc) probably report error?
+                        _ => unimplemented!(), //FIXME (jc) probably report error?
                     }
                 } else {
                     Ok(())
@@ -1447,7 +1468,7 @@ impl Expr {
             Expr::Env(ref e) => {
                 let res = e.apply(env, Context::Expr)?;
                 match res {
-                    NodeSet::Empty => {unimplemented!()} //FIXME (jc) probably report error?
+                    NodeSet::Empty => unimplemented!(), //FIXME (jc) probably report error?
                     NodeSet::One(node) => {
                         let var_name = node.as_string();
                         let res = std::env::var(var_name).unwrap_or(String::new());

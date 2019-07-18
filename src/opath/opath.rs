@@ -144,7 +144,12 @@ impl Opath {
             .apply(Env::new(root, current, None), Context::Expr)
     }
 
-    pub fn apply_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> OpathResult<NodeSet> {
+    pub fn apply_ext(
+        &self,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+    ) -> OpathResult<NodeSet> {
         let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
         self.expr
             .apply(Env::new(root, current, Some(scope)), Context::Expr)
@@ -163,7 +168,12 @@ impl Opath {
         Ok(res)
     }
 
-    pub fn apply_one_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> OpathResult<NodeRef> {
+    pub fn apply_one_ext(
+        &self,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+    ) -> OpathResult<NodeRef> {
         let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
         let res = self
             .expr
