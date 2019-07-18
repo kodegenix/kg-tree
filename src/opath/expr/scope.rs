@@ -114,13 +114,14 @@ trait ScopeImpl: Sized {
             Some(v) => match *v {
                 NodeSet::One(ref n) => Ok(T::get(n)),
                 _ => {
-                    Err(OpathErrorDetail::Undef(line!()))
-                }, //FIXME (jc): expected single result
+                    let diag = BasicDiag::new(OpathErrorDetail::MultipleVarValues {var_name: var.to_string()});
+                    Err(diag)
+                },
             },
             None => {
-
-                Err(OpathErrorDetail::Undef(line!()))
-            }, //FIXME (jc): variable not found
+                let diag = BasicDiag::new(OpathErrorDetail::VariableNotFound {var_name: var.to_string()});
+                Err(diag)
+            },
         }
     }
 
@@ -234,7 +235,7 @@ impl Scope {
         ScopeImpl::get_var(self, var)
     }
 
-    pub fn get_var_value<T: Primitive>(&self, var: &str) -> Result<T, OpathErrorDetail> {
+    pub fn get_var_value<T: Primitive>(&self, var: &str) -> OpathResult<T> {
         ScopeImpl::get_var_value(self, var)
     }
 
@@ -309,7 +310,7 @@ impl ScopeMut {
         ScopeImpl::get_var(self, var)
     }
 
-    pub fn get_var_value<T: Primitive>(&self, var: &str) -> Result<T, OpathErrorDetail> {
+    pub fn get_var_value<T: Primitive>(&self, var: &str) -> OpathResult<T> {
         ScopeImpl::get_var_value(self, var)
     }
 

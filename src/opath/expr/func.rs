@@ -286,31 +286,31 @@ impl<'a> Args<'a> {
         Ok(())
     }
 
-    pub fn resolve(&self, consumable: bool, env: Env) -> Vec<NodeSet> {
+    pub fn resolve(&self, consumable: bool, env: Env) -> OpathResult<Vec<NodeSet>> {
         let mut values = Vec::new();
         for arg in self.args.iter() {
             let mut out = NodeBuf::new();
-            arg.apply_to(env, Context::Expr, &mut out);
+            arg.apply_to(env, Context::Expr, &mut out)?;
             out.make_consumable(consumable);
             values.push(out.into_node_set());
         }
-        values
+        Ok(values)
     }
 
-    pub fn resolve_flat(&self, consumable: bool, env: Env) -> NodeSet {
+    pub fn resolve_flat(&self, consumable: bool, env: Env) -> OpathResult<NodeSet> {
         let mut values = NodeBuf::new();
         for arg in self.args.iter() {
-            arg.apply_to(env, Context::Expr, &mut values);
+            arg.apply_to(env, Context::Expr, &mut values)?;
         }
         values.make_consumable(consumable);
-        values.into_node_set()
+        Ok(values.into_node_set())
     }
 
-    pub fn resolve_column(&self, consumable: bool, column: usize, env: Env) -> NodeSet {
+    pub fn resolve_column(&self, consumable: bool, column: usize, env: Env) -> OpathResult<NodeSet> {
         let mut values = NodeBuf::new();
-        self.args[column].apply_to(env, Context::Expr, &mut values);
+        self.args[column].apply_to(env, Context::Expr, &mut values)?;
         values.make_consumable(consumable);
-        values.into_node_set()
+        Ok(values.into_node_set())
     }
 
     pub fn resolve_rows(
@@ -319,7 +319,7 @@ impl<'a> Args<'a> {
         max_cols: Option<usize>,
         default: NodeRef,
         env: Env,
-    ) -> Vec<Vec<NodeRef>> {
+    ) -> OpathResult<Vec<Vec<NodeRef>>> {
         let cols = if let Some(max) = max_cols {
             std::cmp::min(max, self.args.len())
         } else {
@@ -331,7 +331,7 @@ impl<'a> Args<'a> {
         let mut empty = true;
         for arg in self.args.iter() {
             let mut vals = NodeBuf::new();
-            arg.apply_to(env, Context::Expr, &mut vals);
+            arg.apply_to(env, Context::Expr, &mut vals)?;
             if vals.elems.len() > 0 {
                 empty = false;
             }
@@ -346,7 +346,7 @@ impl<'a> Args<'a> {
             }
         }
         if empty {
-            Vec::new()
+            Ok(Vec::new())
         } else {
             if min_len == std::usize::MAX {
                 min_len = 1;
@@ -370,7 +370,7 @@ impl<'a> Args<'a> {
                 }
                 rows.push(columns);
             }
-            rows
+            Ok(rows)
         }
     }
 
@@ -379,7 +379,7 @@ impl<'a> Args<'a> {
         consumable: bool,
         max_cols: Option<usize>,
         env: Env,
-    ) -> Vec<Vec<NodeRef>> {
+    ) -> OpathResult<Vec<Vec<NodeRef>>> {
         self.resolve_rows(consumable, max_cols, NodeRef::null(), env)
     }
 }
@@ -516,6 +516,7 @@ pub(super) fn apply_func_to(
 ) -> FuncCallResult {
     match *id {
         FuncId::Array => {
+            // FIXME which error?
             let values = args.resolve_flat(true, env);
             out.add(NodeRef::array(values.into_iter().collect()));
             Ok(())

@@ -19,13 +19,23 @@ pub type ApplyResult = OpathResult<()>;
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 600)]
 pub enum OpathErrorDetail {
-    #[display(fmt = "Error calling '{name}'")]
+    #[display(fmt = "Error calling method '{name}'")]
     MethodCallError {
         name: MethodId,
     },
-    #[display(fmt = "Error calling '{name}'")]
+    #[display(fmt = "Error calling function '{name}'")]
     FunctionCallError {
         name: FuncId,
+    },
+
+    #[display(fmt = "Expected single value in variable: '{var_name}'")]
+    MultipleVarValues {
+        var_name: String,
+    },
+
+    #[display(fmt = "Variable not found: '{var_name}'")]
+    VariableNotFound {
+        var_name: String,
     },
 }
 
