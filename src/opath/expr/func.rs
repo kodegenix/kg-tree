@@ -1,12 +1,15 @@
 use super::*;
-use crate::opath::expr::func::FuncCallErr::{
+use crate::opath::expr::func::FuncCallErrorDetail::{
     FuncCallCustomErr, MethodCallCustomErr, NonBinaryNode, RegexParseError,
 };
+pub type FuncCallError = BasicDiag;
+
+pub type FuncCallResult = Result<(), FuncCallError>;
 
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 100)]
 #[allow(dead_code)]
-pub enum FuncCallErr {
+pub enum FuncCallErrorDetail {
     #[display(fmt = "unknown function '{name}'")]
     UnknownFunc { name: String },
     #[display(fmt = "unknown method '{name}' for type '{kind}'")]
@@ -77,10 +80,6 @@ pub enum FuncCallErr {
     #[display(fmt = "error while calling function '{id}': {err}")]
     FuncCallCustomErr { id: FuncId, err: Box<dyn Diag> },
 }
-
-pub type FuncCallError = BasicDiag;
-
-pub type FuncCallResult = Result<(), FuncCallError>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FuncId {
@@ -226,7 +225,7 @@ impl<'a> Args<'a> {
         let count = self.count() as u32;
         if min == max {
             if count != min {
-                return Err(basic_diag!(FuncCallErr::FuncCallInvalidArgCount {
+                return Err(basic_diag!(FuncCallErrorDetail::FuncCallInvalidArgCount {
                     id: id.clone(),
                     required: min,
                     supplied: count
@@ -234,7 +233,7 @@ impl<'a> Args<'a> {
             }
         } else if min < max {
             if count < min || count > max {
-                return Err(basic_diag!(FuncCallErr::FuncCallInvalidArgCountRange {
+                return Err(basic_diag!(FuncCallErrorDetail::FuncCallInvalidArgCountRange {
                     id: id.clone(),
                     required_min: min,
                     required_max: max,
@@ -243,7 +242,7 @@ impl<'a> Args<'a> {
             }
         } else {
             if count < min {
-                return Err(basic_diag!(FuncCallErr::FuncCallInvalidArgCountMin {
+                return Err(basic_diag!(FuncCallErrorDetail::FuncCallInvalidArgCountMin {
                     id: id.clone(),
                     required_min: min,
                     supplied: count
@@ -263,7 +262,7 @@ impl<'a> Args<'a> {
         let count = self.count() as u32;
         if min == max {
             if count != min {
-                return Err(basic_diag!(FuncCallErr::MethodCallInvalidArgCount {
+                return Err(basic_diag!(FuncCallErrorDetail::MethodCallInvalidArgCount {
                     id: id.clone(),
                     kind,
                     required: min,
@@ -272,7 +271,7 @@ impl<'a> Args<'a> {
             }
         } else if min < max {
             if count < min || count > max {
-                return Err(basic_diag!(FuncCallErr::MethodCallInvalidArgCountRange {
+                return Err(basic_diag!(FuncCallErrorDetail::MethodCallInvalidArgCountRange {
                     id: id.clone(),
                     kind,
                     required_min: min,
@@ -282,7 +281,7 @@ impl<'a> Args<'a> {
             }
         } else {
             if count < min {
-                return Err(basic_diag!(FuncCallErr::MethodCallInvalidArgCountMin {
+                return Err(basic_diag!(FuncCallErrorDetail::MethodCallInvalidArgCountMin {
                     id: id.clone(),
                     kind,
                     required_min: min,
@@ -856,7 +855,7 @@ pub(super) fn apply_func_to(
                     return func.call(name, args, env, out);
                 }
             }
-            Err(basic_diag!(FuncCallErr::UnknownFunc {
+            Err(basic_diag!(FuncCallErrorDetail::UnknownFunc {
                 name: name.to_string()
             }))
         }
@@ -890,7 +889,7 @@ pub(super) fn apply_method_to(
 
             Ok(())
         } else {
-            Err(basic_diag!(FuncCallErr::UnknownMethod {
+            Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                 name: id.name().to_string(),
                 kind,
             }))
@@ -925,7 +924,7 @@ pub(super) fn apply_method_to(
 
             Ok(())
         } else {
-            Err(basic_diag!(FuncCallErr::UnknownMethod {
+            Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                 name: id.name().to_string(),
                 kind,
             }))
@@ -956,7 +955,7 @@ pub(super) fn apply_method_to(
                 out.add(NodeRef::integer(p.len() as i64));
                 Ok(())
             }
-            _ => Err(basic_diag!(FuncCallErr::UnknownMethod {
+            _ => Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                 name: id.name().to_string(),
                 kind,
             })),
@@ -1030,7 +1029,7 @@ pub(super) fn apply_method_to(
                 out.add(NodeRef::string(s));
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod {
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                     name: id.name().to_string(),
                     kind: env.current().data().kind()
                 }))
@@ -1128,7 +1127,7 @@ pub(super) fn apply_method_to(
 
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod {
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                     name: id.name().to_string(),
                     kind,
                 }))
@@ -1162,7 +1161,7 @@ pub(super) fn apply_method_to(
 
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod {
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                     name: id.name().to_string(),
                     kind,
                 }))
@@ -1218,7 +1217,7 @@ pub(super) fn apply_method_to(
                 }
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod {
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                     name: id.name().to_string(),
                     kind,
                 }))
@@ -1232,7 +1231,7 @@ pub(super) fn apply_method_to(
                     }
                 }
             }
-            Err(basic_diag!(FuncCallErr::UnknownMethod {
+            Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                 name: name.to_string(),
                 kind,
             }))
@@ -1278,7 +1277,7 @@ pub(super) fn apply_method_to(
                 out.add(NodeRef::string(result));
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod {
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                     name: id.name().to_string(),
                     kind,
                 }))
@@ -1308,7 +1307,7 @@ pub(super) fn apply_method_to(
                 }
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod {
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                     name: id.name().to_string(),
                     kind,
                 }))
@@ -1986,7 +1985,7 @@ mod tests {
                     out: &mut NodeBuf,
                 ) -> FuncCallResult {
                     if !env.current().is_string() {
-                        Err(basic_diag!(FuncCallErr::UnknownMethod {
+                        Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                             name: name.into(),
                             kind: env.current().data().kind(),
                         }))

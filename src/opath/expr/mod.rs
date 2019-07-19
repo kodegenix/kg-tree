@@ -8,6 +8,8 @@ pub use self::scope::{Scope, ScopeMut};
 pub(super) mod func;
 pub(super) mod parse;
 
+pub use func::FuncCallErrorDetail;
+
 mod scope;
 
 pub type ExprError = BasicDiag;
