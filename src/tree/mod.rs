@@ -9,23 +9,42 @@ use serde::ser::{SerializeMap, SerializeSeq};
 
 use super::opath::Opath;
 use super::*;
+use crate::tree::TreeErrorDetail::{
+    AddChildInvalidType, ExtendIncompatibleTypes, RemoveChildInvalidType,
+};
+use std::str::Utf8Error;
 
 pub mod convert;
 pub mod metadata;
 pub mod node;
 
-//FIXME (jc) error handling
-#[derive(Debug)]
-pub enum ErrorKind {
-    Io,
-    Undef(u32),
-}
+pub type TreeError = BasicDiag;
+pub type TreeResult<T> = Result<T, TreeError>;
 
-impl From<kg_io::error::IoError> for ErrorKind {
-    fn from(err: kg_io::error::IoError) -> Self {
-        eprintln!("{}", err);
-        ErrorKind::Io
-    }
+#[derive(Debug, Display, Detail)]
+#[diag(code_offset = 700)]
+pub enum TreeErrorDetail {
+    #[display(fmt = "cannot add child to type '{kind}'")]
+    AddChildInvalidType { kind: Kind },
+
+    #[display(fmt = "cannot set child on type '{kind}'")]
+    SetChildInvalidType { kind: Kind },
+
+    #[display(fmt = "cannot remove child from type '{kind}'")]
+    RemoveChildInvalidType { kind: Kind },
+
+    #[display(fmt = "cannot extend {target} with {source}'")]
+    ExtendIncompatibleTypes { target: Kind, source: Kind },
+
+    #[display(
+        fmt = "cannot build node from bytes, invalid utf-8 sequence. Valid up to '{valid}' position.",
+        valid = "err.valid_up_to()"
+    )]
+    NonUtf8Node { err: Utf8Error },
+
+    //FIXME ws to be removed
+    #[display(fmt = "Error in line '{a0}'")]
+    Undef(u32),
 }
 
 #[derive(Debug)]
@@ -134,27 +153,27 @@ impl NodeRef {
     }
 
     //FIXME (jc) error handling
-    pub fn from_str(s: Cow<'_, str>, format: FileFormat) -> Result<NodeRef, ErrorKind> {
+    pub fn from_str(s: Cow<'_, str>, format: FileFormat) -> TreeResult<NodeRef> {
         match format {
             FileFormat::Json => match NodeRef::from_json(&s) {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
             },
             FileFormat::Yaml => match NodeRef::from_yaml(&s) {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
             },
             FileFormat::Toml => match NodeRef::from_toml(&s) {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
             },
             FileFormat::Text => Ok(NodeRef::string(s)),
@@ -163,14 +182,11 @@ impl NodeRef {
     }
 
     //FIXME (jc) error handling
-    pub fn from_bytes(s: &[u8], format: FileFormat) -> Result<NodeRef, ErrorKind> {
-        fn to_str(s: &[u8]) -> Result<&str, ErrorKind> {
+    pub fn from_bytes(s: &[u8], format: FileFormat) -> TreeResult<NodeRef> {
+        fn to_str(s: &[u8]) -> TreeResult<&str> {
             match std::str::from_utf8(s) {
                 Ok(s) => Ok(s),
-                Err(err) => {
-                    println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
-                }
+                Err(err) => Err(TreeErrorDetail::NonUtf8Node { err }.into()),
             }
         }
         match format {
@@ -178,21 +194,21 @@ impl NodeRef {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
             },
             FileFormat::Yaml => match NodeRef::from_yaml(to_str(s)?) {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
             },
             FileFormat::Toml => match NodeRef::from_toml(to_str(s)?) {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
             },
             FileFormat::Text => Ok(NodeRef::string(to_str(s)?)),
@@ -201,7 +217,7 @@ impl NodeRef {
     }
 
     //FIXME (jc) error handling
-    pub fn from_file(file_path: &Path, format: Option<FileFormat>) -> Result<NodeRef, ErrorKind> {
+    pub fn from_file(file_path: &Path, format: Option<FileFormat>) -> TreeResult<NodeRef> {
         use kg_io::*;
 
         let file_path_ = if file_path.is_absolute() {
@@ -375,7 +391,8 @@ impl NodeRef {
         index: Option<usize>,
         key: Option<Symbol>,
         value: NodeRef,
-    ) -> Result<Option<NodeRef>, ErrorKind> {
+    ) -> TreeResult<Option<NodeRef>> {
+        let kind = self.data().kind();
         let n = match *self.data_mut().value_mut() {
             Value::Array(ref mut elems) => {
                 match index {
@@ -394,7 +411,10 @@ impl NodeRef {
                     None
                 }
             }
-            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+            _ => {
+                let detail = AddChildInvalidType { kind };
+                return Err(detail.into());
+            }
         };
 
         self.update_children_metadata();
@@ -410,7 +430,9 @@ impl NodeRef {
         index: Option<usize>,
         key: Option<Symbol>,
         value: NodeRef,
-    ) -> Result<Option<NodeRef>, ErrorKind> {
+    ) -> TreeResult<Option<NodeRef>> {
+        let kind = self.data().kind();
+
         let n = match *self.data_mut().value_mut() {
             Value::Array(ref mut elems) => {
                 match index {
@@ -429,7 +451,10 @@ impl NodeRef {
                     None
                 }
             }
-            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+            _ => {
+                let detail = AddChildInvalidType { kind };
+                return Err(detail.into());
+            }
         };
 
         self.update_children_metadata();
@@ -440,11 +465,12 @@ impl NodeRef {
         Ok(n)
     }
 
-    pub fn add_children<'a, I>(&self, drop: bool, mut items: I) -> Result<Vec<NodeRef>, ErrorKind>
+    pub fn add_children<'a, I>(&self, drop: bool, mut items: I) -> TreeResult<Vec<NodeRef>>
     where
         I: Iterator<Item = (Option<usize>, Option<Symbol>, NodeRef)>,
     {
         let mut res = Vec::new();
+        let kind = self.data().kind();
 
         match *self.data_mut().value_mut() {
             Value::Array(ref mut elems) => {
@@ -474,7 +500,10 @@ impl NodeRef {
                     }
                 }
             }
-            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+            _ => {
+                let detail = AddChildInvalidType { kind };
+                return Err(detail.into());
+            }
         }
 
         self.update_children_metadata();
@@ -486,7 +515,9 @@ impl NodeRef {
         &self,
         index: Option<usize>,
         key: Option<Cow<'_, str>>,
-    ) -> Result<Option<NodeRef>, ErrorKind> {
+    ) -> TreeResult<Option<NodeRef>> {
+        let kind = self.data().kind();
+
         let n = match *self.data_mut().value_mut() {
             Value::Array(ref mut elems) => match index {
                 Some(i) => {
@@ -507,7 +538,10 @@ impl NodeRef {
                     None
                 }
             }
-            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+            _ => {
+                let detail = RemoveChildInvalidType { kind };
+                return Err(detail.into());
+            }
         };
 
         if let Some(ref n) = n {
@@ -521,10 +555,11 @@ impl NodeRef {
         &self,
         drop: bool,
         mut items: I,
-    ) -> Result<Vec<NodeRef>, ErrorKind>
+    ) -> Result<Vec<NodeRef>, TreeErrorDetail>
     where
         I: Iterator<Item = (Option<usize>, Option<Cow<'a, str>>)>,
     {
+        let kind = self.data().kind();
         let mut res = Vec::new();
 
         match *self.data_mut().value_mut() {
@@ -567,7 +602,10 @@ impl NodeRef {
                     }
                 }
             }
-            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+            _ => {
+                let detail = RemoveChildInvalidType { kind };
+                return Err(detail.into());
+            }
         };
 
         self.update_children_metadata();
@@ -576,7 +614,7 @@ impl NodeRef {
     }
 
     #[inline]
-    fn extend_internal(&self, o: NodeRef, index: Option<usize>) -> Result<bool, ErrorKind> {
+    fn extend_internal(&self, o: NodeRef, index: Option<usize>) -> TreeResult<bool> {
         if !self.is_ref_eq(&o) {
             let mut n = self.data_mut();
             let mut o = o.data_mut();
@@ -608,7 +646,14 @@ impl NodeRef {
                         }
                     }
                 }
-                _ => return Err(ErrorKind::Undef(line!())), // incompatible types
+                _ => {
+                    // incompatible types
+                    let detail = ExtendIncompatibleTypes {
+                        target: n.kind(),
+                        source: o.kind(),
+                    };
+                    return Err(detail.into());
+                }
             }
             Ok(true)
         } else {
@@ -616,14 +661,14 @@ impl NodeRef {
         }
     }
 
-    pub fn extend(&self, o: NodeRef, index: Option<usize>) -> Result<(), ErrorKind> {
+    pub fn extend(&self, o: NodeRef, index: Option<usize>) -> TreeResult<()> {
         if self.extend_internal(o, index)? {
             self.update_children_metadata();
         }
         Ok(())
     }
 
-    pub fn extend_multiple<I>(&self, mut extends: I) -> Result<(), ErrorKind>
+    pub fn extend_multiple<I>(&self, mut extends: I) -> TreeResult<()>
     where
         I: Iterator<Item = (NodeRef, Option<usize>)>,
     {

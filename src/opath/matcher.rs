@@ -24,7 +24,7 @@ impl NodePathMatcher {
         self.paths.insert(path);
     }
 
-    pub fn resolve(&mut self, expr: &Opath, root: &NodeRef, current: &NodeRef) -> OpathResult<()> {
+    pub fn resolve(&mut self, expr: &Opath, root: &NodeRef, current: &NodeRef) -> ExprResult<()> {
         let res = expr.apply(root, current)?;
         for ref n in res {
             self.insert(n);
@@ -38,7 +38,7 @@ impl NodePathMatcher {
         root: &NodeRef,
         current: &NodeRef,
         cache: &mut dyn OpathCache,
-    ) -> OpathResult<()> {
+    ) -> ExprResult<()> {
         let res = expr.apply(root, current)?;
         for ref n in res {
             self.insert_cache(n, cache);
@@ -52,7 +52,7 @@ impl NodePathMatcher {
         root: &NodeRef,
         current: &NodeRef,
         scope: &Scope,
-    ) -> OpathResult<()> {
+    ) -> ExprResult<()> {
         let res = expr.apply_ext(root, current, scope)?;
         for ref n in res {
             self.insert(n);
@@ -67,7 +67,7 @@ impl NodePathMatcher {
         current: &NodeRef,
         scope: &Scope,
         cache: &mut dyn OpathCache,
-    ) -> OpathResult<()> {
+    ) -> ExprResult<()> {
         let res = expr.apply_ext(root, current, scope)?;
         for ref n in res {
             self.insert_cache(n, cache);

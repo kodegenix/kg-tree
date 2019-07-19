@@ -1,4 +1,5 @@
 use super::*;
+use crate::opath::expr::ExprErrorDetail::InterpolationDepthReached;
 
 pub trait ResolveStrategy {
     fn resolve_interpolation(
@@ -7,7 +8,7 @@ pub trait ResolveStrategy {
         node: &NodeRef,
         parent: &NodeRef,
         root: &NodeRef,
-    ) -> OpathResult<Option<NodeRef>>;
+    ) -> ExprResult<Option<NodeRef>>;
 }
 
 #[derive(Debug)]
@@ -20,7 +21,7 @@ impl ResolveStrategy for DefaultResolveStrategy {
         _node: &NodeRef,
         parent: &NodeRef,
         root: &NodeRef,
-    ) -> OpathResult<Option<NodeRef>> {
+    ) -> ExprResult<Option<NodeRef>> {
         interpolation.resolve(root, parent)
     }
 }
@@ -35,7 +36,7 @@ impl ResolveStrategy for RootedResolveStrategy {
         _node: &NodeRef,
         _parent: &NodeRef,
         root: &NodeRef,
-    ) -> OpathResult<Option<NodeRef>> {
+    ) -> ExprResult<Option<NodeRef>> {
         interpolation.resolve(root, root)
     }
 }
@@ -64,11 +65,11 @@ impl TreeResolver {
         TreeResolver { parser }
     }
 
-    pub fn resolve(&mut self, root: &NodeRef) -> OpathResult<()> {
+    pub fn resolve(&mut self, root: &NodeRef) -> ExprResult<()> {
         self.resolve_custom(DefaultResolveStrategy, root)
     }
 
-    pub fn resolve_custom<P>(&mut self, mut strategy: P, root: &NodeRef) -> OpathResult<()>
+    pub fn resolve_custom<P>(&mut self, mut strategy: P, root: &NodeRef) -> ExprResult<()>
     where
         P: ResolveStrategy,
     {
@@ -97,7 +98,7 @@ impl TreeResolver {
         loop {
             iter += 1;
             if iter == 100 {
-                panic!("too many iterations while resolving interpolations"); //FIXME (jc) add proper error handling
+                return Err(InterpolationDepthReached { depth: 100 }.into());
             }
 
             let mut change = false;

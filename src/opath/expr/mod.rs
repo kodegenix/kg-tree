@@ -10,25 +10,32 @@ pub(super) mod parse;
 
 mod scope;
 
-pub type OpathError = BasicDiag;
+pub type ExprError = BasicDiag;
 
-pub type OpathResult<T> = Result<T, OpathError>;
-pub type ApplyResult = OpathResult<()>;
+pub type ExprResult<T> = Result<T, ExprError>;
+pub type ApplyResult = ExprResult<()>;
 
-//FIXME (jc)
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 600)]
-pub enum OpathErrorDetail {
-    #[display(fmt = "Error calling method '{name}'")]
-    MethodCallError { name: MethodId },
-    #[display(fmt = "Error calling function '{name}'")]
-    FunctionCallError { name: FuncId },
-
-    #[display(fmt = "Expected single value in variable: '{var_name}'")]
+pub enum ExprErrorDetail {
+    #[display(fmt = "expected single value in variable: '{var_name}'")]
     MultipleVarValues { var_name: String },
 
-    #[display(fmt = "Variable not found: '{var_name}'")]
+    #[display(fmt = "variable not found: '{var_name}'")]
     VariableNotFound { var_name: String },
+
+    // This variant should probably be placed in resolve.rs module
+    #[display(fmt = "too many iterations while resolving interpolations: '{depth}'")]
+    InterpolationDepthReached { depth: usize },
+
+    #[display(fmt = "error calling method '{id}': {detail}", detail = "err.detail()")]
+    MethodCallError { id: MethodId, err: Box<dyn Diag> },
+
+    #[display(
+        fmt = "error calling function '{id}': {detail}",
+        detail = "err.detail()"
+    )]
+    FuncCallError { id: FuncId, err: Box<dyn Diag> },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -512,7 +519,7 @@ impl Expr {
         unsafe { *std::mem::transmute::<&Expr, &u8>(self) }
     }
 
-    fn apply_to(&self, env: Env<'_>, ctx: Context, out: &mut NodeBuf) -> OpathResult<()> {
+    fn apply_to(&self, env: Env<'_>, ctx: Context, out: &mut NodeBuf) -> ExprResult<()> {
         use std::{f64, i64};
 
         #[inline]
@@ -1310,7 +1317,7 @@ impl Expr {
             Expr::Property(ref e) => e.apply_to(env, Context::Property, out),
             Expr::Index(ref e) => e.apply_to(env, Context::Index, out),
             Expr::Range(ref r) => {
-                fn get_opt_float(env: Env<'_>, e: Option<&Expr>) -> OpathResult<Option<f64>> {
+                fn get_opt_float(env: Env<'_>, e: Option<&Expr>) -> ExprResult<Option<f64>> {
                     match e {
                         None => Ok(None),
                         Some(e) => Ok(Some(e.apply_one(env, Context::Expr)?.as_float())),
@@ -1428,11 +1435,11 @@ impl Expr {
                 match func::apply_method_to(call.id(), call.args(), env, ctx, out) {
                     Ok(()) => Ok(()),
                     Err(e) => {
-                        let detail = OpathErrorDetail::MethodCallError {
-                            name: call.id().clone(),
+                        let detail = ExprErrorDetail::MethodCallError {
+                            id: call.id().clone(),
+                            err: Box::new(e),
                         };
-                        let diag = BasicDiag::with_cause(detail, e);
-                        return Err(diag);
+                        return Err(detail.into());
                     }
                 }
             }
@@ -1440,11 +1447,11 @@ impl Expr {
                 match func::apply_func_to(call.id(), call.args(), env, ctx, out) {
                     Ok(()) => Ok(()),
                     Err(e) => {
-                        let detail = OpathErrorDetail::FunctionCallError {
-                            name: call.id().clone(),
+                        let detail = ExprErrorDetail::FuncCallError {
+                            id: call.id().clone(),
+                            err: Box::new(e),
                         };
-                        let diag = BasicDiag::with_cause(detail, e);
-                        return Err(diag);
+                        return Err(detail.into());
                     }
                 }
             }
@@ -1488,13 +1495,13 @@ impl Expr {
         }
     }
 
-    pub(super) fn apply(&self, env: Env<'_>, ctx: Context) -> OpathResult<NodeSet> {
+    pub(super) fn apply(&self, env: Env<'_>, ctx: Context) -> ExprResult<NodeSet> {
         let mut out = NodeBuf::new();
         self.apply_to(env, ctx, &mut out)?;
         Ok(out.into_node_set())
     }
 
-    pub(super) fn apply_one(&self, env: Env<'_>, ctx: Context) -> OpathResult<NodeRef> {
+    pub(super) fn apply_one(&self, env: Env<'_>, ctx: Context) -> ExprResult<NodeRef> {
         let n = self.apply(env, ctx)?;
         let res = match n {
             NodeSet::Empty => NodeRef::null(),

@@ -54,7 +54,7 @@ impl Interpolation {
         }
     }
 
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef) -> OpathResult<Option<NodeRef>> {
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef) -> ExprResult<Option<NodeRef>> {
         let res = match *self {
             Interpolation::Empty => None,
             Interpolation::Simple(ref s) => Some(NodeRef::string(s.as_str())),
@@ -63,7 +63,7 @@ impl Interpolation {
         Ok(res)
     }
 
-    pub fn resolve_into(self, root: &NodeRef, current: &NodeRef) -> OpathResult<Option<NodeRef>> {
+    pub fn resolve_into(self, root: &NodeRef, current: &NodeRef) -> ExprResult<Option<NodeRef>> {
         let res = match self {
             Interpolation::Empty => None,
             Interpolation::Simple(s) => Some(NodeRef::string(s.as_str())),
@@ -77,7 +77,7 @@ impl Interpolation {
         root: &NodeRef,
         current: &NodeRef,
         scope: &Scope,
-    ) -> OpathResult<Option<NodeRef>> {
+    ) -> ExprResult<Option<NodeRef>> {
         let res = match *self {
             Interpolation::Empty => None,
             Interpolation::Simple(ref s) => Some(NodeRef::string(s.as_str())),
@@ -91,7 +91,7 @@ impl Interpolation {
         root: &NodeRef,
         current: &NodeRef,
         scope: &Scope,
-    ) -> OpathResult<Option<NodeRef>> {
+    ) -> ExprResult<Option<NodeRef>> {
         let res = match self {
             Interpolation::Empty => None,
             Interpolation::Simple(s) => Some(NodeRef::string(s)),

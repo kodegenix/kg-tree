@@ -1,4 +1,7 @@
 use super::*;
+use crate::opath::expr::func::FuncCallErr::{
+    FuncCallCustomErr, MethodCallCustomErr, NonBinaryNode, RegexParseError,
+};
 
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 100)]
@@ -61,6 +64,10 @@ pub enum FuncCallErr {
         required_min: u32,
         required_max: u32,
     },
+    #[display(fmt = "cannot parse node from type {kind}")]
+    NonBinaryNode { kind: Kind },
+    #[display(fmt = "cannot parse regex: {err}")]
+    RegexParseError { err: regex::Error },
     #[display(fmt = "error while calling method '{id}' for type '{kind}': {err}")]
     MethodCallCustomErr {
         id: MethodId,
@@ -286,7 +293,7 @@ impl<'a> Args<'a> {
         Ok(())
     }
 
-    pub fn resolve(&self, consumable: bool, env: Env) -> OpathResult<Vec<NodeSet>> {
+    pub fn resolve(&self, consumable: bool, env: Env) -> ExprResult<Vec<NodeSet>> {
         let mut values = Vec::new();
         for arg in self.args.iter() {
             let mut out = NodeBuf::new();
@@ -297,7 +304,7 @@ impl<'a> Args<'a> {
         Ok(values)
     }
 
-    pub fn resolve_flat(&self, consumable: bool, env: Env) -> OpathResult<NodeSet> {
+    pub fn resolve_flat(&self, consumable: bool, env: Env) -> ExprResult<NodeSet> {
         let mut values = NodeBuf::new();
         for arg in self.args.iter() {
             arg.apply_to(env, Context::Expr, &mut values)?;
@@ -306,12 +313,7 @@ impl<'a> Args<'a> {
         Ok(values.into_node_set())
     }
 
-    pub fn resolve_column(
-        &self,
-        consumable: bool,
-        column: usize,
-        env: Env,
-    ) -> OpathResult<NodeSet> {
+    pub fn resolve_column(&self, consumable: bool, column: usize, env: Env) -> ExprResult<NodeSet> {
         let mut values = NodeBuf::new();
         self.args[column].apply_to(env, Context::Expr, &mut values)?;
         values.make_consumable(consumable);
@@ -324,7 +326,7 @@ impl<'a> Args<'a> {
         max_cols: Option<usize>,
         default: NodeRef,
         env: Env,
-    ) -> OpathResult<Vec<Vec<NodeRef>>> {
+    ) -> ExprResult<Vec<Vec<NodeRef>>> {
         let cols = if let Some(max) = max_cols {
             std::cmp::min(max, self.args.len())
         } else {
@@ -384,7 +386,7 @@ impl<'a> Args<'a> {
         consumable: bool,
         max_cols: Option<usize>,
         env: Env,
-    ) -> OpathResult<Vec<Vec<NodeRef>>> {
+    ) -> ExprResult<Vec<Vec<NodeRef>>> {
         self.resolve_rows(consumable, max_cols, NodeRef::null(), env)
     }
 }
@@ -521,8 +523,12 @@ pub(super) fn apply_func_to(
 ) -> FuncCallResult {
     match *id {
         FuncId::Array => {
-            // FIXME which error?
-            let values = args.resolve_flat(true, env);
+            let values = args
+                .resolve_flat(true, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
             out.add(NodeRef::array(values.into_iter().collect()));
             Ok(())
         }
@@ -530,7 +536,12 @@ pub(super) fn apply_func_to(
             if args.count() == 0 {
                 out.add(NodeRef::object(Properties::new()));
             } else if args.count() == 1 {
-                let values = args.resolve_column(false, 0, env);
+                let values = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?;
                 let mut map = LinkedHashMap::with_capacity(values.len());
                 for value in values.into_iter() {
                     if let Value::Object(ref props) = value.data().value() {
@@ -542,8 +553,18 @@ pub(super) fn apply_func_to(
                 out.add(NodeRef::object(map));
             } else {
                 args.check_count_func(id, 2, 2)?;
-                let keys = args.resolve_column(false, 0, env);
-                let values = args.resolve_column(true, 1, env);
+                let keys = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?;
+                let values = args
+                    .resolve_column(true, 1, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?;
                 let mut map = LinkedHashMap::with_capacity(std::cmp::min(keys.len(), values.len()));
                 for (k, v) in keys.into_iter().zip(values.into_iter()) {
                     map.insert(k.as_string().to_string().into(), v);
@@ -556,7 +577,12 @@ pub(super) fn apply_func_to(
             args.check_count_func(id, 1, 2)?;
 
             if args.count() == 1 {
-                let paths = args.resolve_column(false, 0, env);
+                let paths = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?;
                 for p in paths.into_iter() {
                     match NodeRef::from_file(&resolve_path_str(p.data().as_string().as_ref()), None)
                     {
@@ -565,8 +591,18 @@ pub(super) fn apply_func_to(
                     }
                 }
             } else {
-                let paths = args.resolve_column(false, 0, env);
-                let formats = args.resolve_column(false, 1, env);
+                let paths = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?;
+                let formats =
+                    args.resolve_column(false, 1, env)
+                        .map_err(|d| FuncCallCustomErr {
+                            id: id.clone(),
+                            err: Box::new(d),
+                        })?;
 
                 for (p, f) in paths.into_iter().zip(formats.into_iter()) {
                     let format: FileFormat = f.data().as_string().as_ref().into();
@@ -583,7 +619,12 @@ pub(super) fn apply_func_to(
         }
         FuncId::Json => {
             args.check_count_func(id, 1, 1)?;
-            let res = args.resolve_flat(false, env);
+            let res = args
+                .resolve_flat(false, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
             for n in res.into_iter() {
                 let n = n.data();
                 let s = n.as_string();
@@ -596,7 +637,12 @@ pub(super) fn apply_func_to(
         }
         FuncId::Parse => {
             args.check_count_func(id, 2, 2)?;
-            let rows = args.resolve_rows_null(false, None, env);
+            let rows = args
+                .resolve_rows_null(false, None, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
 
             for r in rows {
                 let ref content = r[0];
@@ -612,14 +658,24 @@ pub(super) fn apply_func_to(
             args.check_count_func(id, 1, 3)?;
             match args.count() {
                 1 => {
-                    let row = args.resolve_flat(false, env);
+                    let row = args
+                        .resolve_flat(false, env)
+                        .map_err(|d| FuncCallCustomErr {
+                            id: id.clone(),
+                            err: Box::new(d),
+                        })?;
                     let format = FileFormat::Json;
                     for n in row {
                         out.add(NodeRef::string(n.to_format(format, false)));
                     }
                 }
                 2 => {
-                    let rows = args.resolve_rows_null(false, None, env);
+                    let rows = args.resolve_rows_null(false, None, env).map_err(|d| {
+                        FuncCallCustomErr {
+                            id: id.clone(),
+                            err: Box::new(d),
+                        }
+                    })?;
                     for r in rows {
                         let ref n = r[0];
                         let format = {
@@ -634,7 +690,12 @@ pub(super) fn apply_func_to(
                     }
                 }
                 3 => {
-                    let rows = args.resolve_rows_null(false, None, env);
+                    let rows = args.resolve_rows_null(false, None, env).map_err(|d| {
+                        FuncCallCustomErr {
+                            id: id.clone(),
+                            err: Box::new(d),
+                        }
+                    })?;
                     for r in rows {
                         let ref n = r[0];
                         let format = {
@@ -656,7 +717,12 @@ pub(super) fn apply_func_to(
         FuncId::ParseInt => {
             args.check_count_func(id, 1, 2)?;
 
-            let strs = args.resolve_column(false, 0, env);
+            let strs = args
+                .resolve_column(false, 0, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
 
             let mut radixes_1;
             let mut radixes_2;
@@ -664,6 +730,10 @@ pub(super) fn apply_func_to(
             let radixes: &mut dyn Iterator<Item = u32> = if args.count() == 2 {
                 radixes_1 = args
                     .resolve_column(false, 1, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?
                     .into_iter()
                     .map(|r| r.as_integer().map_or(10, |base| base as u32))
                     .chain(std::iter::repeat(10u32));
@@ -694,7 +764,12 @@ pub(super) fn apply_func_to(
 
             args.check_count_func(id, 1, 1)?;
 
-            let strs = args.resolve_column(false, 0, env);
+            let strs = args
+                .resolve_column(false, 0, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
 
             for s in strs.into_iter() {
                 let s = s.data();
@@ -711,16 +786,33 @@ pub(super) fn apply_func_to(
         FuncId::ParseBinary => {
             args.check_count_func(id, 2, 2)?;
 
-            let contents = args.resolve_column(false, 0, env);
-            let formats = args.resolve_column(false, 1, env);
+            let contents = args
+                .resolve_column(false, 0, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
+            let formats = args
+                .resolve_column(false, 1, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
 
             for (c, f) in contents.into_iter().zip(formats.into_iter()) {
                 let f: NodeRef = f;
                 let c: NodeRef = c;
                 let format: FileFormat = f.data().as_string().as_ref().into();
 
-                // FIXME ws error handling
-                let bytes = c.as_binary().expect("Binary node expected");
+                let res = c.as_binary();
+
+                if res.is_none() {
+                    return Err(NonBinaryNode {
+                        kind: c.data().kind(),
+                    }
+                    .into());
+                }
+                let bytes = res.unwrap();
 
                 match NodeRef::from_bytes(bytes.as_slice(), format) {
                     Ok(n) => out.add(n),
@@ -732,7 +824,12 @@ pub(super) fn apply_func_to(
         FuncId::IsNaN => {
             args.check_count_func(id, 1, 1)?;
 
-            let nums = args.resolve_column(false, 0, env);
+            let nums = args
+                .resolve_column(false, 0, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
 
             for n in nums.into_iter() {
                 let f = n.as_float();
@@ -742,7 +839,12 @@ pub(super) fn apply_func_to(
         }
         FuncId::Sqrt => {
             args.check_count_func(id, 1, 1)?;
-            let res = args.resolve_flat(false, env);
+            let res = args
+                .resolve_flat(false, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
             for n in res.into_iter() {
                 out.add(NodeRef::float(n.as_float().sqrt()));
             }
@@ -806,7 +908,13 @@ pub(super) fn apply_method_to(
     ) -> FuncCallResult {
         if env.current().is_array() {
             args.check_count_method(id, kind, 1, 1)?;
-            let elems = args.resolve_column(true, 0, env);
+            let elems = args
+                .resolve_column(true, 0, env)
+                .map_err(|d| MethodCallCustomErr {
+                    id: id.clone(),
+                    kind,
+                    err: Box::new(d),
+                })?;
             for elem in elems.into_iter() {
                 env.current().add_child(index, None, elem).unwrap();
             }
@@ -888,7 +996,13 @@ pub(super) fn apply_method_to(
             if let Value::Array(ref elems) = *env.current().data().value() {
                 args.check_count_method(id, env.current().data().kind(), 1, 2)?;
                 let sep = {
-                    let nsep = args.resolve_column(false, 0, env);
+                    let nsep =
+                        args.resolve_column(false, 0, env)
+                            .map_err(|d| MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            })?;
                     match nsep.into_one() {
                         Some(sep) => sep.data().as_string().to_string(),
                         None => String::new(),
@@ -896,7 +1010,13 @@ pub(super) fn apply_method_to(
                 };
                 let wrap = {
                     if args.count() == 2 {
-                        let nwrap = args.resolve_column(false, 1, env);
+                        let nwrap = args.resolve_column(false, 1, env).map_err(|d| {
+                            MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            }
+                        })?;
                         match nwrap.into_one() {
                             Some(wrap) => wrap.data().as_string().to_string(),
                             None => String::new(),
@@ -919,45 +1039,65 @@ pub(super) fn apply_method_to(
         MethodId::Push => array_add(None, id, kind, args, env, out),
         MethodId::Pop => array_remove(None, id, kind, args, env, out),
         MethodId::Unshift => array_add(Some(0), id, kind, args, env, out),
-        MethodId::Shift => array_remove(Some(0), id, kind, args, env, out),
         MethodId::Find => {
             args.check_count_method(id, kind, 1, 1)?;
-            let nres = args.resolve_column(false, 0, env);
+            let nres = args
+                .resolve_column(false, 0, env)
+                .map_err(|d| MethodCallCustomErr {
+                    id: id.clone(),
+                    kind,
+                    err: Box::new(d),
+                })?;
             for n in nres.into_iter() {
                 let d = n.data();
                 let s = d.as_string();
                 if s.is_empty() {
                     out.add(env.current().clone());
                 } else if s.starts_with("@.") {
-                    match Opath::parse(&s) {
-                        Ok(opath) => {
-                            opath.expr().apply_to(env, Context::Expr, out);
-                        }
-                        Err(_) => {
-                            //FIXME (jc): how to handle parse errors here?
-                            unimplemented!()
-                        }
-                    }
+                    let opath = Opath::parse(&s).map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?;
+                    opath
+                        .expr()
+                        .apply_to(env, Context::Expr, out)
+                        .map_err(|d| MethodCallCustomErr {
+                            id: id.clone(),
+                            kind,
+                            err: Box::new(d),
+                        })?;
                 } else {
                     let s = String::with_capacity(256) + "@." + &s;
-                    match Opath::parse(&s) {
-                        Ok(opath) => {
-                            opath.expr().apply_to(env, Context::Expr, out);
-                        }
-                        Err(_) => {
-                            //FIXME (jc): how to handle parse errors here?
-                            unimplemented!()
-                        }
-                    }
+                    let opath = Opath::parse(&s).map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?;
+                    opath
+                        .expr()
+                        .apply_to(env, Context::Expr, out)
+                        .map_err(|d| MethodCallCustomErr {
+                            id: id.clone(),
+                            kind,
+                            err: Box::new(d),
+                        })?;
                 }
             }
             Ok(())
         }
+        MethodId::Shift => array_remove(Some(0), id, kind, args, env, out),
         MethodId::Set => {
             if env.current().is_object() {
                 args.check_count_method(id, kind, 2, 2)?;
 
-                let keys = args.resolve_column(false, 0, env);
+                let keys = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?;
                 let keys: Vec<_> = keys
                     .into_iter()
                     .map(|k| {
@@ -969,7 +1109,13 @@ pub(super) fn apply_method_to(
                     })
                     .collect();
 
-                let values = args.resolve_column(true, 1, env);
+                let values =
+                    args.resolve_column(true, 1, env)
+                        .map_err(|d| MethodCallCustomErr {
+                            id: id.clone(),
+                            kind,
+                            err: Box::new(d),
+                        })?;
 
                 env.current()
                     .add_children(
@@ -992,7 +1138,13 @@ pub(super) fn apply_method_to(
             if env.current().is_object() {
                 args.check_count_method(id, kind, 1, 1)?;
 
-                let keys = args.resolve_column(false, 0, env);
+                let keys = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?;
                 let keys: Vec<_> = keys
                     .into_iter()
                     .map(|k| {
@@ -1029,13 +1181,31 @@ pub(super) fn apply_method_to(
                 args.check_count_method(id, kind, 1, 2)?;
 
                 if args.count() == 1 {
-                    let values = args.resolve_column(true, 0, env);
+                    let values =
+                        args.resolve_column(true, 0, env)
+                            .map_err(|d| MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            })?;
                     env.current()
                         .extend_multiple(values.into_iter().map(|n| (n, None)))
                         .unwrap();
                 } else {
-                    let values = args.resolve_column(true, 0, env);
-                    let indices = args.resolve_column(false, 1, env);
+                    let values =
+                        args.resolve_column(true, 0, env)
+                            .map_err(|d| MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            })?;
+                    let indices =
+                        args.resolve_column(false, 1, env)
+                            .map_err(|d| MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            })?;
                     let len = env.current().data().children_count().unwrap();
                     env.current()
                         .extend_multiple(
@@ -1073,11 +1243,25 @@ pub(super) fn apply_method_to(
             if kind == Kind::String {
                 args.check_count_method(id, kind, 1, 2)?;
 
-                let re = args.resolve_column(true, 0, env).into_one().unwrap();
-                let regex = Regex::new(&re.data().as_string()).expect("regex parse error"); //FIXME (jc) regex
+                let re = args
+                    .resolve_column(true, 0, env)
+                    .map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?
+                    .into_one()
+                    .unwrap();
+                let regex =
+                    Regex::new(&re.data().as_string()).map_err(|err| RegexParseError { err })?;
                 let replacement = {
                     if args.count() == 2 {
                         args.resolve_column(true, 1, env)
+                            .map_err(|d| MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            })?
                             .into_one()
                             .unwrap()
                             .data()
@@ -1105,8 +1289,17 @@ pub(super) fn apply_method_to(
 
             if kind == Kind::String {
                 args.check_count_method(id, kind, 1, 2)?;
-                let re = args.resolve_column(true, 0, env).into_one().unwrap();
-                let regex = Regex::new(re.data().as_string().as_ref()).expect("regex parse error"); //FIXME (jc) regex
+                let re = args
+                    .resolve_column(true, 0, env)
+                    .map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?
+                    .into_one()
+                    .unwrap();
+                let regex = Regex::new(re.data().as_string().as_ref())
+                    .map_err(|err| RegexParseError { err })?;
 
                 let value = env.current().data();
                 let s = value.as_string();

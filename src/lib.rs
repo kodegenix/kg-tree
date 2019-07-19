@@ -22,7 +22,7 @@ pub use tree::convert::Primitive;
 use tree::metadata::Metadata;
 pub use tree::metadata::{FileFormat, FileInfo};
 pub use tree::node::{Kind, KindMask, Node, Value};
-pub use tree::{ErrorKind, NodeRef};
+pub use tree::{NodeRef, TreeErrorDetail};
 
 mod tree;
 

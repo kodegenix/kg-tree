@@ -109,19 +109,19 @@ trait ScopeImpl: Sized {
         }
     }
 
-    fn get_var_value<T: Primitive>(&self, var: &str) -> OpathResult<T> {
+    fn get_var_value<T: Primitive>(&self, var: &str) -> ExprResult<T> {
         match self.get_var(var) {
             Some(v) => match *v {
                 NodeSet::One(ref n) => Ok(T::get(n)),
                 _ => {
-                    let diag = BasicDiag::new(OpathErrorDetail::MultipleVarValues {
+                    let diag = BasicDiag::new(ExprErrorDetail::MultipleVarValues {
                         var_name: var.to_string(),
                     });
                     Err(diag)
                 }
             },
             None => {
-                let diag = BasicDiag::new(OpathErrorDetail::VariableNotFound {
+                let diag = BasicDiag::new(ExprErrorDetail::VariableNotFound {
                     var_name: var.to_string(),
                 });
                 Err(diag)
@@ -239,7 +239,7 @@ impl Scope {
         ScopeImpl::get_var(self, var)
     }
 
-    pub fn get_var_value<T: Primitive>(&self, var: &str) -> OpathResult<T> {
+    pub fn get_var_value<T: Primitive>(&self, var: &str) -> ExprResult<T> {
         ScopeImpl::get_var_value(self, var)
     }
 
@@ -314,7 +314,7 @@ impl ScopeMut {
         ScopeImpl::get_var(self, var)
     }
 
-    pub fn get_var_value<T: Primitive>(&self, var: &str) -> OpathResult<T> {
+    pub fn get_var_value<T: Primitive>(&self, var: &str) -> ExprResult<T> {
         ScopeImpl::get_var_value(self, var)
     }
 
