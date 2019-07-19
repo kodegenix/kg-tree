@@ -2,6 +2,7 @@
 
 [![Latest Version](https://img.shields.io/crates/v/kg-tree.svg)](https://crates.io/crates/kg-tree)
 [![Documentation](https://docs.rs/kg-tree/badge.svg)](https://docs.rs/kg-tree)
+[![Build Status](https://travis-ci.com/Kodegenix/kg-tree.svg?branch=master)](https://travis-ci.com/Kodegenix/kg-tree)
 
 Generic object tree with Opath query language, similar to XPath.
 
