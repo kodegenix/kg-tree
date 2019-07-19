@@ -93,10 +93,6 @@ impl FileInfo {
     pub fn file_format(&self) -> FileFormat {
         self.file_format
     }
-
-    pub fn deep_copy(&self) -> Rc<FileInfo> {
-        FileInfo::new(&self.file_path, self.file_type, self.file_format)
-    }
 }
 
 impl std::fmt::Display for FileInfo {
@@ -156,6 +152,7 @@ pub struct Metadata {
     index: usize,
     key: Symbol,
     file: Option<Rc<FileInfo>>,
+    span: Option<Box<Span>>,
 }
 
 impl Metadata {
@@ -165,6 +162,7 @@ impl Metadata {
             index: 0,
             key: Symbol::default(),
             file: None,
+            span: None,
         }
     }
 
@@ -207,6 +205,14 @@ impl Metadata {
         self.file = file;
     }
 
+    pub fn span(&self) -> Option<Span> {
+        self.span.as_ref().map(|s| **s)
+    }
+
+    pub fn set_span(&mut self, span: Option<Span>) {
+        self.span = span.map(|s| Box::new(s));
+    }
+
     pub (super) fn detach(&mut self) {
         self.parent = None;
         self.index = 0;
@@ -218,7 +224,8 @@ impl Metadata {
             parent: None,
             index: 0,
             key: Symbol::default(),
-            file: self.file.as_ref().map(|f| f.deep_copy()),
+            file: self.file.clone(),
+            span: self.span.clone(),
         }
     }
 }

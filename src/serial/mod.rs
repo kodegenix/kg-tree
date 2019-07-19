@@ -7,6 +7,7 @@ pub use self::ser::to_tree;
 mod error;
 mod ser;
 mod de;
+mod fmt;
 
 #[cfg(test)]
 mod tests {
