@@ -3,8 +3,6 @@ use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::rc::{Rc, Weak};
 
-use kg_io::FileType;
-
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -232,6 +230,10 @@ impl Metadata {
 
 impl HeapSizeOf for Metadata {
     fn heap_size_of_children(&self) -> usize {
-        0
+        if self.span.is_some() {
+            std::mem::size_of::<Span>()
+        } else {
+            0
+        }
     }
 }
