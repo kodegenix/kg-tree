@@ -18,7 +18,7 @@ addons:
       - kalakris-cmake
 
 before_script:
-  - CARGO_TARGET_DIR=target/ cargo install --force cargo-travis
+  - CARGO_TARGET_DIR=$TRAVIS_BUILD_DIR/target/ cargo install --force cargo-travis
   - export PATH=$HOME/.cargo/bin:$PATH
 
 script:
