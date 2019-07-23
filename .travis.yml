@@ -2,27 +2,28 @@ language: rust
 rust:
   - nightly
 
+cache: cargo
+
+sudo: false
+
 addons:
   apt:
     packages:
       - libcurl4-openssl-dev
       - libelf-dev
       - libdw-dev
-      - libiberty-dev
-      - zlib1g-dev
-      - cmake
-      - gcc
       - binutils-dev
+      - cmake
+    sources:
+      - kalakris-cmake
+
+before_script:
+  - cargo install --force cargo-travis
+  - export PATH=$HOME/.cargo/bin:$PATH
+
+script:
+  - cargo build
+  - cargo test
 
 after_success:
-  - wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz
-  - tar xzf master.tar.gz
-  - cd kcov-master
-  - mkdir build
-  - cd build
-  - cmake ..
-  - make
-  - sudo make install
-  - cd ../..
-  - rm -rf kcov-master
-  - kcov --coveralls-id=$TRAVIS_JOB_ID --verify --exclude-pattern=/.cargo,/usr/lib target/cov target/debug/kg_tree-*
+  - cargo coveralls
