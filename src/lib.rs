@@ -18,7 +18,6 @@ use kg_diag::io::fs;
 use kg_symbol::Symbol;
 use kg_utils::collections::LinkedHashMap;
 
-pub use tree::{ErrorKind, NodeRef};
 pub use tree::convert::Primitive;
 use tree::metadata::Metadata;
 pub use tree::metadata::{FileFormat, FileInfo};

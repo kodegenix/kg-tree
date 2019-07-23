@@ -218,7 +218,6 @@ impl NodeRef {
 
     //FIXME (jc) error handling
     pub fn from_file(file_path: &Path, format: Option<FileFormat>) -> TreeResult<NodeRef> {
-        use kg_io::*;
 
         let file_path_ = if file_path.is_absolute() {
             fs::canonicalize(file_path)?
@@ -238,7 +237,7 @@ impl NodeRef {
         let n = NodeRef::from_str(s.into(), format)?;
         n.data_mut().set_file(Some(&FileInfo::new(
             &file_path_,
-            kg_io::FileType::File,
+            FileType::File,
             format,
         )));
         Ok(n)
