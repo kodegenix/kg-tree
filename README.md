@@ -3,7 +3,7 @@
 [![Latest Version](https://img.shields.io/crates/v/kg-tree.svg)](https://crates.io/crates/kg-tree)
 [![Documentation](https://docs.rs/kg-tree/badge.svg)](https://docs.rs/kg-tree)
 [![Build Status](https://travis-ci.org/Kodegenix/kg-tree.svg?branch=master)](https://travis-ci.org/Kodegenix/kg-tree)
-[![Coverage Status](https://coveralls.io/repos/github/Kodegenix/kg-tree/badge.svg?branch=coveralls)](https://coveralls.io/github/Kodegenix/kg-tree?branch=coveralls)
+[![Coverage Status](https://coveralls.io/repos/github/Kodegenix/kg-tree/badge.svg?branch=master)](https://coveralls.io/github/Kodegenix/kg-tree?branch=master)
 
 Generic object tree with Opath query language, similar to XPath.
 
