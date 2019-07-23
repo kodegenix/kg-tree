@@ -324,7 +324,7 @@ mod tests {
         let interp = Interpolation::parse(s.into()).unwrap();
 
         assert!(interp.is_empty());
-        assert_eq!(interp.resolve(&n, &n), None);
+        assert_eq!(interp.resolve(&n, &n).unwrap(), None);
     }
 
     #[test]
@@ -335,7 +335,7 @@ mod tests {
         let interp = Interpolation::parse(s.into()).unwrap();
 
         assert!(interp.is_simple());
-        assert_eq!(interp.resolve(&n, &n).unwrap().as_string(), "test <%> test");
+        assert_eq!(interp.resolve(&n, &n).unwrap().unwrap().as_string(), "test <%> test");
     }
 
     #[test]
@@ -347,7 +347,7 @@ mod tests {
 
         assert!(interp.is_expr());
         assert_eq!(
-            interp.resolve(&n, &n).unwrap().as_string(),
+            interp.resolve(&n, &n).unwrap().unwrap().as_string(),
             "username: johnny, email: johnny@example.org was logged in."
         );
     }
@@ -360,7 +360,7 @@ mod tests {
         let interp = Interpolation::parse(s.into()).unwrap();
 
         assert!(interp.is_expr());
-        assert_eq!(interp.resolve(&n, &n).unwrap().as_string(), "johnny");
+        assert_eq!(interp.resolve(&n, &n).unwrap().unwrap().as_string(), "johnny");
     }
 
     #[test]
@@ -372,7 +372,7 @@ mod tests {
 
         assert!(interp.is_expr());
         assert_eq!(
-            interp.resolve(&n, &n).unwrap().as_string(),
+            interp.resolve(&n, &n).unwrap().unwrap().as_string(),
             "username: johnny, email: <%johnny@example.org%> was logged in."
         );
     }
@@ -386,7 +386,7 @@ mod tests {
 
         assert!(interp.is_expr());
         assert_eq!(
-            interp.resolve(&n, &n).unwrap().as_string(),
+            interp.resolve(&n, &n).unwrap().unwrap().as_string(),
             "username: johnny, email: johnny@example.org was logged in."
         );
     }

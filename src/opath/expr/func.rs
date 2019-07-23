@@ -1384,7 +1384,7 @@ mod tests {
             let n = NodeRef::from_json(r#"{}"#).unwrap();
 
             let expr = Opath::parse("parse('{\"aaaa\":-}', 'json')").unwrap();
-            let mut res = expr.apply(&n, &n);
+            let mut res = expr.apply(&n, &n).unwrap();
             eprintln!("res = {:?}", res);
         }
 
@@ -1411,7 +1411,7 @@ mod tests {
             let a = vec![expr("$.**"), expr("'str'"), expr("1..10")];
             let args = Args::new(&a);
 
-            let values = args.resolve(false, Env::new(&n, &n, None));
+            let values = args.resolve(false, Env::new(&n, &n, None)).unwrap();
 
             assert_eq!(values.len(), 3);
             assert_eq!(values[0].len(), 11);
@@ -1433,7 +1433,7 @@ mod tests {
             let a = vec![expr("$.**"), expr("'str'"), expr("1..10")];
             let args = Args::new(&a);
 
-            let values = args.resolve(true, Env::new(&n, &n, None));
+            let values = args.resolve(true, Env::new(&n, &n, None)).unwrap();
 
             assert_eq!(values.len(), 3);
             assert_eq!(values[0].len(), 11);
@@ -1452,7 +1452,7 @@ mod tests {
             let a = vec![expr("$.**"), expr("'str'"), expr("1..10")];
             let args = Args::new(&a);
 
-            let values = args.resolve_flat(false, Env::new(&n, &n, None));
+            let values = args.resolve_flat(false, Env::new(&n, &n, None)).unwrap();
 
             assert_eq!(values.len(), 11 + 1 + 10);
             let mut consumable = true;
@@ -1468,7 +1468,7 @@ mod tests {
             let a = vec![expr("$.**"), expr("'str'"), expr("1..10")];
             let args = Args::new(&a);
 
-            let values = args.resolve_flat(true, Env::new(&n, &n, None));
+            let values = args.resolve_flat(true, Env::new(&n, &n, None)).unwrap();
 
             assert_eq!(values.len(), 11 + 1 + 10);
             for v in values.iter() {
@@ -1482,7 +1482,7 @@ mod tests {
             let a = vec![expr("$.**"), expr("'str'"), expr("1..10")];
             let args = Args::new(&a);
 
-            let values = args.resolve_rows_null(false, None, Env::new(&n, &n, None));
+            let values = args.resolve_rows_null(false, None, Env::new(&n, &n, None)).unwrap();
             assert_eq!(values.len(), 10);
             assert_eq!(values[0].len(), 3);
             assert_eq!(values[1].len(), 3);
@@ -1510,7 +1510,7 @@ mod tests {
             let a = vec![expr("$.**"), expr("'str'"), expr("1..10")];
             let args = Args::new(&a);
 
-            let values = args.resolve_rows_null(true, None, Env::new(&n, &n, None));
+            let values = args.resolve_rows_null(true, None, Env::new(&n, &n, None)).unwrap();
 
             assert_eq!(values.len(), 10);
             assert_eq!(values[0].len(), 3);
@@ -1541,7 +1541,7 @@ mod tests {
 
             let expr = Opath::parse("array(@.*.@key)").unwrap();
 
-            let res = expr.apply(&n, &n);
+            let res = expr.apply(&n, &n).unwrap();
 
             assert_eq!(res.len(), 1);
 
@@ -1556,7 +1556,7 @@ mod tests {
 
             let expr = Opath::parse("map(@.*.@key, @.*.@index)").unwrap();
 
-            let res = expr.apply(&n, &n);
+            let res = expr.apply(&n, &n).unwrap();
 
             assert_eq!(res.len(), 1);
 
@@ -1577,7 +1577,7 @@ mod tests {
                     .unwrap();
 
                 let expr = Opath::parse("parseInt(@.nums.*, @.basis.*)").unwrap();
-                let mut res = expr.apply(&n, &n).into_iter();
+                let mut res = expr.apply(&n, &n).unwrap().into_iter();
 
                 assert_eq!(res.len(), 6);
                 assert_eq!(res.next().unwrap().as_integer().unwrap(), 10);
@@ -1592,7 +1592,7 @@ mod tests {
             fn integer_str() {
                 let n = NodeRef::null();
                 let expr = Opath::parse("parseInt('10')").unwrap();
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
 
@@ -1606,7 +1606,7 @@ mod tests {
             fn radix() {
                 let n = NodeRef::from_json(r#"{}"#).unwrap();
                 let expr = Opath::parse("parseInt('10', 2)").unwrap();
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
 
@@ -1620,7 +1620,7 @@ mod tests {
             fn radix_str() {
                 let n = NodeRef::null();
                 let expr = Opath::parse("parseInt('10', '2')").unwrap();
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
 
@@ -1634,7 +1634,7 @@ mod tests {
             fn float() {
                 let n = NodeRef::from_json(r#"{}"#).unwrap();
                 let expr = Opath::parse("parseInt('10.33')").unwrap();
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
 
@@ -1648,7 +1648,7 @@ mod tests {
             fn nan() {
                 let n = NodeRef::from_json(r#"{}"#).unwrap();
                 let expr = Opath::parse("parseInt('blaa')").unwrap();
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
 
@@ -1662,7 +1662,7 @@ mod tests {
             fn neg() {
                 let n = NodeRef::from_json(r#"{}"#).unwrap();
                 let expr = Opath::parse("parseInt('-10')").unwrap();
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
 
@@ -1676,7 +1676,7 @@ mod tests {
             fn num_first() {
                 let n = NodeRef::from_json(r#"{}"#).unwrap();
                 let expr = Opath::parse("parseInt('10ab')").unwrap();
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
 
@@ -1690,7 +1690,7 @@ mod tests {
             fn mul_tokens() {
                 let n = NodeRef::from_json(r#"{}"#).unwrap();
                 let expr = Opath::parse("parseInt('10 aaa')").unwrap();
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
 
@@ -1704,7 +1704,7 @@ mod tests {
             fn whitespaces() {
                 let n = NodeRef::from_json(r#"{}"#).unwrap();
                 let expr = Opath::parse("parseInt('  10  ')").unwrap();
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
 
@@ -1726,7 +1726,7 @@ mod tests {
                     env: Env<'_>,
                     out: &mut NodeBuf,
                 ) -> FuncCallResult {
-                    let res = args.resolve_flat(false, env);
+                    let res = args.resolve_flat(false, env).unwrap();
                     for r in res.into_iter() {
                         if r.is_number() {
                             out.add(r);
@@ -1739,7 +1739,7 @@ mod tests {
                     .with_func("filter_numbers".into(), box Func::new(filter_numbers));
                 let n = test_node();
                 let expr = Opath::parse("filter_numbers($.**).@path").unwrap();
-                let res = expr.apply_ext(&n, &n, scope.as_ref()).into_vec();
+                let res = expr.apply_ext(&n, &n, scope.as_ref()).unwrap().into_vec();
 
                 assert_eq!(res.len(), 3);
                 assert_eq!(res[0].as_string(), "$.one");
@@ -1761,7 +1761,7 @@ mod tests {
 
                 let expr = Opath::parse("@.find('nested.two')").unwrap();
 
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
                 assert_eq!(Opath::from(&res[0]).to_string(), "$.nested.two");
@@ -1773,7 +1773,7 @@ mod tests {
 
                 let expr = Opath::parse("@.find('nested.*')").unwrap();
 
-                let res = expr.apply(&n, &n).into_vec();
+                let res = expr.apply(&n, &n).unwrap().into_vec();
 
                 assert_eq!(res.len(), 3);
                 assert_eq!(Opath::from(&res[0]).to_string(), "$.nested.two");
@@ -1787,7 +1787,7 @@ mod tests {
             let n = test_node();
             let expr = Opath::parse("@.array.join(':')").unwrap();
 
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
             assert_eq!(res.len(), 1);
 
             let ref s = res[0];
@@ -1799,11 +1799,11 @@ mod tests {
         fn set() {
             let n = test_node();
             let expr = Opath::parse("@.set('new_prop', 12)").unwrap();
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
             assert_eq!(res.len(), 0);
 
             let expr = Opath::parse("@.new_prop").unwrap();
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
 
             assert_eq!(res.len(), 1);
 
@@ -1837,7 +1837,7 @@ mod tests {
             let n = test_node();
             let expr = Opath::parse("(@.array.push('new elem'), @.array[2])").unwrap();
 
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
 
             assert_eq!(res.len(), 2);
 
@@ -1854,7 +1854,7 @@ mod tests {
         fn push_non_root() {
             let n = test_node();
             let expr = Opath::parse("(@.array.push($.one), @.array[2])").unwrap();
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
 
             assert_eq!(res.len(), 2);
 
@@ -1876,7 +1876,7 @@ mod tests {
             let expected = NodeRef::from_json(expected).unwrap();
 
             let expr = Opath::parse("@.pop()").unwrap();
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
 
             assert_eq!(res.len(), 1);
 
@@ -1894,7 +1894,7 @@ mod tests {
             let n = NodeRef::from_json(n).unwrap();
 
             let expr = Opath::parse("@.pop()").unwrap();
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
 
             assert_eq!(res.len(), 1);
 
@@ -1912,7 +1912,7 @@ mod tests {
             let expected = NodeRef::from_json(expected).unwrap();
 
             let expr = Opath::parse("@.shift()").unwrap();
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
 
             assert_eq!(res.len(), 1);
 
@@ -1930,7 +1930,7 @@ mod tests {
             let n = NodeRef::from_json(n).unwrap();
 
             let expr = Opath::parse("@.shift()").unwrap();
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
 
             assert_eq!(res.len(), 1);
 
@@ -1943,7 +1943,7 @@ mod tests {
         fn unshift_root() {
             let n = test_node();
             let expr = Opath::parse("(@.array.unshift('new elem'), @.array[0])").unwrap();
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
 
             assert_eq!(res.len(), 2);
 
@@ -1960,7 +1960,7 @@ mod tests {
         fn unshift_non_root() {
             let n = test_node();
             let expr = Opath::parse("(@.array.unshift($.one), @.array[0])").unwrap();
-            let res = expr.apply(&n, &n).into_vec();
+            let res = expr.apply(&n, &n).unwrap().into_vec();
 
             assert_eq!(res.len(), 2);
 
@@ -1992,6 +1992,7 @@ mod tests {
                     } else {
                         let mut res = args
                             .resolve_flat(false, env)
+                            .unwrap()
                             .into_iter()
                             .filter_map(|n| n.data().as_string().chars().next())
                             .collect::<Vec<char>>();
@@ -2018,13 +2019,13 @@ mod tests {
                 let n = NodeRef::null();
 
                 let expr = Opath::parse("'ala ma kota'.count_char('a', 'k')").unwrap();
-                let res = expr.apply_ext(&n, &n, scope.as_ref()).into_vec();
+                let res = expr.apply_ext(&n, &n, scope.as_ref()).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
                 assert_eq!(res[0].as_integer(), Some(5));
 
                 let expr = Opath::parse("'ala ma kota'.count_char('o', 'k', 't')").unwrap();
-                let res = expr.apply_ext(&n, &n, scope.as_ref()).into_vec();
+                let res = expr.apply_ext(&n, &n, scope.as_ref()).unwrap().into_vec();
 
                 assert_eq!(res.len(), 1);
                 assert_eq!(res[0].as_integer(), Some(3));

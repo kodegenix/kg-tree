@@ -19,7 +19,7 @@ pub static EXAMPLE_JSON: &str = r#"
 pub fn query(query: &str, json: &str) -> Vec<NodeRef> {
     let opath = opath::Opath::parse(query).unwrap();
     let n = NodeRef::from_json(json).unwrap();
-    opath.apply(&n, &n).into_vec()
+    opath.apply(&n, &n).unwrap().into_vec()
 }
 
 pub fn assert_bool_op(query_str: &str, expected: bool) {

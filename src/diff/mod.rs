@@ -597,7 +597,7 @@ mod tests {
         let a = NodeRef::from_json(jsona).unwrap();
         let b = NodeRef::from_json(jsonb).unwrap();
 
-        let d = ModelDiff::full(&a, &b);
+        let d = ModelDiff::full(&a, &b).unwrap();
 
         assert_eq!(d.changes().len(), 14);
     }

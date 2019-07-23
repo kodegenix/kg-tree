@@ -1847,7 +1847,7 @@ mod tests {
                 FileFormat::Json,
             )));
             let o = Opath::parse("@file_path_components").unwrap();
-            let r = o.apply(&n, &n);
+            let r = o.apply(&n, &n).unwrap();
 
             assert_eq!(r.len(), 1);
             assert_eq!(r.into_vec()[0].to_json(), r#"["some","path","file.json"]"#);
@@ -1873,12 +1873,12 @@ mod tests {
             }"#;
             let n = NodeRef::from_json(data).unwrap();
             let hosts_expr = Opath::parse("$.hosts.*").unwrap();
-            let hosts = hosts_expr.apply(&n, &n);
+            let hosts = hosts_expr.apply(&n, &n).unwrap();
             let scope = ScopeMut::new();
             scope.set_var("hosts".into(), hosts);
 
             let e = Opath::parse("$hosts[@.hostname!='zeus']").unwrap();
-            let res = e.apply_ext(&n, &n, scope.as_ref());
+            let res = e.apply_ext(&n, &n, scope.as_ref()).unwrap();
 
             assert!(res.is_many());
             assert_eq!(res.len(), 2);
