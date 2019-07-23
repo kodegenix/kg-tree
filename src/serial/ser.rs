@@ -1,11 +1,11 @@
 use super::*;
 
 pub fn to_tree<T>(value: &T) -> self::error::Result<NodeRef>
-    where T: serde::Serialize
+where
+    T: serde::Serialize,
 {
     value.serialize(NodeSerializer)
 }
-
 
 struct NodeSerializer;
 
@@ -85,8 +85,10 @@ impl serde::ser::Serializer for NodeSerializer {
         Ok(NodeRef::null())
     }
 
-    fn serialize_some<T: ? Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
-        where T: serde::Serialize {
+    fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
+    where
+        T: serde::Serialize,
+    {
         value.serialize(self)
     }
 
@@ -98,17 +100,36 @@ impl serde::ser::Serializer for NodeSerializer {
         Ok(NodeRef::null())
     }
 
-    fn serialize_unit_variant(self, _name: &'static str, _variant_index: u32, variant: &'static str) -> Result<Self::Ok, Self::Error> {
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
         Ok(NodeRef::string(variant))
     }
 
-    fn serialize_newtype_struct<T: ? Sized>(self, _name: &'static str, value: &T) -> Result<Self::Ok, Self::Error>
-        where T: serde::Serialize {
+    fn serialize_newtype_struct<T: ?Sized>(
+        self,
+        _name: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error>
+    where
+        T: serde::Serialize,
+    {
         value.serialize(self)
     }
 
-    fn serialize_newtype_variant<T: ? Sized>(self, _name: &'static str, _variant_index: u32, variant: &'static str, value: &T) -> Result<Self::Ok, Self::Error>
-        where T: serde::Serialize {
+    fn serialize_newtype_variant<T: ?Sized>(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error>
+    where
+        T: serde::Serialize,
+    {
         let val = value.serialize(self)?;
         let mut p = Properties::new();
         p.insert(variant.into(), val);
@@ -131,7 +152,11 @@ impl serde::ser::Serializer for NodeSerializer {
         Ok(seqser)
     }
 
-    fn serialize_tuple_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeTupleStruct, Self::Error> {
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         let seqser = SeqSerializer {
             variant: None,
             elems: Elements::with_capacity(len),
@@ -139,7 +164,13 @@ impl serde::ser::Serializer for NodeSerializer {
         Ok(seqser)
     }
 
-    fn serialize_tuple_variant(self, _name: &'static str, _variant_index: u32, variant: &'static str, len: usize) -> Result<Self::SerializeTupleVariant, Self::Error> {
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         let seqser = SeqSerializer {
             variant: Some(variant.into()),
             elems: Elements::with_capacity(len),
@@ -156,7 +187,11 @@ impl serde::ser::Serializer for NodeSerializer {
         Ok(mapser)
     }
 
-    fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct, Self::Error> {
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
         let mapser = MapSerializer {
             variant: None,
             key: None,
@@ -165,7 +200,13 @@ impl serde::ser::Serializer for NodeSerializer {
         Ok(mapser)
     }
 
-    fn serialize_struct_variant(self, _name: &'static str, _variant_index: u32, variant: &'static str, len: usize) -> Result<Self::SerializeStructVariant, Self::Error> {
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        len: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
         let mapser = MapSerializer {
             variant: Some(variant.into()),
             key: None,
@@ -174,7 +215,6 @@ impl serde::ser::Serializer for NodeSerializer {
         Ok(mapser)
     }
 }
-
 
 struct SymbolSerializer;
 
@@ -250,8 +290,10 @@ impl serde::Serializer for SymbolSerializer {
         unreachable!()
     }
 
-    fn serialize_some<T: ? Sized>(self, _value: &T) -> Result<Self::Ok, Self::Error>
-        where T: serde::Serialize {
+    fn serialize_some<T: ?Sized>(self, _value: &T) -> Result<Self::Ok, Self::Error>
+    where
+        T: serde::Serialize,
+    {
         unreachable!()
     }
 
@@ -263,17 +305,36 @@ impl serde::Serializer for SymbolSerializer {
         unreachable!()
     }
 
-    fn serialize_unit_variant(self, _name: &'static str, _variant_index: u32, _variant: &'static str) -> Result<Self::Ok, Self::Error> {
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
         unreachable!()
     }
 
-    fn serialize_newtype_struct<T: ? Sized>(self, _name: &'static str, _value: &T) -> Result<Self::Ok, Self::Error>
-        where T: serde::Serialize {
+    fn serialize_newtype_struct<T: ?Sized>(
+        self,
+        _name: &'static str,
+        _value: &T,
+    ) -> Result<Self::Ok, Self::Error>
+    where
+        T: serde::Serialize,
+    {
         unreachable!()
     }
 
-    fn serialize_newtype_variant<T: ? Sized>(self, _name: &'static str, _variant_index: u32, _variant: &'static str, _value: &T) -> Result<Self::Ok, Self::Error>
-        where T: serde::Serialize {
+    fn serialize_newtype_variant<T: ?Sized>(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _value: &T,
+    ) -> Result<Self::Ok, Self::Error>
+    where
+        T: serde::Serialize,
+    {
         unreachable!()
     }
 
@@ -285,11 +346,21 @@ impl serde::Serializer for SymbolSerializer {
         unreachable!()
     }
 
-    fn serialize_tuple_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeTupleStruct, Self::Error> {
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         unreachable!()
     }
 
-    fn serialize_tuple_variant(self, _name: &'static str, _variant_index: u32, _variant: &'static str, _len: usize) -> Result<Self::SerializeTupleVariant, Self::Error> {
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         unreachable!()
     }
 
@@ -297,15 +368,24 @@ impl serde::Serializer for SymbolSerializer {
         unreachable!()
     }
 
-    fn serialize_struct(self, _name: &'static str, _len: usize) -> Result<Self::SerializeStruct, Self::Error> {
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
         unreachable!()
     }
 
-    fn serialize_struct_variant(self, _name: &'static str, _variant_index: u32, _variant: &'static str, _len: usize) -> Result<Self::SerializeStructVariant, Self::Error> {
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
         unreachable!()
     }
 }
-
 
 struct SeqSerializer {
     variant: Option<Symbol>,
@@ -316,8 +396,10 @@ impl serde::ser::SerializeSeq for SeqSerializer {
     type Ok = NodeRef;
     type Error = self::error::Error;
 
-    fn serialize_element<T: ? Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-        where T: serde::Serialize {
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: serde::Serialize,
+    {
         self.elems.push(value.serialize(NodeSerializer)?);
         Ok(())
     }
@@ -331,8 +413,10 @@ impl serde::ser::SerializeTuple for SeqSerializer {
     type Ok = NodeRef;
     type Error = self::error::Error;
 
-    fn serialize_element<T: ? Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-        where T: serde::Serialize {
+    fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: serde::Serialize,
+    {
         self.elems.push(value.serialize(NodeSerializer)?);
         Ok(())
     }
@@ -346,8 +430,10 @@ impl serde::ser::SerializeTupleStruct for SeqSerializer {
     type Ok = NodeRef;
     type Error = self::error::Error;
 
-    fn serialize_field<T: ? Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-        where T: serde::Serialize {
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: serde::Serialize,
+    {
         self.elems.push(value.serialize(NodeSerializer)?);
         Ok(())
     }
@@ -361,8 +447,10 @@ impl serde::ser::SerializeTupleVariant for SeqSerializer {
     type Ok = NodeRef;
     type Error = self::error::Error;
 
-    fn serialize_field<T: ? Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-        where T: serde::Serialize {
+    fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+    where
+        T: serde::Serialize,
+    {
         self.elems.push(value.serialize(NodeSerializer)?);
         Ok(())
     }
@@ -373,7 +461,6 @@ impl serde::ser::SerializeTupleVariant for SeqSerializer {
         Ok(NodeRef::object(p))
     }
 }
-
 
 struct MapSerializer {
     variant: Option<Symbol>,
@@ -386,21 +473,32 @@ impl serde::ser::SerializeMap for MapSerializer {
     type Error = self::error::Error;
 
     fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
-        where T: serde::Serialize {
+    where
+        T: serde::Serialize,
+    {
         let key = key.serialize(SymbolSerializer)?;
         self.key = Some(key);
         Ok(())
     }
 
     fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
-        where T: serde::Serialize {
+    where
+        T: serde::Serialize,
+    {
         let val = value.serialize(NodeSerializer)?;
         self.props.insert(self.key.take().unwrap(), val);
         Ok(())
     }
 
-    fn serialize_entry<K: ?Sized, V: ?Sized>(&mut self, key: &K, value: &V) -> Result<(), Self::Error>
-        where K: serde::Serialize, V: serde::Serialize {
+    fn serialize_entry<K: ?Sized, V: ?Sized>(
+        &mut self,
+        key: &K,
+        value: &V,
+    ) -> Result<(), Self::Error>
+    where
+        K: serde::Serialize,
+        V: serde::Serialize,
+    {
         let key = key.serialize(SymbolSerializer)?;
         let val = value.serialize(NodeSerializer)?;
         self.props.insert(key, val);
@@ -416,9 +514,16 @@ impl serde::ser::SerializeStruct for MapSerializer {
     type Ok = NodeRef;
     type Error = self::error::Error;
 
-    fn serialize_field<T: ? Sized>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
-        where T: serde::Serialize {
-        self.props.insert(key.into(), value.serialize(NodeSerializer)?);
+    fn serialize_field<T: ?Sized>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error>
+    where
+        T: serde::Serialize,
+    {
+        self.props
+            .insert(key.into(), value.serialize(NodeSerializer)?);
         Ok(())
     }
 
@@ -431,9 +536,16 @@ impl serde::ser::SerializeStructVariant for MapSerializer {
     type Ok = NodeRef;
     type Error = self::error::Error;
 
-    fn serialize_field<T: ? Sized>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
-        where T: serde::Serialize {
-        self.props.insert(key.into(), value.serialize(NodeSerializer)?);
+    fn serialize_field<T: ?Sized>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error>
+    where
+        T: serde::Serialize,
+    {
+        self.props
+            .insert(key.into(), value.serialize(NodeSerializer)?);
         Ok(())
     }
 

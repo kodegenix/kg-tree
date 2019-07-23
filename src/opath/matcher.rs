@@ -24,32 +24,55 @@ impl NodePathMatcher {
         self.paths.insert(path);
     }
 
-    pub fn resolve(&mut self, expr: &Opath, root: &NodeRef, current: &NodeRef) {
-        let res = expr.apply(root, current);
+    pub fn resolve(&mut self, expr: &Opath, root: &NodeRef, current: &NodeRef) -> ExprResult<()> {
+        let res = expr.apply(root, current)?;
         for ref n in res {
             self.insert(n);
         }
+        Ok(())
     }
 
-    pub fn resolve_cache(&mut self, expr: &Opath, root: &NodeRef, current: &NodeRef, cache: &mut dyn OpathCache) {
-        let res = expr.apply(root, current);
+    pub fn resolve_cache(
+        &mut self,
+        expr: &Opath,
+        root: &NodeRef,
+        current: &NodeRef,
+        cache: &mut dyn OpathCache,
+    ) -> ExprResult<()> {
+        let res = expr.apply(root, current)?;
         for ref n in res {
             self.insert_cache(n, cache);
         }
+        Ok(())
     }
 
-    pub fn resolve_ext(&mut self, expr: &Opath, root: &NodeRef, current: &NodeRef, scope: &Scope) {
-        let res = expr.apply_ext(root, current, scope);
+    pub fn resolve_ext(
+        &mut self,
+        expr: &Opath,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+    ) -> ExprResult<()> {
+        let res = expr.apply_ext(root, current, scope)?;
         for ref n in res {
             self.insert(n);
         }
+        Ok(())
     }
 
-    pub fn resolve_ext_cache(&mut self, expr: &Opath, root: &NodeRef, current: &NodeRef, scope: &Scope, cache: &mut dyn OpathCache) {
-        let res = expr.apply_ext(root, current, scope);
+    pub fn resolve_ext_cache(
+        &mut self,
+        expr: &Opath,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+        cache: &mut dyn OpathCache,
+    ) -> ExprResult<()> {
+        let res = expr.apply_ext(root, current, scope)?;
         for ref n in res {
             self.insert_cache(n, cache);
         }
+        Ok(())
     }
 
     pub fn matches(&self, path: &Opath) -> bool {
@@ -60,7 +83,6 @@ impl NodePathMatcher {
         self.paths.clear();
     }
 }
-
 
 #[cfg(test)]
 mod tests {

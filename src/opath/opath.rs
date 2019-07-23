@@ -29,17 +29,15 @@ fn expr_string<S: AsRef<str>>(value: S) -> Expr {
 }
 
 impl Opath {
-    pub (super) fn new(e: Expr) -> Opath {
-        Opath {
-            expr: e,
-        }
+    pub(super) fn new(e: Expr) -> Opath {
+        Opath { expr: e }
     }
 
-    pub (super) fn expr(&self) -> &Expr {
+    pub(super) fn expr(&self) -> &Expr {
         &self.expr
     }
 
-    pub (super) fn into_expr(self) -> Expr {
+    pub(super) fn into_expr(self) -> Expr {
         self.expr
     }
 
@@ -48,7 +46,11 @@ impl Opath {
         super::expr::parse::Parser::new().parse(&mut r)
     }
 
-    pub fn parse_opt_delims(expr: &str, open_delim: &str, close_delim: &str) -> Result<Opath, OpathParseError> {
+    pub fn parse_opt_delims(
+        expr: &str,
+        open_delim: &str,
+        close_delim: &str,
+    ) -> Result<Opath, OpathParseError> {
         let expr = expr.trim();
         let expr = if expr.starts_with(open_delim) && expr.ends_with(close_delim) {
             &expr[open_delim.len()..expr.len() - close_delim.len()]
@@ -65,8 +67,12 @@ impl Opath {
             let p = n.data().parent();
             if let Some(p) = p {
                 match *p.data().value() {
-                    Value::Array(_) => seq.push(Expr::Index(Box::new(Expr::Integer(n.data().index() as i64)))),
-                    Value::Object(_) => seq.push(Expr::Property(Box::new(expr_string(n.data().key())))),
+                    Value::Array(_) => seq.push(Expr::Index(Box::new(Expr::Integer(
+                        n.data().index() as i64,
+                    )))),
+                    Value::Object(_) => {
+                        seq.push(Expr::Property(Box::new(expr_string(n.data().key()))))
+                    }
                     _ => unreachable!(),
                 }
                 n = p;
@@ -85,8 +91,12 @@ impl Opath {
             let p = n.data().parent();
             if let Some(p) = p {
                 match *p.data().value() {
-                    Value::Array(_) => seq.push(Expr::Index(Box::new(Expr::Integer(n.data().index() as i64)))),
-                    Value::Object(_) => seq.push(Expr::Property(Box::new(expr_string(n.data().key())))),
+                    Value::Array(_) => seq.push(Expr::Index(Box::new(Expr::Integer(
+                        n.data().index() as i64,
+                    )))),
+                    Value::Object(_) => {
+                        seq.push(Expr::Property(Box::new(expr_string(n.data().key()))))
+                    }
                     _ => unreachable!(),
                 }
                 n = p;
@@ -120,37 +130,58 @@ impl Opath {
     }
 
     pub fn json(json: String) -> Opath {
-        Opath::new(Expr::FuncCall(Box::new(FuncCall::new(FuncId::Json, vec![Expr::StringEnc(json)]))))
+        Opath::new(Expr::FuncCall(Box::new(FuncCall::new(
+            FuncId::Json,
+            vec![Expr::StringEnc(json)],
+        ))))
     }
 
-    pub fn apply(&self, root: &NodeRef, current: &NodeRef) -> NodeSet {
+    pub fn apply(&self, root: &NodeRef, current: &NodeRef) -> ExprResult<NodeSet> {
         let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
-        self.expr.apply(Env::new(root, current, None), Context::Expr)
+        self.expr
+            .apply(Env::new(root, current, None), Context::Expr)
     }
 
-    pub fn apply_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> NodeSet {
+    pub fn apply_ext(
+        &self,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+    ) -> ExprResult<NodeSet> {
         let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
-        self.expr.apply(Env::new(root, current, Some(scope)), Context::Expr)
+        self.expr
+            .apply(Env::new(root, current, Some(scope)), Context::Expr)
     }
 
-    pub fn apply_one(&self, root: &NodeRef, current: &NodeRef) -> NodeRef {
+    pub fn apply_one(&self, root: &NodeRef, current: &NodeRef) -> ExprResult<NodeRef> {
         let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
-        let res = self.expr.apply(Env::new(root, current, None), Context::Expr);
-        match res {
+        let res = self
+            .expr
+            .apply(Env::new(root, current, None), Context::Expr)?;
+        let res = match res {
             NodeSet::Empty => NodeRef::null(),
             NodeSet::One(a) => a,
             NodeSet::Many(_) => unimplemented!(),
-        }
+        };
+        Ok(res)
     }
 
-    pub fn apply_one_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> NodeRef {
+    pub fn apply_one_ext(
+        &self,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+    ) -> ExprResult<NodeRef> {
         let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
-        let res = self.expr.apply(Env::new(root, current, Some(scope)), Context::Expr);
-        match res {
+        let res = self
+            .expr
+            .apply(Env::new(root, current, Some(scope)), Context::Expr)?;
+        let res = match res {
             NodeSet::Empty => NodeRef::null(),
             NodeSet::One(a) => a,
             NodeSet::Many(_) => unimplemented!(),
-        }
+        };
+        Ok(res)
     }
 
     pub fn parent_path(&self) -> Option<Opath> {
@@ -171,11 +202,11 @@ impl Opath {
                             Expr::Property(ref expr) => match **expr {
                                 Expr::String(_) | Expr::StringEnc(_) => pseq.push(e.clone()),
                                 _ => return None,
-                            }
+                            },
                             Expr::Index(ref expr) => match **expr {
                                 Expr::Integer(_) => pseq.push(e.clone()),
                                 _ => return None,
-                            }
+                            },
                             _ => return None,
                         }
                     }
@@ -230,11 +261,13 @@ impl PartialEq for Opath {
 impl Eq for Opath {}
 
 impl ser::Serialize for Opath {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: ser::Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
         serializer.collect_str(&format_args!("${{{}}}", self.expr))
     }
 }
-
 
 struct OpathVisitor();
 
@@ -251,28 +284,39 @@ impl<'de> de::Visitor<'de> for OpathVisitor {
         write!(f, "string")
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         match Opath::parse_opt_delims(v, "${", "}") {
             Ok(expr) => Ok(expr),
             Err(err) => Err(de::Error::custom(err.detail())),
         }
     }
 
-    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         self.visit_str(v)
     }
 
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         self.visit_str(&v)
     }
 }
 
 impl<'de> de::Deserialize<'de> for Opath {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: de::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
         deserializer.deserialize_str(OpathVisitor::new())
     }
 }
-
 
 #[cfg(test)]
 mod tests {

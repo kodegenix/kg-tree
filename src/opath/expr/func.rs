@@ -1,33 +1,40 @@
 use super::*;
+use crate::opath::expr::func::FuncCallErrorDetail::{
+    FuncCallCustomErr, MethodCallCustomErr, NonBinaryNode, RegexParseError,
+};
+pub type FuncCallError = BasicDiag;
+
+pub type FuncCallResult = Result<(), FuncCallError>;
 
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 100)]
 #[allow(dead_code)]
-pub enum FuncCallErr {
+pub enum FuncCallErrorDetail {
     #[display(fmt = "unknown function '{name}'")]
-    UnknownFunc {
-        name: String,
-    },
+    UnknownFunc { name: String },
     #[display(fmt = "unknown method '{name}' for type '{kind}'")]
-    UnknownMethod {
-        name: String,
-        kind: Kind,
-    },
-    #[display(fmt = "method '{id}' for type '{kind}' requires {required} parameters, but {supplied} were supplied")]
+    UnknownMethod { name: String, kind: Kind },
+    #[display(
+        fmt = "method '{id}' for type '{kind}' requires {required} parameters, but {supplied} were supplied"
+    )]
     MethodCallInvalidArgCount {
         id: MethodId,
         kind: Kind,
         supplied: u32,
         required: u32,
     },
-    #[display(fmt = "method '{id}' for type '{kind}' requires at least {required_min} parameters, but {supplied} were supplied")]
+    #[display(
+        fmt = "method '{id}' for type '{kind}' requires at least {required_min} parameters, but {supplied} were supplied"
+    )]
     MethodCallInvalidArgCountMin {
         id: MethodId,
         kind: Kind,
         supplied: u32,
         required_min: u32,
     },
-    #[display(fmt = "method '{id}' for type '{kind}' requires from {required_min} to {required_max} parameters, but {supplied} were supplied")]
+    #[display(
+        fmt = "method '{id}' for type '{kind}' requires from {required_min} to {required_max} parameters, but {supplied} were supplied"
+    )]
     MethodCallInvalidArgCountRange {
         id: MethodId,
         kind: Kind,
@@ -35,25 +42,35 @@ pub enum FuncCallErr {
         required_min: u32,
         required_max: u32,
     },
-    #[display(fmt = "function '{id}' requires {required} parameters, but {supplied} were supplied")]
+    #[display(
+        fmt = "function '{id}' requires {required} parameters, but {supplied} were supplied"
+    )]
     FuncCallInvalidArgCount {
         id: FuncId,
         supplied: u32,
         required: u32,
     },
-    #[display(fmt = "function '{id}' requires at least {required_min} parameters, but {supplied} were supplied")]
+    #[display(
+        fmt = "function '{id}' requires at least {required_min} parameters, but {supplied} were supplied"
+    )]
     FuncCallInvalidArgCountMin {
         id: FuncId,
         supplied: u32,
         required_min: u32,
     },
-    #[display(fmt = "function '{id}' requires from {required_min} to {required_max} parameters, but {supplied} were supplied")]
+    #[display(
+        fmt = "function '{id}' requires from {required_min} to {required_max} parameters, but {supplied} were supplied"
+    )]
     FuncCallInvalidArgCountRange {
         id: FuncId,
         supplied: u32,
         required_min: u32,
         required_max: u32,
     },
+    #[display(fmt = "cannot parse node from type {kind}")]
+    NonBinaryNode { kind: Kind },
+    #[display(fmt = "cannot parse regex: {err}")]
+    RegexParseError { err: regex::Error },
     #[display(fmt = "error while calling method '{id}' for type '{kind}': {err}")]
     MethodCallCustomErr {
         id: MethodId,
@@ -61,17 +78,8 @@ pub enum FuncCallErr {
         err: Box<dyn Diag>,
     },
     #[display(fmt = "error while calling function '{id}': {err}")]
-    FuncCallCustomErr {
-        id: FuncId,
-        err: Box<dyn Diag>,
-    },
+    FuncCallCustomErr { id: FuncId, err: Box<dyn Diag> },
 }
-
-
-pub type FuncCallError = BasicDiag;
-
-pub type FuncCallResult = Result<(), FuncCallError>;
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FuncId {
@@ -131,7 +139,6 @@ impl std::fmt::Display for FuncId {
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MethodId {
     Length,
@@ -147,7 +154,7 @@ pub enum MethodId {
     Join,
     Replace,
     Split,
-    Custom(String)
+    Custom(String),
 }
 
 impl MethodId {
@@ -196,20 +203,17 @@ impl std::fmt::Display for MethodId {
     }
 }
 
-
 #[derive(Debug)]
 pub struct Args<'a> {
     args: &'a Vec<Expr>,
 }
 
 impl<'a> Args<'a> {
-    pub (super) fn new(args: &'a Vec<Expr>) -> Args<'a> {
-        Args {
-            args,
-        }
+    pub(super) fn new(args: &'a Vec<Expr>) -> Args<'a> {
+        Args { args }
     }
 
-    pub (super) fn as_vec(&self) -> &Vec<Expr> {
+    pub(super) fn as_vec(&self) -> &Vec<Expr> {
         self.args
     }
 
@@ -221,68 +225,107 @@ impl<'a> Args<'a> {
         let count = self.count() as u32;
         if min == max {
             if count != min {
-                return Err(basic_diag!(FuncCallErr::FuncCallInvalidArgCount { id: id.clone(), required: min, supplied: count }));
+                return Err(basic_diag!(FuncCallErrorDetail::FuncCallInvalidArgCount {
+                    id: id.clone(),
+                    required: min,
+                    supplied: count
+                }));
             }
         } else if min < max {
             if count < min || count > max {
-                return Err(basic_diag!(FuncCallErr::FuncCallInvalidArgCountRange { id: id.clone(), required_min: min, required_max: max, supplied: count }));
+                return Err(basic_diag!(FuncCallErrorDetail::FuncCallInvalidArgCountRange {
+                    id: id.clone(),
+                    required_min: min,
+                    required_max: max,
+                    supplied: count
+                }));
             }
         } else {
             if count < min {
-                return Err(basic_diag!(FuncCallErr::FuncCallInvalidArgCountMin { id: id.clone(), required_min: min, supplied: count }));
+                return Err(basic_diag!(FuncCallErrorDetail::FuncCallInvalidArgCountMin {
+                    id: id.clone(),
+                    required_min: min,
+                    supplied: count
+                }));
             }
         }
         Ok(())
     }
 
-    pub fn check_count_method(&self, id: &MethodId, kind: Kind, min: u32, max: u32) -> FuncCallResult {
+    pub fn check_count_method(
+        &self,
+        id: &MethodId,
+        kind: Kind,
+        min: u32,
+        max: u32,
+    ) -> FuncCallResult {
         let count = self.count() as u32;
         if min == max {
             if count != min {
-                return Err(basic_diag!(FuncCallErr::MethodCallInvalidArgCount { id: id.clone(), kind, required: min, supplied: count }));
+                return Err(basic_diag!(FuncCallErrorDetail::MethodCallInvalidArgCount {
+                    id: id.clone(),
+                    kind,
+                    required: min,
+                    supplied: count
+                }));
             }
         } else if min < max {
             if count < min || count > max {
-                return Err(basic_diag!(FuncCallErr::MethodCallInvalidArgCountRange { id: id.clone(), kind, required_min: min, required_max: max, supplied: count }));
+                return Err(basic_diag!(FuncCallErrorDetail::MethodCallInvalidArgCountRange {
+                    id: id.clone(),
+                    kind,
+                    required_min: min,
+                    required_max: max,
+                    supplied: count
+                }));
             }
         } else {
             if count < min {
-                return Err(basic_diag!(FuncCallErr::MethodCallInvalidArgCountMin { id: id.clone(), kind, required_min: min, supplied: count }));
+                return Err(basic_diag!(FuncCallErrorDetail::MethodCallInvalidArgCountMin {
+                    id: id.clone(),
+                    kind,
+                    required_min: min,
+                    supplied: count
+                }));
             }
         }
         Ok(())
     }
 
-
-    pub fn resolve(&self, consumable: bool, env: Env) -> Vec<NodeSet> {
+    pub fn resolve(&self, consumable: bool, env: Env) -> ExprResult<Vec<NodeSet>> {
         let mut values = Vec::new();
         for arg in self.args.iter() {
             let mut out = NodeBuf::new();
-            arg.apply_to(env, Context::Expr, &mut out);
+            arg.apply_to(env, Context::Expr, &mut out)?;
             out.make_consumable(consumable);
             values.push(out.into_node_set());
         }
-        values
+        Ok(values)
     }
 
-    pub fn resolve_flat(&self, consumable: bool, env: Env) -> NodeSet {
+    pub fn resolve_flat(&self, consumable: bool, env: Env) -> ExprResult<NodeSet> {
         let mut values = NodeBuf::new();
         for arg in self.args.iter() {
-            arg.apply_to(env, Context::Expr, &mut values);
+            arg.apply_to(env, Context::Expr, &mut values)?;
         }
         values.make_consumable(consumable);
-        values.into_node_set()
+        Ok(values.into_node_set())
     }
 
-    pub fn resolve_column(&self, consumable: bool, column: usize, env: Env) -> NodeSet {
+    pub fn resolve_column(&self, consumable: bool, column: usize, env: Env) -> ExprResult<NodeSet> {
         let mut values = NodeBuf::new();
-        self.args[column].apply_to(env, Context::Expr, &mut values);
+        self.args[column].apply_to(env, Context::Expr, &mut values)?;
         values.make_consumable(consumable);
-        values.into_node_set()
+        Ok(values.into_node_set())
     }
 
-    pub fn resolve_rows(&self, consumable: bool, max_cols: Option<usize>, default: NodeRef,
-                        env: Env) -> Vec<Vec<NodeRef>> {
+    pub fn resolve_rows(
+        &self,
+        consumable: bool,
+        max_cols: Option<usize>,
+        default: NodeRef,
+        env: Env,
+    ) -> ExprResult<Vec<Vec<NodeRef>>> {
         let cols = if let Some(max) = max_cols {
             std::cmp::min(max, self.args.len())
         } else {
@@ -294,7 +337,7 @@ impl<'a> Args<'a> {
         let mut empty = true;
         for arg in self.args.iter() {
             let mut vals = NodeBuf::new();
-            arg.apply_to(env, Context::Expr, &mut vals);
+            arg.apply_to(env, Context::Expr, &mut vals)?;
             if vals.elems.len() > 0 {
                 empty = false;
             }
@@ -309,7 +352,7 @@ impl<'a> Args<'a> {
             }
         }
         if empty {
-            Vec::new()
+            Ok(Vec::new())
         } else {
             if min_len == std::usize::MAX {
                 min_len = 1;
@@ -333,15 +376,19 @@ impl<'a> Args<'a> {
                 }
                 rows.push(columns);
             }
-            rows
+            Ok(rows)
         }
     }
 
-    pub fn resolve_rows_null(&self, consumable: bool, max_cols: Option<usize>, env: Env) -> Vec<Vec<NodeRef>> {
+    pub fn resolve_rows_null(
+        &self,
+        consumable: bool,
+        max_cols: Option<usize>,
+        env: Env,
+    ) -> ExprResult<Vec<Vec<NodeRef>>> {
         self.resolve_rows(consumable, max_cols, NodeRef::null(), env)
     }
 }
-
 
 pub trait FuncCallable: std::fmt::Debug + Sync + Send {
     fn call(&self, name: &str, args: Args, env: Env, out: &mut NodeBuf) -> FuncCallResult;
@@ -355,7 +402,6 @@ impl Clone for Box<dyn FuncCallable> {
     }
 }
 
-
 #[derive(Clone, Copy)]
 pub struct Func {
     fn_ptr: fn(&str, Args, Env, &mut NodeBuf) -> FuncCallResult,
@@ -363,9 +409,7 @@ pub struct Func {
 
 impl Func {
     pub fn new(f: fn(&str, Args, Env, &mut NodeBuf) -> FuncCallResult) -> Func {
-        Func {
-            fn_ptr: f,
-        }
+        Func { fn_ptr: f }
     }
 }
 
@@ -384,8 +428,18 @@ impl std::fmt::Debug for Func {
         let ptr = self.fn_ptr as *mut std::os::raw::c_void;
         let mut resolved = false;
         backtrace::resolve(ptr, |s| {
-            if let (Some(addr), Some(name), Some(filename), Some(lineno)) = (s.addr(), s.name(), s.filename(), s.lineno()) {
-                write!(f, "Func({:p} - {} at {}:{})", addr, name, filename.display(), lineno).unwrap();
+            if let (Some(addr), Some(name), Some(filename), Some(lineno)) =
+                (s.addr(), s.name(), s.filename(), s.lineno())
+            {
+                write!(
+                    f,
+                    "Func({:p} - {} at {}:{})",
+                    addr,
+                    name,
+                    filename.display(),
+                    lineno
+                )
+                .unwrap();
             }
             resolved = true;
         });
@@ -393,7 +447,6 @@ impl std::fmt::Debug for Func {
         Ok(())
     }
 }
-
 
 pub trait MethodCallable: std::fmt::Debug + Sync + Send {
     fn call(&self, name: &str, args: Args, env: Env, out: &mut NodeBuf) -> FuncCallResult;
@@ -409,19 +462,15 @@ impl Clone for Box<dyn MethodCallable> {
     }
 }
 
-
 #[derive(Clone, Copy)]
 pub struct Method {
-    fn_ptr: fn (&str, Args, Env, &mut NodeBuf) -> FuncCallResult,
+    fn_ptr: fn(&str, Args, Env, &mut NodeBuf) -> FuncCallResult,
     mask: KindMask,
 }
 
 impl Method {
     pub fn new(mask: KindMask, f: fn(&str, Args, Env, &mut NodeBuf) -> FuncCallResult) -> Method {
-        Method {
-            fn_ptr: f,
-            mask,
-        }
+        Method { fn_ptr: f, mask }
     }
 }
 
@@ -444,8 +493,18 @@ impl std::fmt::Debug for Method {
         let ptr = self.fn_ptr as *mut std::os::raw::c_void;
         let mut resolved = false;
         backtrace::resolve(ptr, |s| {
-            if let (Some(addr), Some(name), Some(filename), Some(lineno)) = (s.addr(), s.name(), s.filename(), s.lineno()) {
-                write!(f, "Method({:p} - {} at {}:{})", addr, name, filename.display(), lineno).unwrap();
+            if let (Some(addr), Some(name), Some(filename), Some(lineno)) =
+                (s.addr(), s.name(), s.filename(), s.lineno())
+            {
+                write!(
+                    f,
+                    "Method({:p} - {} at {}:{})",
+                    addr,
+                    name,
+                    filename.display(),
+                    lineno
+                )
+                .unwrap();
             }
             resolved = true;
         });
@@ -454,16 +513,21 @@ impl std::fmt::Debug for Method {
     }
 }
 
-
-pub (super) fn apply_func_to(id: &FuncId,
-                             args: Args,
-                             env: Env,
-                             _ctx: Context,
-                             out: &mut NodeBuf) -> FuncCallResult
-{
+pub(super) fn apply_func_to(
+    id: &FuncId,
+    args: Args,
+    env: Env,
+    _ctx: Context,
+    out: &mut NodeBuf,
+) -> FuncCallResult {
     match *id {
         FuncId::Array => {
-            let values = args.resolve_flat(true, env);
+            let values = args
+                .resolve_flat(true, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
             out.add(NodeRef::array(values.into_iter().collect()));
             Ok(())
         }
@@ -471,7 +535,12 @@ pub (super) fn apply_func_to(id: &FuncId,
             if args.count() == 0 {
                 out.add(NodeRef::object(Properties::new()));
             } else if args.count() == 1 {
-                let values = args.resolve_column(false, 0, env);
+                let values = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?;
                 let mut map = LinkedHashMap::with_capacity(values.len());
                 for value in values.into_iter() {
                     if let Value::Object(ref props) = value.data().value() {
@@ -483,8 +552,18 @@ pub (super) fn apply_func_to(id: &FuncId,
                 out.add(NodeRef::object(map));
             } else {
                 args.check_count_func(id, 2, 2)?;
-                let keys = args.resolve_column(false, 0, env);
-                let values = args.resolve_column(true, 1, env);
+                let keys = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?;
+                let values = args
+                    .resolve_column(true, 1, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?;
                 let mut map = LinkedHashMap::with_capacity(std::cmp::min(keys.len(), values.len()));
                 for (k, v) in keys.into_iter().zip(values.into_iter()) {
                     map.insert(k.as_string().to_string().into(), v);
@@ -497,22 +576,41 @@ pub (super) fn apply_func_to(id: &FuncId,
             args.check_count_func(id, 1, 2)?;
 
             if args.count() == 1 {
-                let paths = args.resolve_column(false, 0, env);
+                let paths = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?;
                 for p in paths.into_iter() {
-                    match NodeRef::from_file(&resolve_path_str(p.data().as_string().as_ref()), None) {
+                    match NodeRef::from_file(&resolve_path_str(p.data().as_string().as_ref()), None)
+                    {
                         Ok(n) => out.add(n),
-                        Err(_err) => {}, //FIXME (jc) errors should be reported to the user somehow?
+                        Err(_err) => {} //FIXME (jc) errors should be reported to the user somehow?
                     }
                 }
             } else {
-                let paths = args.resolve_column(false, 0, env);
-                let formats = args.resolve_column(false, 1, env);
+                let paths = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?;
+                let formats =
+                    args.resolve_column(false, 1, env)
+                        .map_err(|d| FuncCallCustomErr {
+                            id: id.clone(),
+                            err: Box::new(d),
+                        })?;
 
                 for (p, f) in paths.into_iter().zip(formats.into_iter()) {
                     let format: FileFormat = f.data().as_string().as_ref().into();
-                    match NodeRef::from_file(&resolve_path_str(p.data().as_string().as_ref()), Some(format)) {
+                    match NodeRef::from_file(
+                        &resolve_path_str(p.data().as_string().as_ref()),
+                        Some(format),
+                    ) {
                         Ok(n) => out.add(n),
-                        Err(_err) => {}, //FIXME (jc) errors should be reported to the user somehow?
+                        Err(_err) => {} //FIXME (jc) errors should be reported to the user somehow?
                     }
                 }
             }
@@ -520,7 +618,12 @@ pub (super) fn apply_func_to(id: &FuncId,
         }
         FuncId::Json => {
             args.check_count_func(id, 1, 1)?;
-            let res = args.resolve_flat(false, env);
+            let res = args
+                .resolve_flat(false, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
             for n in res.into_iter() {
                 let n = n.data();
                 let s = n.as_string();
@@ -533,14 +636,19 @@ pub (super) fn apply_func_to(id: &FuncId,
         }
         FuncId::Parse => {
             args.check_count_func(id, 2, 2)?;
-            let rows = args.resolve_rows_null(false, None, env);
+            let rows = args
+                .resolve_rows_null(false, None, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
 
             for r in rows {
                 let ref content = r[0];
                 let format: FileFormat = r[1].data().as_string().as_ref().into();
                 match NodeRef::from_str(content.data().as_string(), format) {
                     Ok(n) => out.add(n),
-                    Err(_err) => {}, //FIXME (jc) errors should be reported to the user somehow?
+                    Err(_err) => {} //FIXME (jc) errors should be reported to the user somehow?
                 }
             }
             Ok(())
@@ -549,14 +657,24 @@ pub (super) fn apply_func_to(id: &FuncId,
             args.check_count_func(id, 1, 3)?;
             match args.count() {
                 1 => {
-                    let row = args.resolve_flat(false, env);
+                    let row = args
+                        .resolve_flat(false, env)
+                        .map_err(|d| FuncCallCustomErr {
+                            id: id.clone(),
+                            err: Box::new(d),
+                        })?;
                     let format = FileFormat::Json;
                     for n in row {
                         out.add(NodeRef::string(n.to_format(format, false)));
                     }
                 }
                 2 => {
-                    let rows = args.resolve_rows_null(false, None, env);
+                    let rows = args.resolve_rows_null(false, None, env).map_err(|d| {
+                        FuncCallCustomErr {
+                            id: id.clone(),
+                            err: Box::new(d),
+                        }
+                    })?;
                     for r in rows {
                         let ref n = r[0];
                         let format = {
@@ -571,7 +689,12 @@ pub (super) fn apply_func_to(id: &FuncId,
                     }
                 }
                 3 => {
-                    let rows = args.resolve_rows_null(false, None, env);
+                    let rows = args.resolve_rows_null(false, None, env).map_err(|d| {
+                        FuncCallCustomErr {
+                            id: id.clone(),
+                            err: Box::new(d),
+                        }
+                    })?;
                     for r in rows {
                         let ref n = r[0];
                         let format = {
@@ -593,13 +716,23 @@ pub (super) fn apply_func_to(id: &FuncId,
         FuncId::ParseInt => {
             args.check_count_func(id, 1, 2)?;
 
-            let strs = args.resolve_column(false, 0, env);
+            let strs = args
+                .resolve_column(false, 0, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
 
             let mut radixes_1;
             let mut radixes_2;
 
             let radixes: &mut dyn Iterator<Item = u32> = if args.count() == 2 {
-                radixes_1 = args.resolve_column(false, 1, env)
+                radixes_1 = args
+                    .resolve_column(false, 1, env)
+                    .map_err(|d| FuncCallCustomErr {
+                        id: id.clone(),
+                        err: Box::new(d),
+                    })?
                     .into_iter()
                     .map(|r| r.as_integer().map_or(10, |base| base as u32))
                     .chain(std::iter::repeat(10u32));
@@ -630,7 +763,12 @@ pub (super) fn apply_func_to(id: &FuncId,
 
             args.check_count_func(id, 1, 1)?;
 
-            let strs = args.resolve_column(false, 0, env);
+            let strs = args
+                .resolve_column(false, 0, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
 
             for s in strs.into_iter() {
                 let s = s.data();
@@ -647,20 +785,37 @@ pub (super) fn apply_func_to(id: &FuncId,
         FuncId::ParseBinary => {
             args.check_count_func(id, 2, 2)?;
 
-            let contents = args.resolve_column(false, 0, env);
-            let formats = args.resolve_column(false, 1, env);
+            let contents = args
+                .resolve_column(false, 0, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
+            let formats = args
+                .resolve_column(false, 1, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
 
             for (c, f) in contents.into_iter().zip(formats.into_iter()) {
                 let f: NodeRef = f;
                 let c: NodeRef = c;
                 let format: FileFormat = f.data().as_string().as_ref().into();
 
-                // FIXME ws error handling
-                let bytes = c.as_binary().expect("Binary node expected");
+                let res = c.as_binary();
+
+                if res.is_none() {
+                    return Err(NonBinaryNode {
+                        kind: c.data().kind(),
+                    }
+                    .into());
+                }
+                let bytes = res.unwrap();
 
                 match NodeRef::from_bytes(bytes.as_slice(), format) {
                     Ok(n) => out.add(n),
-                    Err(_err) => {}, //FIXME (jc) errors should be reported to the user somehow?
+                    Err(_err) => {} //FIXME (jc) errors should be reported to the user somehow?
                 }
             }
             Ok(())
@@ -668,7 +823,12 @@ pub (super) fn apply_func_to(id: &FuncId,
         FuncId::IsNaN => {
             args.check_count_func(id, 1, 1)?;
 
-            let nums = args.resolve_column(false, 0, env);
+            let nums = args
+                .resolve_column(false, 0, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
 
             for n in nums.into_iter() {
                 let f = n.as_float();
@@ -678,7 +838,12 @@ pub (super) fn apply_func_to(id: &FuncId,
         }
         FuncId::Sqrt => {
             args.check_count_func(id, 1, 1)?;
-            let res = args.resolve_flat(false, env);
+            let res = args
+                .resolve_flat(false, env)
+                .map_err(|d| FuncCallCustomErr {
+                    id: id.clone(),
+                    err: Box::new(d),
+                })?;
             for n in res.into_iter() {
                 out.add(NodeRef::float(n.as_float().sqrt()));
             }
@@ -690,25 +855,29 @@ pub (super) fn apply_func_to(id: &FuncId,
                     return func.call(name, args, env, out);
                 }
             }
-            Err(basic_diag!(FuncCallErr::UnknownFunc { name: name.to_string() }))
+            Err(basic_diag!(FuncCallErrorDetail::UnknownFunc {
+                name: name.to_string()
+            }))
         }
     }
 }
 
-
-pub (super) fn apply_method_to(id: &MethodId,
-                               args: Args,
-                               env: Env,
-                               _ctx: Context,
-                               out: &mut NodeBuf) -> FuncCallResult
-{
+pub(super) fn apply_method_to(
+    id: &MethodId,
+    args: Args,
+    env: Env,
+    _ctx: Context,
+    out: &mut NodeBuf,
+) -> FuncCallResult {
     #[inline]
-    fn array_remove(index: Option<usize>,
-                    id: &MethodId,
-                    kind: Kind,
-                    args: Args,
-                    env: Env,
-                    out: &mut NodeBuf) -> FuncCallResult {
+    fn array_remove(
+        index: Option<usize>,
+        id: &MethodId,
+        kind: Kind,
+        args: Args,
+        env: Env,
+        out: &mut NodeBuf,
+    ) -> FuncCallResult {
         if env.current().is_array() {
             args.check_count_method(id, kind, 0, 0)?;
 
@@ -720,29 +889,45 @@ pub (super) fn apply_method_to(id: &MethodId,
 
             Ok(())
         } else {
-            Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+            Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
+                name: id.name().to_string(),
+                kind,
+            }))
         }
     }
 
     #[inline]
-    fn array_add(index: Option<usize>,
-                 id: &MethodId,
-                 kind: Kind,
-                 args: Args,
-                 env: Env,
-                 out: &mut NodeBuf) -> FuncCallResult {
+    fn array_add(
+        index: Option<usize>,
+        id: &MethodId,
+        kind: Kind,
+        args: Args,
+        env: Env,
+        out: &mut NodeBuf,
+    ) -> FuncCallResult {
         if env.current().is_array() {
             args.check_count_method(id, kind, 1, 1)?;
-            let elems = args.resolve_column(true, 0, env);
+            let elems = args
+                .resolve_column(true, 0, env)
+                .map_err(|d| MethodCallCustomErr {
+                    id: id.clone(),
+                    kind,
+                    err: Box::new(d),
+                })?;
             for elem in elems.into_iter() {
                 env.current().add_child(index, None, elem).unwrap();
-            };
+            }
 
-            out.add(NodeRef::integer(env.current().data().children_count().unwrap() as i64));
+            out.add(NodeRef::integer(
+                env.current().data().children_count().unwrap() as i64,
+            ));
 
             Ok(())
         } else {
-            Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+            Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
+                name: id.name().to_string(),
+                kind,
+            }))
         }
     }
 
@@ -753,34 +938,35 @@ pub (super) fn apply_method_to(id: &MethodId,
             out.add(NodeRef::string(env.current().as_string()));
             Ok(())
         }
-        MethodId::Length => {
-            match env.current().data().value() {
-                Value::Binary(ref e) => {
-                    out.add(NodeRef::integer(e.len() as i64));
-                    Ok(())
-                }
-                Value::String(ref s) => {
-                    out.add(NodeRef::integer(s.len() as i64));
-                    Ok(())
-                }
-                Value::Array(ref e) => {
-                    out.add(NodeRef::integer(e.len() as i64));
-                    Ok(())
-                }
-                Value::Object(ref p) => {
-                    out.add(NodeRef::integer(p.len() as i64));
-                    Ok(())
-                }
-                _ => Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+        MethodId::Length => match env.current().data().value() {
+            Value::Binary(ref e) => {
+                out.add(NodeRef::integer(e.len() as i64));
+                Ok(())
             }
-        }
+            Value::String(ref s) => {
+                out.add(NodeRef::integer(s.len() as i64));
+                Ok(())
+            }
+            Value::Array(ref e) => {
+                out.add(NodeRef::integer(e.len() as i64));
+                Ok(())
+            }
+            Value::Object(ref p) => {
+                out.add(NodeRef::integer(p.len() as i64));
+                Ok(())
+            }
+            _ => Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
+                name: id.name().to_string(),
+                kind,
+            })),
+        },
         MethodId::Join => {
             fn wrap(node: &NodeRef, wrap_open: &str, wrap_close: &str, buf: &mut String) {
-                if !wrap_open.is_empty(){
+                if !wrap_open.is_empty() {
                     buf.push_str(wrap_open);
                 }
                 buf.push_str(node.data().as_string().as_ref());
-                if !wrap_close.is_empty(){
+                if !wrap_close.is_empty() {
                     buf.push_str(wrap_close);
                 }
             }
@@ -809,7 +995,13 @@ pub (super) fn apply_method_to(id: &MethodId,
             if let Value::Array(ref elems) = *env.current().data().value() {
                 args.check_count_method(id, env.current().data().kind(), 1, 2)?;
                 let sep = {
-                    let nsep = args.resolve_column(false, 0, env);
+                    let nsep =
+                        args.resolve_column(false, 0, env)
+                            .map_err(|d| MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            })?;
                     match nsep.into_one() {
                         Some(sep) => sep.data().as_string().to_string(),
                         None => String::new(),
@@ -817,7 +1009,13 @@ pub (super) fn apply_method_to(id: &MethodId,
                 };
                 let wrap = {
                     if args.count() == 2 {
-                        let nwrap = args.resolve_column(false, 1, env);
+                        let nwrap = args.resolve_column(false, 1, env).map_err(|d| {
+                            MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            }
+                        })?;
                         match nwrap.into_one() {
                             Some(wrap) => wrap.data().as_string().to_string(),
                             None => String::new(),
@@ -831,101 +1029,149 @@ pub (super) fn apply_method_to(id: &MethodId,
                 out.add(NodeRef::string(s));
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind: env.current().data().kind() }))
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
+                    name: id.name().to_string(),
+                    kind: env.current().data().kind()
+                }))
             }
         }
-        MethodId::Push => {
-            array_add(None, id, kind, args, env, out)
-        }
-        MethodId::Pop => {
-            array_remove(None, id, kind, args, env, out)
-        }
-        MethodId::Unshift => {
-            array_add(Some(0), id, kind, args, env, out)
-        }
-        MethodId::Shift => {
-            array_remove(Some(0), id, kind, args, env, out)
-        }
+        MethodId::Push => array_add(None, id, kind, args, env, out),
+        MethodId::Pop => array_remove(None, id, kind, args, env, out),
+        MethodId::Unshift => array_add(Some(0), id, kind, args, env, out),
         MethodId::Find => {
             args.check_count_method(id, kind, 1, 1)?;
-            let nres = args.resolve_column(false, 0, env);
+            let nres = args
+                .resolve_column(false, 0, env)
+                .map_err(|d| MethodCallCustomErr {
+                    id: id.clone(),
+                    kind,
+                    err: Box::new(d),
+                })?;
             for n in nres.into_iter() {
                 let d = n.data();
                 let s = d.as_string();
                 if s.is_empty() {
                     out.add(env.current().clone());
                 } else if s.starts_with("@.") {
-                    match Opath::parse(&s) {
-                        Ok(opath) => {
-                            opath.expr().apply_to(env, Context::Expr, out);
-                        }
-                        Err(_) => {
-                            //FIXME (jc): how to handle parse errors here?
-                            unimplemented!()
-                        }
-                    }
+                    let opath = Opath::parse(&s).map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?;
+                    opath
+                        .expr()
+                        .apply_to(env, Context::Expr, out)
+                        .map_err(|d| MethodCallCustomErr {
+                            id: id.clone(),
+                            kind,
+                            err: Box::new(d),
+                        })?;
                 } else {
                     let s = String::with_capacity(256) + "@." + &s;
-                    match Opath::parse(&s) {
-                        Ok(opath) => {
-                            opath.expr().apply_to(env, Context::Expr, out);
-                        }
-                        Err(_) => {
-                            //FIXME (jc): how to handle parse errors here?
-                            unimplemented!()
-                        }
-                    }
+                    let opath = Opath::parse(&s).map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?;
+                    opath
+                        .expr()
+                        .apply_to(env, Context::Expr, out)
+                        .map_err(|d| MethodCallCustomErr {
+                            id: id.clone(),
+                            kind,
+                            err: Box::new(d),
+                        })?;
                 }
             }
             Ok(())
         }
+        MethodId::Shift => array_remove(Some(0), id, kind, args, env, out),
         MethodId::Set => {
             if env.current().is_object() {
                 args.check_count_method(id, kind, 2, 2)?;
 
-                let keys = args.resolve_column(false, 0, env);
-                let keys: Vec<_> = keys.into_iter().map(|k| if k.is_consumable() {
-                    k.into_string()
-                } else {
-                    k.as_string()
-                }).collect();
+                let keys = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?;
+                let keys: Vec<_> = keys
+                    .into_iter()
+                    .map(|k| {
+                        if k.is_consumable() {
+                            k.into_string()
+                        } else {
+                            k.as_string()
+                        }
+                    })
+                    .collect();
 
-                let values = args.resolve_column(true, 1, env);
+                let values =
+                    args.resolve_column(true, 1, env)
+                        .map_err(|d| MethodCallCustomErr {
+                            id: id.clone(),
+                            kind,
+                            err: Box::new(d),
+                        })?;
 
-                env.current().add_children(true, keys.into_iter().zip(values.into_iter()).map(|(k, v)| (None, Some(k.into()), v))).unwrap();
+                env.current()
+                    .add_children(
+                        true,
+                        keys.into_iter()
+                            .zip(values.into_iter())
+                            .map(|(k, v)| (None, Some(k.into()), v)),
+                    )
+                    .unwrap();
 
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
+                    name: id.name().to_string(),
+                    kind,
+                }))
             }
         }
         MethodId::Delete => {
             if env.current().is_object() {
                 args.check_count_method(id, kind, 1, 1)?;
 
-                let keys = args.resolve_column(false, 0, env);
-                let keys: Vec<_> = keys.into_iter().map(|k| if k.is_consumable() {
-                    k.into_string()
-                } else {
-                    k.as_string()
-                }).collect();
+                let keys = args
+                    .resolve_column(false, 0, env)
+                    .map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?;
+                let keys: Vec<_> = keys
+                    .into_iter()
+                    .map(|k| {
+                        if k.is_consumable() {
+                            k.into_string()
+                        } else {
+                            k.as_string()
+                        }
+                    })
+                    .collect();
 
-                env.current().remove_children(true, keys.into_iter().map(|k| (None, Some(k.into())))).unwrap();
+                env.current()
+                    .remove_children(true, keys.into_iter().map(|k| (None, Some(k.into()))))
+                    .unwrap();
 
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
+                    name: id.name().to_string(),
+                    kind,
+                }))
             }
         }
         MethodId::Extend => {
             fn calc_index(i: Option<i64>, len: usize) -> Option<usize> {
                 match i {
-                    Some(i) if i < 0 => {
-                        Some(std::cmp::max(len as i64 + i, 0) as usize)
-                    }
-                    Some(i) => {
-                        Some(i as usize)
-                    }
+                    Some(i) if i < 0 => Some(std::cmp::max(len as i64 + i, 0) as usize),
+                    Some(i) => Some(i as usize),
                     None => None,
                 }
             }
@@ -934,17 +1180,47 @@ pub (super) fn apply_method_to(id: &MethodId,
                 args.check_count_method(id, kind, 1, 2)?;
 
                 if args.count() == 1 {
-                    let values = args.resolve_column(true, 0, env);
-                    env.current().extend_multiple(values.into_iter().map(|n| (n, None))).unwrap();
+                    let values =
+                        args.resolve_column(true, 0, env)
+                            .map_err(|d| MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            })?;
+                    env.current()
+                        .extend_multiple(values.into_iter().map(|n| (n, None)))
+                        .unwrap();
                 } else {
-                    let values = args.resolve_column(true, 0, env);
-                    let indices = args.resolve_column(false, 1, env);
+                    let values =
+                        args.resolve_column(true, 0, env)
+                            .map_err(|d| MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            })?;
+                    let indices =
+                        args.resolve_column(false, 1, env)
+                            .map_err(|d| MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            })?;
                     let len = env.current().data().children_count().unwrap();
-                    env.current().extend_multiple(values.into_iter().zip(indices.into_iter()).map(|(n, i)| (n, calc_index(i.as_integer(), len)))).unwrap();
+                    env.current()
+                        .extend_multiple(
+                            values
+                                .into_iter()
+                                .zip(indices.into_iter())
+                                .map(|(n, i)| (n, calc_index(i.as_integer(), len))),
+                        )
+                        .unwrap();
                 }
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
+                    name: id.name().to_string(),
+                    kind,
+                }))
             }
         }
         MethodId::Custom(ref name) => {
@@ -955,7 +1231,10 @@ pub (super) fn apply_method_to(id: &MethodId,
                     }
                 }
             }
-            Err(basic_diag!(FuncCallErr::UnknownMethod { name: name.to_string(), kind, }))
+            Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
+                name: name.to_string(),
+                kind,
+            }))
         }
         MethodId::Replace => {
             use regex::Regex;
@@ -963,11 +1242,30 @@ pub (super) fn apply_method_to(id: &MethodId,
             if kind == Kind::String {
                 args.check_count_method(id, kind, 1, 2)?;
 
-                let re = args.resolve_column(true, 0, env).into_one().unwrap();
-                let regex = Regex::new(&re.data().as_string()).expect("regex parse error"); //FIXME (jc) regex
+                let re = args
+                    .resolve_column(true, 0, env)
+                    .map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?
+                    .into_one()
+                    .unwrap();
+                let regex =
+                    Regex::new(&re.data().as_string()).map_err(|err| RegexParseError { err })?;
                 let replacement = {
                     if args.count() == 2 {
-                        args.resolve_column(true, 1, env).into_one().unwrap().data().as_string().to_string()
+                        args.resolve_column(true, 1, env)
+                            .map_err(|d| MethodCallCustomErr {
+                                id: id.clone(),
+                                kind,
+                                err: Box::new(d),
+                            })?
+                            .into_one()
+                            .unwrap()
+                            .data()
+                            .as_string()
+                            .to_string()
                     } else {
                         String::new()
                     }
@@ -979,7 +1277,10 @@ pub (super) fn apply_method_to(id: &MethodId,
                 out.add(NodeRef::string(result));
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
+                    name: id.name().to_string(),
+                    kind,
+                }))
             }
         }
         MethodId::Split => {
@@ -987,8 +1288,17 @@ pub (super) fn apply_method_to(id: &MethodId,
 
             if kind == Kind::String {
                 args.check_count_method(id, kind, 1, 2)?;
-                let re = args.resolve_column(true, 0, env).into_one().unwrap();
-                let regex = Regex::new(re.data().as_string().as_ref()).expect("regex parse error"); //FIXME (jc) regex
+                let re = args
+                    .resolve_column(true, 0, env)
+                    .map_err(|d| MethodCallCustomErr {
+                        id: id.clone(),
+                        kind,
+                        err: Box::new(d),
+                    })?
+                    .into_one()
+                    .unwrap();
+                let regex = Regex::new(re.data().as_string().as_ref())
+                    .map_err(|err| RegexParseError { err })?;
 
                 let value = env.current().data();
                 let s = value.as_string();
@@ -997,13 +1307,14 @@ pub (super) fn apply_method_to(id: &MethodId,
                 }
                 Ok(())
             } else {
-                Err(basic_diag!(FuncCallErr::UnknownMethod { name: id.name().to_string(), kind, }))
+                Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
+                    name: id.name().to_string(),
+                    kind,
+                }))
             }
-        }
-        //_ => unimplemented!()
+        } //_ => unimplemented!()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -1023,6 +1334,61 @@ mod tests {
             }
         }
     "#;
+
+    mod diags_example {
+        use super::*;
+
+        #[derive(Debug, Display, Detail)]
+        #[diag(code_offset = 800)]
+        pub enum TestErr {
+            #[display(fmt = "unknown function '{name}'")]
+            PlainErr { name: String },
+            #[display(fmt = "TestErr2 occured: {det}", det = "err.detail()")]
+            TestErr2 { err: Box<dyn Diag> },
+        }
+
+        #[derive(Debug, Display, Detail)]
+        #[diag(code_offset = 900)]
+        pub enum TestErr2 {
+            #[display(fmt = "Another plain error '{name}'")]
+            AnotherPlainErr { name: String },
+            #[display(fmt = "TestERR: {detail}", detail = "err.detail()")]
+            TestErr { err: Box<dyn Diag> },
+        }
+
+        fn test_err() -> Result<(), BasicDiag> {
+            match test_err2() {
+                Ok(_) => panic!(),
+                Err(err) => {
+                    let detail = TestErr::TestErr2 { err: Box::new(err) };
+                    Err(BasicDiag::from(detail))
+                }
+            }
+        }
+
+        fn test_err2() -> Result<(), BasicDiag> {
+            let detail = TestErr2::AnotherPlainErr {
+                name: "inner".to_string(),
+            };
+            Err(BasicDiag::from(detail))
+        }
+
+        #[test]
+        fn test_diag() {
+            let res = test_err();
+            println!("{}", res.unwrap_err());
+        }
+
+        #[test]
+        fn errors_test() {
+            let n = NodeRef::from_json(r#"{}"#).unwrap();
+
+            let expr = Opath::parse("parse('{\"aaaa\":-}', 'json')").unwrap();
+            let mut res = expr.apply(&n, &n);
+            eprintln!("res = {:?}", res);
+        }
+
+    }
 
     fn test_node<'a>() -> NodeRef {
         NodeRef::from_json(TEST_JSON).unwrap()
@@ -1354,7 +1720,12 @@ mod tests {
 
             #[test]
             fn filter_numbers() {
-                fn filter_numbers(_name: &str, args: Args, env: Env<'_>, out: &mut NodeBuf) -> FuncCallResult {
+                fn filter_numbers(
+                    _name: &str,
+                    args: Args,
+                    env: Env<'_>,
+                    out: &mut NodeBuf,
+                ) -> FuncCallResult {
                     let res = args.resolve_flat(false, env);
                     for r in res.into_iter() {
                         if r.is_number() {
@@ -1364,7 +1735,8 @@ mod tests {
                     Ok(())
                 }
 
-                let scope = ScopeMut::new().with_func("filter_numbers".into(), box Func::new(filter_numbers));
+                let scope = ScopeMut::new()
+                    .with_func("filter_numbers".into(), box Func::new(filter_numbers));
                 let n = test_node();
                 let expr = Opath::parse("filter_numbers($.**).@path").unwrap();
                 let res = expr.apply_ext(&n, &n, scope.as_ref()).into_vec();
@@ -1495,7 +1867,6 @@ mod tests {
             assert_eq!(e.as_float(), 1.0);
         }
 
-
         #[test]
         fn pop_non_empty() {
             let n: &str = r#"["a", "b"]"#;
@@ -1607,14 +1978,20 @@ mod tests {
 
             #[test]
             fn count_char() {
-                fn count_char(name: &str, args: Args, env: Env, out: &mut NodeBuf) -> FuncCallResult {
+                fn count_char(
+                    name: &str,
+                    args: Args,
+                    env: Env,
+                    out: &mut NodeBuf,
+                ) -> FuncCallResult {
                     if !env.current().is_string() {
-                        Err(basic_diag!(FuncCallErr::UnknownMethod {
+                        Err(basic_diag!(FuncCallErrorDetail::UnknownMethod {
                             name: name.into(),
                             kind: env.current().data().kind(),
                         }))
                     } else {
-                        let mut res = args.resolve_flat(false, env)
+                        let mut res = args
+                            .resolve_flat(false, env)
                             .into_iter()
                             .filter_map(|n| n.data().as_string().chars().next())
                             .collect::<Vec<char>>();
@@ -1634,7 +2011,10 @@ mod tests {
                     }
                 }
 
-                let scope = ScopeMut::new().with_method("count_char".into(), box Method::new(KindMask::string(), count_char));
+                let scope = ScopeMut::new().with_method(
+                    "count_char".into(),
+                    box Method::new(KindMask::string(), count_char),
+                );
                 let n = NodeRef::null();
 
                 let expr = Opath::parse("'ala ma kota'.count_char('a', 'k')").unwrap();

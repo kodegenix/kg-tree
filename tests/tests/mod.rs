@@ -2,10 +2,10 @@ use super::*;
 
 use self::common::*;
 
-mod common;
-mod math_ops;
-mod convert;
-mod prop_access;
-mod number_ranges;
-mod bool_ops;
 mod attrs;
+mod bool_ops;
+mod common;
+mod convert;
+mod math_ops;
+mod number_ranges;
+mod prop_access;

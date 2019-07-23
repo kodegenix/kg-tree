@@ -6,7 +6,6 @@ pub trait Primitive: Clone {
     fn empty() -> Self;
 }
 
-
 impl Primitive for String {
     fn get(node: &NodeRef) -> Self {
         node.as_string()

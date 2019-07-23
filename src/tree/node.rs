@@ -5,14 +5,14 @@ use super::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
-    Null    = 0x01,
+    Null = 0x01,
     Boolean = 0x02,
     Integer = 0x04,
-    Float   = 0x08,
-    String  = 0x10,
-    Binary  = 0x20,
-    Array   = 0x40,
-    Object  = 0x80,
+    Float = 0x08,
+    String = 0x10,
+    Binary = 0x20,
+    Array = 0x40,
+    Object = 0x80,
 }
 
 impl Kind {
@@ -48,7 +48,6 @@ impl std::fmt::Display for Kind {
         write!(f, "{}", self.as_type_str())
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct KindMask(u8);
@@ -114,7 +113,6 @@ impl KindMask {
     }
 }
 
-
 #[derive(Debug)]
 pub enum Value {
     Null,
@@ -151,10 +149,10 @@ impl Value {
         match *self {
             Value::String(ref mut s) => {
                 s.shrink_to_fit();
-            },
+            }
             Value::Binary(ref mut b) => {
                 b.shrink_to_fit();
-            },
+            }
             Value::Array(ref mut elems) => {
                 elems.shrink_to_fit();
                 for e in elems.iter_mut() {
@@ -187,7 +185,6 @@ impl HeapSizeOf for Value {
     }
 }
 
-
 #[derive(Debug)]
 pub struct Node {
     metadata: Metadata,
@@ -195,11 +192,8 @@ pub struct Node {
 }
 
 impl Node {
-    pub (super) fn new(metadata: Metadata, value: Value) -> Node {
-        Node {
-            metadata,
-            value,
-        }
+    pub(super) fn new(metadata: Metadata, value: Value) -> Node {
+        Node { metadata, value }
     }
 
     pub fn value(&self) -> &Value {
@@ -311,11 +305,13 @@ impl Node {
             Value::Null => Some(0),
             Value::Boolean(b) => Some(b as i64),
             Value::Integer(n) => Some(n),
-            Value::Float(n) => if n.is_finite() {
-                Some(n as i64)
-            } else {
-                None
-            },
+            Value::Float(n) => {
+                if n.is_finite() {
+                    Some(n as i64)
+                } else {
+                    None
+                }
+            }
             Value::String(ref s) => i64::from_str(s).ok(),
             Value::Binary(_) => None,
             Value::Array(_) => None,
@@ -504,50 +500,71 @@ impl Node {
 
     pub fn dir(&self) -> String {
         match self.file() {
-            Some(f) => if f.file_type() == FileType::Dir {
-                f.file_path().to_str().unwrap().to_string()
-            } else {
-                f.file_path().parent().map_or(String::new(), |p| p.to_str().unwrap().to_string())
-            },
+            Some(f) => {
+                if f.file_type() == FileType::Dir {
+                    f.file_path().to_str().unwrap().to_string()
+                } else {
+                    f.file_path()
+                        .parent()
+                        .map_or(String::new(), |p| p.to_str().unwrap().to_string())
+                }
+            }
             None => String::new(),
         }
     }
 
     pub fn dir_abs(&self) -> String {
         match self.file() {
-            Some(f) => if f.file_type() == FileType::Dir {
-                f.file_path_abs().to_str().unwrap().to_string()
-            } else {
-                f.file_path_abs().parent().map_or(String::new(), |p| p.to_str().unwrap().to_string())
-            },
+            Some(f) => {
+                if f.file_type() == FileType::Dir {
+                    f.file_path_abs().to_str().unwrap().to_string()
+                } else {
+                    f.file_path_abs()
+                        .parent()
+                        .map_or(String::new(), |p| p.to_str().unwrap().to_string())
+                }
+            }
             None => String::new(),
         }
     }
 
     pub fn file_path_components<'b>(&'b self) -> impl Iterator<Item = String> + 'b {
         match self.file() {
-            Some(f) => Box::new(f.file_path().components().map(|c| c.as_os_str().to_str().unwrap().to_string())) as Box<dyn Iterator<Item = String>>,
+            Some(f) => Box::new(
+                f.file_path()
+                    .components()
+                    .map(|c| c.as_os_str().to_str().unwrap().to_string()),
+            ) as Box<dyn Iterator<Item = String>>,
             None => Box::new(std::iter::empty()) as Box<dyn Iterator<Item = String>>,
         }
     }
 
     pub fn file_name(&self) -> String {
         match self.file() {
-            Some(f) => f.file_path().file_name().map_or(String::new(), |e| e.to_str().unwrap().to_string()),
+            Some(f) => f
+                .file_path()
+                .file_name()
+                .map_or(String::new(), |e| e.to_str().unwrap().to_string()),
             None => String::new(),
         }
     }
 
     pub fn file_stem(&self) -> String {
         match self.file() {
-            Some(f) => f.file_path().file_stem().map_or(String::new(), |e| e.to_str().unwrap().to_string()),
+            Some(f) => f
+                .file_path()
+                .file_stem()
+                .map_or(String::new(), |e| e.to_str().unwrap().to_string()),
             None => String::new(),
         }
     }
 
     pub fn file_ext(&self) -> String {
         match self.file() {
-            Some(f) => f.file_path().extension().map_or(String::new(), |e| e.to_str().unwrap().to_string()),
+            Some(f) => f
+                .file_path()
+                .extension()
+                .map_or(String::new(), |e| e.to_str().unwrap().to_string()),
             None => String::new(),
         }
     }
@@ -575,8 +592,8 @@ impl Node {
 
 impl std::fmt::Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use std::fmt::Write;
         use kg_display::PrettyPrinter;
+        use std::fmt::Write;
 
         #[inline]
         fn padding<'a>(f: &mut std::fmt::Formatter) -> (usize, Cow<'a, str>) {
@@ -592,7 +609,11 @@ impl std::fmt::Display for Node {
 
         if f.alternate() {
             let ref m = self.metadata;
-            write!(f, "<{:p},", m.parent().map_or(std::ptr::null(), |p| p.data_ptr()))?;
+            write!(
+                f,
+                "<{:p},",
+                m.parent().map_or(std::ptr::null(), |p| p.data_ptr())
+            )?;
             write!(f, "{},", m.index())?;
             write!(f, "{:?},", m.key())?;
             match m.file() {
@@ -675,8 +696,6 @@ impl HeapSizeOf for Node {
         self.metadata.heap_size_of_children() + self.value.heap_size_of_children()
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

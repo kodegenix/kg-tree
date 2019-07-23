@@ -64,13 +64,14 @@ impl std::fmt::Display for Inner {
     }
 }
 
-
 trait ScopeImpl: Sized {
     fn borrow(&self) -> Ref<Inner>;
 
     fn get_func(&self, func: &'_ str) -> Option<Ref<Box<dyn FuncCallable>>> {
         if let Some(f) = self.borrow().func_map.get(func) {
-            Some(Ref::map(self.borrow(), |_| unsafe { std::mem::transmute(f) }))
+            Some(Ref::map(self.borrow(), |_| unsafe {
+                std::mem::transmute(f)
+            }))
         } else {
             if let Some(ref p) = self.borrow().parent {
                 unsafe { std::mem::transmute(p.get_func(func)) }
@@ -82,7 +83,9 @@ trait ScopeImpl: Sized {
 
     fn get_method(&self, method: &'_ str) -> Option<Ref<Box<dyn MethodCallable>>> {
         if let Some(m) = self.borrow().method_map.get(method) {
-            Some(Ref::map(self.borrow(), |_| unsafe { std::mem::transmute(m) }))
+            Some(Ref::map(self.borrow(), |_| unsafe {
+                std::mem::transmute(m)
+            }))
         } else {
             if let Some(ref p) = self.borrow().parent {
                 unsafe { std::mem::transmute(p.get_method(method)) }
@@ -94,7 +97,9 @@ trait ScopeImpl: Sized {
 
     fn get_var(&self, var: &'_ str) -> Option<Ref<NodeSet>> {
         if let Some(v) = self.borrow().var_map.get(var) {
-            Some(Ref::map(self.borrow(), |_| unsafe { std::mem::transmute(v) }))
+            Some(Ref::map(self.borrow(), |_| unsafe {
+                std::mem::transmute(v)
+            }))
         } else {
             if let Some(ref p) = self.borrow().parent {
                 unsafe { std::mem::transmute(p.get_var(var)) }
@@ -104,13 +109,23 @@ trait ScopeImpl: Sized {
         }
     }
 
-    fn get_var_value<T: Primitive>(&self, var: &str) -> Result<T, Error> {
+    fn get_var_value<T: Primitive>(&self, var: &str) -> ExprResult<T> {
         match self.get_var(var) {
             Some(v) => match *v {
                 NodeSet::One(ref n) => Ok(T::get(n)),
-                _ => Err(Error::Undef(line!())), //FIXME (jc): expected single result
+                _ => {
+                    let diag = BasicDiag::new(ExprErrorDetail::MultipleVarValues {
+                        var_name: var.to_string(),
+                    });
+                    Err(diag)
+                }
+            },
+            None => {
+                let diag = BasicDiag::new(ExprErrorDetail::VariableNotFound {
+                    var_name: var.to_string(),
+                });
+                Err(diag)
             }
-            None => Err(Error::Undef(line!())), //FIXME (jc): variable not found
         }
     }
 
@@ -119,7 +134,7 @@ trait ScopeImpl: Sized {
             Some(v) => match *v {
                 NodeSet::One(ref n) => Some(T::get(n)),
                 _ => None,
-            }
+            },
             None => None,
         }
     }
@@ -134,7 +149,9 @@ trait ScopeImpl: Sized {
 
     fn parent(&self) -> Option<Ref<Scope>> {
         if let Some(ref p) = self.borrow().parent {
-            Some(Ref::map(self.borrow(), |_| unsafe { std::mem::transmute(p) }))
+            Some(Ref::map(self.borrow(), |_| unsafe {
+                std::mem::transmute(p)
+            }))
         } else {
             None
         }
@@ -159,7 +176,6 @@ trait ScopeImpl: Sized {
     }
 }
 
-
 trait ScopeMutImpl: ScopeImpl + Sized {
     fn borrow_mut(&self) -> RefMut<Inner>;
 
@@ -177,7 +193,6 @@ trait ScopeMutImpl: ScopeImpl + Sized {
         self.set_var(name, var);
         self
     }
-
 
     fn set_func(&self, name: Symbol, func: Box<dyn FuncCallable>) {
         self.borrow_mut().func_map.insert(name, func);
@@ -208,7 +223,6 @@ trait ScopeMutImpl: ScopeImpl + Sized {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Scope(Rc<RefCell<Inner>>);
 
@@ -225,7 +239,7 @@ impl Scope {
         ScopeImpl::get_var(self, var)
     }
 
-    pub fn get_var_value<T: Primitive>(&self, var: &str) -> Result<T, Error> {
+    pub fn get_var_value<T: Primitive>(&self, var: &str) -> ExprResult<T> {
         ScopeImpl::get_var_value(self, var)
     }
 
@@ -272,7 +286,6 @@ impl std::fmt::Display for Scope {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct ScopeMut(Rc<RefCell<Inner>>);
 
@@ -301,7 +314,7 @@ impl ScopeMut {
         ScopeImpl::get_var(self, var)
     }
 
-    pub fn get_var_value<T: Primitive>(&self, var: &str) -> Result<T, Error> {
+    pub fn get_var_value<T: Primitive>(&self, var: &str) -> ExprResult<T> {
         ScopeImpl::get_var_value(self, var)
     }
 
@@ -340,7 +353,6 @@ impl ScopeMut {
     pub fn with_var(self, name: Symbol, var: NodeSet) -> Self {
         ScopeMutImpl::with_var(self, name, var)
     }
-
 
     pub fn set_func(&self, name: Symbol, func: Box<dyn FuncCallable>) {
         ScopeMutImpl::set_func(self, name, func)
@@ -402,7 +414,6 @@ impl std::fmt::Display for ScopeMut {
         self.borrow().fmt(f)
     }
 }
-
 
 #[cfg(test)]
 mod tests {

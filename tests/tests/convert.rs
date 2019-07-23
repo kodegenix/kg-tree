@@ -256,4 +256,3 @@ mod as_integer {
         node.as_integer().unwrap();
     }
 }
-

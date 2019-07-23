@@ -100,7 +100,6 @@ fn integer_object() {
     assert!(f64::is_nan(res.as_float()));
 }
 
-
 #[test]
 fn float_float() {
     let results = query("3.1 - 2.1", EXAMPLE_JSON);
@@ -148,7 +147,6 @@ fn float_undefined() {
     assert!(f64::is_nan(res.as_float()));
 }
 
-
 #[test]
 fn float_bool() {
     let results = query("2.1 - true", EXAMPLE_JSON);
@@ -188,7 +186,6 @@ fn float_null() {
     assert!(res.is_number());
     assert_approx_eq!(res.as_float(), 1.1);
 }
-
 
 #[test]
 fn bool_integer() {
@@ -702,7 +699,6 @@ fn string_bool() {
     assert!(f64::is_nan(res.as_float()));
 }
 
-
 #[test]
 fn number_string_float() {
     let results = query("'3' - 2.1", EXAMPLE_JSON);
@@ -772,7 +768,6 @@ fn string_empty_array() {
     assert!(res.is_float());
     assert!(f64::is_nan(res.as_float()));
 }
-
 
 #[test]
 fn string_object() {

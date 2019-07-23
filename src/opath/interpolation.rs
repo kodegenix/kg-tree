@@ -12,12 +12,14 @@ pub enum Interpolation {
 impl Interpolation {
     pub fn parse(input: Cow<str>) -> Result<Interpolation, OpathParseError> {
         match Parser::new().parse_str(&input)? {
-            Interpolation::Empty => if let Cow::Owned(s) = input {
-                Ok(Interpolation::Simple(s))
-            } else {
-                Ok(Interpolation::Empty)
+            Interpolation::Empty => {
+                if let Cow::Owned(s) = input {
+                    Ok(Interpolation::Simple(s))
+                } else {
+                    Ok(Interpolation::Empty)
+                }
             }
-            i @ _ => Ok(i)
+            i @ _ => Ok(i),
         }
     }
 
@@ -30,54 +32,72 @@ impl Interpolation {
                     Interpolation::Empty => Interpolation::Simple(s),
                     _ => i,
                 },
-                Err(_err) => {
-                    Interpolation::Simple(s)
+                Err(_err) => Interpolation::Simple(s),
+            },
+        }
+    }
+
+    pub fn parse_delims(
+        input: Cow<str>,
+        open_delim: &str,
+        close_delim: &str,
+    ) -> Result<Interpolation, OpathParseError> {
+        match Parser::with_delims(open_delim, close_delim).parse_str(&input)? {
+            Interpolation::Empty => {
+                if let Cow::Owned(s) = input {
+                    Ok(Interpolation::Simple(s))
+                } else {
+                    Ok(Interpolation::Empty)
                 }
             }
+            i @ _ => Ok(i),
         }
     }
 
-    pub fn parse_delims(input: Cow<str>, open_delim: &str, close_delim: &str) -> Result<Interpolation, OpathParseError> {
-        match Parser::with_delims(open_delim, close_delim).parse_str(&input)? {
-            Interpolation::Empty => if let Cow::Owned(s) = input {
-                Ok(Interpolation::Simple(s))
-            } else {
-                Ok(Interpolation::Empty)
-            }
-            i @ _ => Ok(i)
-        }
-    }
-
-    pub fn resolve(&self, root: &NodeRef, current: &NodeRef) -> Option<NodeRef> {
-        match *self {
+    pub fn resolve(&self, root: &NodeRef, current: &NodeRef) -> ExprResult<Option<NodeRef>> {
+        let res = match *self {
             Interpolation::Empty => None,
             Interpolation::Simple(ref s) => Some(NodeRef::string(s.as_str())),
-            Interpolation::Expr(ref e) => Some(e.apply_one(root, current)),
-        }
+            Interpolation::Expr(ref e) => Some(e.apply_one(root, current)?),
+        };
+        Ok(res)
     }
 
-    pub fn resolve_into(self, root: &NodeRef, current: &NodeRef) -> Option<NodeRef> {
-        match self {
+    pub fn resolve_into(self, root: &NodeRef, current: &NodeRef) -> ExprResult<Option<NodeRef>> {
+        let res = match self {
             Interpolation::Empty => None,
             Interpolation::Simple(s) => Some(NodeRef::string(s.as_str())),
-            Interpolation::Expr(e) => Some(e.apply_one(root, current)),
-        }
+            Interpolation::Expr(e) => Some(e.apply_one(root, current)?),
+        };
+        Ok(res)
     }
 
-    pub fn resolve_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> Option<NodeRef> {
-        match *self {
+    pub fn resolve_ext(
+        &self,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+    ) -> ExprResult<Option<NodeRef>> {
+        let res = match *self {
             Interpolation::Empty => None,
             Interpolation::Simple(ref s) => Some(NodeRef::string(s.as_str())),
-            Interpolation::Expr(ref e) => Some(e.apply_one_ext(root, current, scope)),
-        }
+            Interpolation::Expr(ref e) => Some(e.apply_one_ext(root, current, scope)?),
+        };
+        Ok(res)
     }
 
-    pub fn resolve_ext_into(self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> Option<NodeRef> {
-        match self {
+    pub fn resolve_ext_into(
+        self,
+        root: &NodeRef,
+        current: &NodeRef,
+        scope: &Scope,
+    ) -> ExprResult<Option<NodeRef>> {
+        let res = match self {
             Interpolation::Empty => None,
             Interpolation::Simple(s) => Some(NodeRef::string(s)),
-            Interpolation::Expr(e) => Some(e.apply_one_ext(root, current, scope)),
-        }
+            Interpolation::Expr(e) => Some(e.apply_one_ext(root, current, scope)?),
+        };
+        Ok(res)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -102,9 +122,11 @@ impl Interpolation {
     }
 }
 
-
 impl ser::Serialize for Interpolation {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: ser::Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
         match *self {
             Interpolation::Empty => serializer.serialize_none(),
             Interpolation::Simple(ref s) => serializer.serialize_str(s),
@@ -112,7 +134,6 @@ impl ser::Serialize for Interpolation {
         }
     }
 }
-
 
 struct InterpolationVisitor;
 
@@ -123,25 +144,36 @@ impl<'de> de::Visitor<'de> for InterpolationVisitor {
         write!(f, "string")
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(Interpolation::parse_always(v.to_string().into()))
     }
 
-    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(Interpolation::parse_always(v.to_string().into()))
     }
 
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(Interpolation::parse_always(v.into()))
     }
 }
 
 impl<'de> de::Deserialize<'de> for Interpolation {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: de::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
         deserializer.deserialize_str(InterpolationVisitor)
     }
 }
-
 
 #[derive(Debug)]
 struct Delims {
@@ -226,11 +258,14 @@ impl Parser {
                             r.skip_chars(self.delims.close.len())?;
                             p0 = r.position();
                         } else {
-                            return self::parse::ParseErr::unexpected_eoi_str(r, self.delims.close.clone());
+                            return self::parse::ParseErr::unexpected_eoi_str(
+                                r,
+                                self.delims.close.clone(),
+                            );
                         }
                     }
                 }
-                _ => {},
+                _ => {}
             }
         }
 
@@ -251,11 +286,13 @@ impl Parser {
         }
 
         Ok(match expr.len() {
-            0 => if buf.is_empty() {
-                Interpolation::Empty
-            } else {
-                Interpolation::Simple(buf)
-            },
+            0 => {
+                if buf.is_empty() {
+                    Interpolation::Empty
+                } else {
+                    Interpolation::Simple(buf)
+                }
+            }
             1 => match expr.pop().unwrap() {
                 Expr::String(s) => Interpolation::Simple(s),
                 Expr::StringEnc(s) => Interpolation::Simple(s),
@@ -270,7 +307,6 @@ impl Parser {
         self.parse(&mut r)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -310,7 +346,10 @@ mod tests {
         let interp = Interpolation::parse(s.into()).unwrap();
 
         assert!(interp.is_expr());
-        assert_eq!(interp.resolve(&n, &n).unwrap().as_string(), "username: johnny, email: johnny@example.org was logged in.");
+        assert_eq!(
+            interp.resolve(&n, &n).unwrap().as_string(),
+            "username: johnny, email: johnny@example.org was logged in."
+        );
     }
 
     #[test]
@@ -324,7 +363,6 @@ mod tests {
         assert_eq!(interp.resolve(&n, &n).unwrap().as_string(), "johnny");
     }
 
-
     #[test]
     fn with_expressions_and_escapes() {
         let s = "username: <% username %>, email: \\<%<%email%>%> was logged in.";
@@ -333,7 +371,10 @@ mod tests {
         let interp = Interpolation::parse(s.into()).unwrap();
 
         assert!(interp.is_expr());
-        assert_eq!(interp.resolve(&n, &n).unwrap().as_string(), "username: johnny, email: <%johnny@example.org%> was logged in.");
+        assert_eq!(
+            interp.resolve(&n, &n).unwrap().as_string(),
+            "username: johnny, email: <%johnny@example.org%> was logged in."
+        );
     }
 
     #[test]
@@ -344,6 +385,9 @@ mod tests {
         let interp = Interpolation::parse_delims(s.into(), "${", "}$").unwrap();
 
         assert!(interp.is_expr());
-        assert_eq!(interp.resolve(&n, &n).unwrap().as_string(), "username: johnny, email: johnny@example.org was logged in.");
+        assert_eq!(
+            interp.resolve(&n, &n).unwrap().as_string(),
+            "username: johnny, email: johnny@example.org was logged in."
+        );
     }
 }

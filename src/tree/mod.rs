@@ -7,86 +7,80 @@ use serde::de;
 use serde::ser;
 use serde::ser::{SerializeMap, SerializeSeq};
 
-use super::*;
 use super::opath::Opath;
+use super::*;
+use crate::tree::TreeErrorDetail::{
+    AddChildInvalidType, ExtendIncompatibleTypes, RemoveChildInvalidType,
+};
+use std::str::Utf8Error;
 
-pub mod node;
-pub mod metadata;
 pub mod convert;
+pub mod metadata;
+pub mod node;
 
-//FIXME (jc) error handling
-#[derive(Debug)]
-pub enum ErrorKind {
-    Io,
+pub type TreeError = BasicDiag;
+pub type TreeResult<T> = Result<T, TreeError>;
+
+#[derive(Debug, Display, Detail)]
+#[diag(code_offset = 700)]
+pub enum TreeErrorDetail {
+    #[display(fmt = "cannot add child to type '{kind}'")]
+    AddChildInvalidType { kind: Kind },
+
+    #[display(fmt = "cannot set child on type '{kind}'")]
+    SetChildInvalidType { kind: Kind },
+
+    #[display(fmt = "cannot remove child from type '{kind}'")]
+    RemoveChildInvalidType { kind: Kind },
+
+    #[display(fmt = "cannot extend {target} with {source}'")]
+    ExtendIncompatibleTypes { target: Kind, source: Kind },
+
+    #[display(
+        fmt = "cannot build node from bytes, invalid utf-8 sequence. Valid up to '{valid}' position.",
+        valid = "err.valid_up_to()"
+    )]
+    NonUtf8Node { err: Utf8Error },
+
+    //FIXME ws to be removed
+    #[display(fmt = "Error in line '{a0}'")]
     Undef(u32),
 }
-
-impl From<kg_diag::IoError> for ErrorKind {
-    fn from(err: kg_diag::IoError) -> Self {
-        eprintln!("{}", err);
-        ErrorKind::Io
-    }
-}
-
 
 #[derive(Debug)]
 pub struct NodeRef(Rc<RefCell<Node>>);
 
 impl NodeRef {
     pub fn null() -> NodeRef {
-        NodeRef::new(Node::new(
-            Metadata::new(),
-            Value::Null,
-        ))
+        NodeRef::new(Node::new(Metadata::new(), Value::Null))
     }
 
     pub fn boolean(b: bool) -> NodeRef {
-        NodeRef::new(Node::new(
-            Metadata::new(),
-            Value::Boolean(b),
-        ))
+        NodeRef::new(Node::new(Metadata::new(), Value::Boolean(b)))
     }
 
     pub fn integer(n: i64) -> NodeRef {
-        NodeRef::new(Node::new(
-            Metadata::new(),
-            Value::Integer(n),
-        ))
+        NodeRef::new(Node::new(Metadata::new(), Value::Integer(n)))
     }
 
     pub fn float(n: f64) -> NodeRef {
-        NodeRef::new(Node::new(
-            Metadata::new(),
-            Value::Float(n),
-        ))
+        NodeRef::new(Node::new(Metadata::new(), Value::Float(n)))
     }
 
     pub fn string<S: Into<String>>(s: S) -> NodeRef {
-        NodeRef::new(Node::new(
-            Metadata::new(),
-            Value::String(s.into()),
-        ))
+        NodeRef::new(Node::new(Metadata::new(), Value::String(s.into())))
     }
 
     pub fn binary<B: Into<Vec<u8>>>(b: B) -> NodeRef {
-        NodeRef::new(Node::new(
-            Metadata::new(),
-            Value::Binary(b.into()),
-        ))
+        NodeRef::new(Node::new(Metadata::new(), Value::Binary(b.into())))
     }
 
     pub fn array(elems: Elements) -> NodeRef {
-        NodeRef::new(Node::new(
-            Metadata::new(),
-            Value::Array(elems),
-        ))
+        NodeRef::new(Node::new(Metadata::new(), Value::Array(elems)))
     }
 
     pub fn object(props: Properties) -> NodeRef {
-        NodeRef::new(Node::new(
-            Metadata::new(),
-            Value::Object(props),
-        ))
+        NodeRef::new(Node::new(Metadata::new(), Value::Object(props)))
     }
 
     fn new(n: Node) -> NodeRef {
@@ -95,11 +89,11 @@ impl NodeRef {
         n
     }
 
-    pub (crate) fn wrap(n: Rc<RefCell<Node>>) -> NodeRef {
+    pub(crate) fn wrap(n: Rc<RefCell<Node>>) -> NodeRef {
         NodeRef(n)
     }
 
-    pub (crate) fn unwrap(&self) -> &Rc<RefCell<Node>> {
+    pub(crate) fn unwrap(&self) -> &Rc<RefCell<Node>> {
         &self.0
     }
 
@@ -115,7 +109,7 @@ impl NodeRef {
         }
     }
 
-    pub (crate) fn update_children_metadata(&self) {
+    pub(crate) fn update_children_metadata(&self) {
         match *self.data_mut().value_mut() {
             Value::Array(ref mut elems) => {
                 for (i, n) in elems.iter_mut().enumerate() {
@@ -139,7 +133,10 @@ impl NodeRef {
         }
     }
 
-    pub fn from_type<T>(value: T) -> Result<NodeRef, serial::Error> where T: serde::Serialize {
+    pub fn from_type<T>(value: T) -> Result<NodeRef, serial::Error>
+    where
+        T: serde::Serialize,
+    {
         serial::to_tree(&value)
     }
 
@@ -156,43 +153,40 @@ impl NodeRef {
     }
 
     //FIXME (jc) error handling
-    pub fn from_str(s: Cow<'_, str>, format: FileFormat) -> Result<NodeRef, ErrorKind> {
+    pub fn from_str(s: Cow<'_, str>, format: FileFormat) -> TreeResult<NodeRef> {
         match format {
             FileFormat::Json => match NodeRef::from_json(&s) {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
-            }
+            },
             FileFormat::Yaml => match NodeRef::from_yaml(&s) {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
-            }
+            },
             FileFormat::Toml => match NodeRef::from_toml(&s) {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
-            }
+            },
             FileFormat::Text => Ok(NodeRef::string(s)),
             FileFormat::Binary => Ok(NodeRef::binary(s.as_bytes())),
         }
     }
 
     //FIXME (jc) error handling
-    pub fn from_bytes(s: &[u8], format: FileFormat) -> Result<NodeRef, ErrorKind> {
-        fn to_str(s: &[u8]) -> Result<&str, ErrorKind> {
+    pub fn from_bytes(s: &[u8], format: FileFormat) -> TreeResult<NodeRef> {
+        fn to_str(s: &[u8]) -> TreeResult<&str> {
             match std::str::from_utf8(s) {
                 Ok(s) => Ok(s),
-                Err(err) => {
-                    println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
-                }
+                Err(err) => Err(TreeErrorDetail::NonUtf8Node { err }.into()),
             }
         }
         match format {
@@ -200,30 +194,31 @@ impl NodeRef {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
-            }
+            },
             FileFormat::Yaml => match NodeRef::from_yaml(to_str(s)?) {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
-            }
+            },
             FileFormat::Toml => match NodeRef::from_toml(to_str(s)?) {
                 Ok(n) => Ok(n),
                 Err(err) => {
                     println!("{}", err);
-                    Err(ErrorKind::Undef(line!()))
+                    Err(TreeErrorDetail::Undef(line!()).into())
                 }
-            }
+            },
             FileFormat::Text => Ok(NodeRef::string(to_str(s)?)),
             FileFormat::Binary => Ok(NodeRef::binary(s)),
         }
     }
 
     //FIXME (jc) error handling
-    pub fn from_file(file_path: &Path, format: Option<FileFormat>) -> Result<NodeRef, ErrorKind> {
+    pub fn from_file(file_path: &Path, format: Option<FileFormat>) -> TreeResult<NodeRef> {
+
         let file_path_ = if file_path.is_absolute() {
             fs::canonicalize(file_path)?
         } else {
@@ -232,17 +227,26 @@ impl NodeRef {
 
         let format = match format {
             Some(f) => f,
-            None => file_path_.extension().map_or(FileFormat::Text, |ext| FileFormat::from(ext.to_str().unwrap())),
+            None => file_path_.extension().map_or(FileFormat::Text, |ext| {
+                FileFormat::from(ext.to_str().unwrap())
+            }),
         };
 
         let mut s = String::new();
         fs::read_to_string(&file_path, &mut s)?;
         let n = NodeRef::from_str(s.into(), format)?;
-        n.data_mut().set_file(Some(&FileInfo::new(&file_path_,FileType::File, format)));
+        n.data_mut().set_file(Some(&FileInfo::new(
+            &file_path_,
+            FileType::File,
+            format,
+        )));
         Ok(n)
     }
 
-    pub fn to_type<'de, T>(&self) -> Result<T, serial::Error> where T: serde::Deserialize<'de> {
+    pub fn to_type<'de, T>(&self) -> Result<T, serial::Error>
+    where
+        T: serde::Deserialize<'de>,
+    {
         serial::from_tree(self)
     }
 
@@ -265,13 +269,15 @@ impl NodeRef {
     pub fn to_format(&self, format: FileFormat, pretty: bool) -> String {
         match format {
             FileFormat::Binary | FileFormat::Text => self.as_string(),
-            FileFormat::Json => if pretty {
-                self.to_json_pretty()
-            } else {
-                self.to_json()
+            FileFormat::Json => {
+                if pretty {
+                    self.to_json_pretty()
+                } else {
+                    self.to_json()
+                }
             }
             FileFormat::Toml => self.to_toml(),
-            FileFormat::Yaml => self.to_yaml()
+            FileFormat::Yaml => self.to_yaml(),
         }
     }
 
@@ -360,12 +366,8 @@ impl NodeRef {
 
     pub fn get_child_index(&self, index: usize) -> Option<NodeRef> {
         match *self.data().value() {
-            Value::Array(ref elems) => {
-                elems.get(index).cloned()
-            }
-            Value::Object(ref props) => {
-                props.values().nth(index).cloned()
-            }
+            Value::Array(ref elems) => elems.get(index).cloned(),
+            Value::Object(ref props) => props.values().nth(index).cloned(),
             _ => None,
         }
     }
@@ -374,20 +376,22 @@ impl NodeRef {
         use std::str::FromStr;
 
         match *self.data().value() {
-            Value::Array(ref elems) => {
-                match usize::from_str(key) {
-                    Ok(index) => elems.get(index).cloned(),
-                    Err(_) => None,
-                }
-            }
-            Value::Object(ref props) => {
-                props.get(key).cloned()
-            }
+            Value::Array(ref elems) => match usize::from_str(key) {
+                Ok(index) => elems.get(index).cloned(),
+                Err(_) => None,
+            },
+            Value::Object(ref props) => props.get(key).cloned(),
             _ => None,
         }
     }
 
-    pub fn add_child(&self, index: Option<usize>, key: Option<Symbol>, value: NodeRef) -> Result<Option<NodeRef>, ErrorKind> {
+    pub fn add_child(
+        &self,
+        index: Option<usize>,
+        key: Option<Symbol>,
+        value: NodeRef,
+    ) -> TreeResult<Option<NodeRef>> {
+        let kind = self.data().kind();
         let n = match *self.data_mut().value_mut() {
             Value::Array(ref mut elems) => {
                 match index {
@@ -406,7 +410,10 @@ impl NodeRef {
                     None
                 }
             }
-            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+            _ => {
+                let detail = AddChildInvalidType { kind };
+                return Err(detail.into());
+            }
         };
 
         self.update_children_metadata();
@@ -417,7 +424,14 @@ impl NodeRef {
         Ok(n)
     }
 
-    pub fn set_child(&self, index: Option<usize>, key: Option<Symbol>, value: NodeRef) -> Result<Option<NodeRef>, ErrorKind> {
+    pub fn set_child(
+        &self,
+        index: Option<usize>,
+        key: Option<Symbol>,
+        value: NodeRef,
+    ) -> TreeResult<Option<NodeRef>> {
+        let kind = self.data().kind();
+
         let n = match *self.data_mut().value_mut() {
             Value::Array(ref mut elems) => {
                 match index {
@@ -436,7 +450,10 @@ impl NodeRef {
                     None
                 }
             }
-            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+            _ => {
+                let detail = AddChildInvalidType { kind };
+                return Err(detail.into());
+            }
         };
 
         self.update_children_metadata();
@@ -447,9 +464,12 @@ impl NodeRef {
         Ok(n)
     }
 
-    pub fn add_children<'a, I>(&self, drop: bool, mut items: I) -> Result<Vec<NodeRef>, ErrorKind>
-        where I: Iterator<Item = (Option<usize>, Option<Symbol>, NodeRef)> {
+    pub fn add_children<'a, I>(&self, drop: bool, mut items: I) -> TreeResult<Vec<NodeRef>>
+    where
+        I: Iterator<Item = (Option<usize>, Option<Symbol>, NodeRef)>,
+    {
         let mut res = Vec::new();
+        let kind = self.data().kind();
 
         match *self.data_mut().value_mut() {
             Value::Array(ref mut elems) => {
@@ -479,7 +499,10 @@ impl NodeRef {
                     }
                 }
             }
-            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+            _ => {
+                let detail = AddChildInvalidType { kind };
+                return Err(detail.into());
+            }
         }
 
         self.update_children_metadata();
@@ -487,21 +510,24 @@ impl NodeRef {
         Ok(res)
     }
 
+    pub fn remove_child(
+        &self,
+        index: Option<usize>,
+        key: Option<Cow<'_, str>>,
+    ) -> TreeResult<Option<NodeRef>> {
+        let kind = self.data().kind();
 
-    pub fn remove_child(&self, index: Option<usize>, key: Option<Cow<'_, str>>) -> Result<Option<NodeRef>, ErrorKind> {
         let n = match *self.data_mut().value_mut() {
-            Value::Array(ref mut elems) => {
-                match index {
-                    Some(i) => {
-                        if i < elems.len() {
-                            Some(elems.remove(i))
-                        } else {
-                            None
-                        }
+            Value::Array(ref mut elems) => match index {
+                Some(i) => {
+                    if i < elems.len() {
+                        Some(elems.remove(i))
+                    } else {
+                        None
                     }
-                    None => elems.pop(),
                 }
-            }
+                None => elems.pop(),
+            },
             Value::Object(ref mut props) => {
                 if let Some(k) = key {
                     props.remove(k.as_ref())
@@ -511,7 +537,10 @@ impl NodeRef {
                     None
                 }
             }
-            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+            _ => {
+                let detail = RemoveChildInvalidType { kind };
+                return Err(detail.into());
+            }
         };
 
         if let Some(ref n) = n {
@@ -521,8 +550,15 @@ impl NodeRef {
         Ok(n)
     }
 
-    pub fn remove_children<'a, I>(&self, drop: bool, mut items: I) -> Result<Vec<NodeRef>, ErrorKind>
-        where I: Iterator<Item = (Option<usize>, Option<Cow<'a, str>>)> {
+    pub fn remove_children<'a, I>(
+        &self,
+        drop: bool,
+        mut items: I,
+    ) -> Result<Vec<NodeRef>, TreeErrorDetail>
+    where
+        I: Iterator<Item = (Option<usize>, Option<Cow<'a, str>>)>,
+    {
+        let kind = self.data().kind();
         let mut res = Vec::new();
 
         match *self.data_mut().value_mut() {
@@ -565,7 +601,10 @@ impl NodeRef {
                     }
                 }
             }
-            _ => return Err(ErrorKind::Undef(line!())), // invalid node type
+            _ => {
+                let detail = RemoveChildInvalidType { kind };
+                return Err(detail.into());
+            }
         };
 
         self.update_children_metadata();
@@ -574,7 +613,7 @@ impl NodeRef {
     }
 
     #[inline]
-    fn extend_internal(&self, o: NodeRef, index: Option<usize>) -> Result<bool, ErrorKind> {
+    fn extend_internal(&self, o: NodeRef, index: Option<usize>) -> TreeResult<bool> {
         if !self.is_ref_eq(&o) {
             let mut n = self.data_mut();
             let mut o = o.data_mut();
@@ -606,7 +645,14 @@ impl NodeRef {
                         }
                     }
                 }
-                _ => return Err(ErrorKind::Undef(line!())), // incompatible types
+                _ => {
+                    // incompatible types
+                    let detail = ExtendIncompatibleTypes {
+                        target: n.kind(),
+                        source: o.kind(),
+                    };
+                    return Err(detail.into());
+                }
             }
             Ok(true)
         } else {
@@ -614,15 +660,17 @@ impl NodeRef {
         }
     }
 
-    pub fn extend(&self, o: NodeRef, index: Option<usize>) -> Result<(), ErrorKind> {
+    pub fn extend(&self, o: NodeRef, index: Option<usize>) -> TreeResult<()> {
         if self.extend_internal(o, index)? {
             self.update_children_metadata();
         }
         Ok(())
     }
 
-    pub fn extend_multiple<I>(&self, mut extends: I) -> Result<(), ErrorKind>
-        where I: Iterator<Item = (NodeRef, Option<usize>)> {
+    pub fn extend_multiple<I>(&self, mut extends: I) -> TreeResult<()>
+    where
+        I: Iterator<Item = (NodeRef, Option<usize>)>,
+    {
         let mut updated = false;
 
         while let Some((o, index)) = extends.next() {
@@ -636,7 +684,6 @@ impl NodeRef {
         Ok(())
     }
 
-
     pub fn is_ref_eq(&self, other: &NodeRef) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
@@ -645,26 +692,31 @@ impl NodeRef {
         NodeRef::new(self.data().deep_copy())
     }
 
-    pub fn visit_recursive<F>(&self, mut visitor: F) where F: FnMut(&NodeRef, &NodeRef, &NodeRef) -> bool {
+    pub fn visit_recursive<F>(&self, mut visitor: F)
+    where
+        F: FnMut(&NodeRef, &NodeRef, &NodeRef) -> bool,
+    {
         fn visit<'a, F>(r: &NodeRef, p: &NodeRef, n: &NodeRef, visitor: &mut F) -> bool
-            where F: FnMut(&NodeRef, &NodeRef, &NodeRef) -> bool {
+        where
+            F: FnMut(&NodeRef, &NodeRef, &NodeRef) -> bool,
+        {
             if visitor(r, p, n) {
                 match *n.data().value() {
                     Value::Array(ref elems) => {
                         for e in elems.iter() {
-                            if !visit(r, n,e, visitor) {
+                            if !visit(r, n, e, visitor) {
                                 return false;
                             }
                         }
-                    },
+                    }
                     Value::Object(ref props) => {
                         for e in props.values() {
-                            if !visit(r, n,e, visitor) {
+                            if !visit(r, n, e, visitor) {
                                 return false;
                             }
                         }
-                    },
-                    _ => {},
+                    }
+                    _ => {}
                 }
                 true
             } else {
@@ -676,7 +728,8 @@ impl NodeRef {
     }
 
     pub fn visit_children<F>(&self, mut visitor: F) -> bool
-        where F: FnMut(&NodeRef, &NodeRef) -> bool
+    where
+        F: FnMut(&NodeRef, &NodeRef) -> bool,
     {
         match *self.data().value() {
             Value::Array(ref elems) => {
@@ -780,7 +833,7 @@ impl NodeRef {
                     } else {
                         for ((ka, va), (kb, vb)) in ap.iter().zip(bp.iter()) {
                             if ka != kb || !va.is_identical_deep(vb) {
-                                return false
+                                return false;
                             }
                         }
                         true
@@ -792,7 +845,7 @@ impl NodeRef {
                     } else {
                         for (va, vb) in ae.iter().zip(be.iter()) {
                             if !va.is_identical_deep(vb) {
-                                return false
+                                return false;
                             }
                         }
                         true
@@ -857,7 +910,14 @@ impl<'a> PartialOrd for NodeRef {
 impl<'a> std::fmt::Display for NodeRef {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if f.alternate() {
-            write!(f, "<{:p},{},{}> {:#}", self.data_ptr(), Rc::strong_count(&self.0), Rc::weak_count(&self.0), self.data())
+            write!(
+                f,
+                "<{:p},{},{}> {:#}",
+                self.data_ptr(),
+                Rc::strong_count(&self.0),
+                Rc::weak_count(&self.0),
+                self.data()
+            )
         } else {
             write!(f, "{}", self.data())
         }
@@ -865,7 +925,10 @@ impl<'a> std::fmt::Display for NodeRef {
 }
 
 impl<'a> ser::Serialize for NodeRef {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: ser::Serializer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
         match *self.data().value() {
             Value::Null => serializer.serialize_none(),
             Value::Boolean(b) => serializer.serialize_bool(b),
@@ -891,7 +954,6 @@ impl<'a> ser::Serialize for NodeRef {
     }
 }
 
-
 struct NodeVisitor;
 
 impl NodeVisitor {
@@ -907,71 +969,122 @@ impl<'de> de::Visitor<'de> for NodeVisitor {
         write!(f, "any data")
     }
 
-    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_bool<E>(self, v: bool) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::boolean(v))
     }
 
-    fn visit_i8<E>(self, v: i8) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_i8<E>(self, v: i8) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::integer(v as i64))
     }
 
-    fn visit_i16<E>(self, v: i16) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_i16<E>(self, v: i16) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::integer(v as i64))
     }
 
-    fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_i32<E>(self, v: i32) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::integer(v as i64))
     }
 
-    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::integer(v as i64))
     }
 
-    fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::integer(v as i64))
     }
 
-    fn visit_u16<E>(self, v: u16) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_u16<E>(self, v: u16) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::integer(v as i64))
     }
 
-    fn visit_u32<E>(self, v: u32) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_u32<E>(self, v: u32) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::integer(v as i64))
     }
 
-    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::integer(v as i64))
     }
 
-    fn visit_f32<E>(self, v: f32) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_f32<E>(self, v: f32) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::float(v as f64))
     }
 
-    fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::float(v))
     }
 
-    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::string(v))
     }
 
-    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::string(v))
     }
 
-    fn visit_string<E>(self, v: String) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::string(v))
     }
 
-    fn visit_none<E>(self) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_none<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::null())
     }
 
-    fn visit_unit<E>(self) -> Result<Self::Value, E> where E: de::Error {
+    fn visit_unit<E>(self) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
         Ok(NodeRef::null())
     }
 
-    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: de::SeqAccess<'de> {
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
         let mut elems = Vec::with_capacity(seq.size_hint().unwrap_or(0));
         while let Some(value) = seq.next_element()? {
             elems.push(value);
@@ -979,7 +1092,10 @@ impl<'de> de::Visitor<'de> for NodeVisitor {
         Ok(NodeRef::array(elems))
     }
 
-    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error> where A: de::MapAccess<'de> {
+    fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::MapAccess<'de>,
+    {
         let mut props = Properties::with_capacity(map.size_hint().unwrap_or(0));
         while let Some((key, value)) = map.next_entry()? {
             props.insert(key, value);
@@ -989,7 +1105,10 @@ impl<'de> de::Visitor<'de> for NodeVisitor {
 }
 
 impl<'de> de::Deserialize<'de> for NodeRef {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: de::Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
         deserializer.deserialize_any(NodeVisitor::new())
     }
 }
@@ -1000,14 +1119,14 @@ impl<'a> HeapSizeOf for NodeRef {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn node_visit_recursive() {
-        let n = NodeRef::from_json(r#"{
+        let n = NodeRef::from_json(
+            r#"{
             "nested_object": {
                 "int": 12,
                 "float": 1.6,
@@ -1017,7 +1136,9 @@ mod tests {
             },
             "nested_array": [12, 10, "aaa", true, null],
             "prop_string": "string property"
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
 
         let mut string_count = 0;
 
