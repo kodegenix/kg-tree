@@ -42,8 +42,6 @@ impl Opath {
     }
 
     pub fn parse(expr: &str) -> Result<Opath, OpathParseError> {
-        use kg_io::*;
-
         let mut r = MemCharReader::new(expr.as_bytes());
         super::expr::parse::Parser::new().parse(&mut r)
     }

@@ -37,6 +37,18 @@ pub enum ParseErr {
         to: Position,
         expected: Vec<char>,
     },
+    #[display(fmt = "invalid number literal: {err}")]
+    InvalidIntegerLiteral {
+        err: std::num::ParseIntError,
+        from: Position,
+        to: Position,
+    },
+    #[display(fmt = "invalid number literal: {err}")]
+    InvalidFloatLiteral {
+        err: std::num::ParseFloatError,
+        from: Position,
+        to: Position,
+    },
     #[display(fmt = "unexpected end of input")]
     UnexpectedEoi {
         pos: Position,
@@ -73,6 +85,7 @@ pub enum ParseErr {
     #[display(fmt = "unclosed {a0}")]
     UnclosedGroup(Terminal),
 }
+
 
 impl ParseErr {
     pub fn invalid_escape<T>(r: &mut dyn CharReader) -> Result<T, Error> {
@@ -208,7 +221,6 @@ impl ParseErr {
 }
 
 
-
 #[derive(Debug, Display, PartialEq, Eq, Clone, Copy)]
 pub enum Terminal {
     #[display(fmt = "END")]
@@ -242,24 +254,17 @@ pub enum Terminal {
 impl LexTerm for Terminal {}
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Context {
-    Value,
-    Object,
-    Array,
-    Key,
-}
-
-
 #[derive(Debug)]
 pub struct Parser {
     token_queue: VecDeque<Token>,
+    buf: String,
 }
 
 impl Parser {
     pub fn new() -> Parser {
         Parser {
             token_queue: VecDeque::new(),
+            buf: String::new(),
         }
     }
 
@@ -405,59 +410,143 @@ impl Parser {
 
     pub fn parse(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
         self.token_queue.clear();
-
         self.parse_value(r)
     }
 
     fn parse_value(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
-        Ok(NodeRef::null())
+        let t = self.next_token(r)?;
+        match t.term() {
+            Terminal::BraceLeft => {
+                self.push_token(t);
+                self.parse_object(r)
+            }
+            Terminal::BracketLeft => {
+                self.push_token(t);
+                self.parse_array(r)
+            }
+            Terminal::Null => Ok(NodeRef::null().with_span(t.span())),
+            Terminal::True => Ok(NodeRef::boolean(true).with_span(t.span())),
+            Terminal::False => Ok(NodeRef::boolean(false).with_span(t.span())),
+            Terminal::Integer => {
+                let s = r.slice_pos(t.from(), t.to())?;
+                let num: i64 = s.parse().map_err(|err| ParseErr::InvalidIntegerLiteral {
+                    err,
+                    from: t.from(),
+                    to: t.to(),
+                })?;
+                Ok(NodeRef::integer(num).with_span(t.span()))
+            }
+            Terminal::Float => {
+                let s = r.slice_pos(t.from(), t.to())?;
+                let num: f64 = s.parse().map_err(|err| ParseErr::InvalidFloatLiteral {
+                    err,
+                    from: t.from(),
+                    to: t.to(),
+                })?;
+                Ok(NodeRef::float(num).with_span(t.span()))
+            }
+            Terminal::Literal => {
+                self.parse_literal(t, r)?;
+                Ok(NodeRef::string(self.buf.clone()).with_span(t.span()))
+            }
+            _ => ParseErr::unexpected_token_many(t, vec![
+                Terminal::BraceLeft,
+                Terminal::BracketLeft,
+                Terminal::Null,
+                Terminal::True,
+                Terminal::False,
+                Terminal::Integer,
+                Terminal::Float,
+                Terminal::Literal,
+            ], r)
+        }
     }
 
-    /*fn parse_literal(&mut self, t: Token, r: &mut dyn CharReader) -> Result<(), Error> {
-        let p = r.position();
-        r.seek(t.from())?;
-        let mut s = String::with_capacity(t.to().offset - t.from().offset);
-        let sep = match r.peek_char(0)? {
-            Some(c) if c == '\'' || c == '\"' => {
-                r.next_char()?;
-                c
-            },
-            Some(_) => unreachable!(),
-            None => return ParseErr::unexpected_eoi_str(r, "string literal".into()),
-        };
-        let mut enc = true;
-        while let Some(c) = r.peek_char(0)? {
-            if c == sep {
-                r.next_char()?;
-                break;
-            } else if c == '\\' {
-                enc = true;
-                r.next_char()?;
-                match r.peek_char(0)? {
-                    Some('\\') => s.push('\\'),
-                    Some('\'') => s.push('\''),
-                    Some('\"') => s.push('\"'),
-                    Some('t') => s.push('\t'),
-                    Some('r') => s.push('\r'),
-                    Some('n') => s.push('\n'),
+    fn parse_object(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
+        let p1 = self.expect_token(r, Terminal::BraceLeft)?.from();
+        let mut props = Properties::new();
+        let mut comma = false;
+        loop {
+            let t = self.next_token(r)?;
+            match t.term() {
+                Terminal::BraceRight => {
+                    let span = Span {
+                        from: p1,
+                        to: t.to(),
+                    };
+                    return Ok(NodeRef::object(props).with_span(span));
+                }
+                Terminal::Comma if comma => {
+                    comma = false;
+                }
+                Terminal::Literal if !comma => {
+                    self.parse_literal(t, r)?;
+                    let key = Symbol::from(&self.buf);
+                    self.expect_token(r, Terminal::Colon)?;
+                    let value = self.parse_value(r)?;
+                    props.insert(key, value);
+                    comma = true;
+                }
+                _ => return ParseErr::unexpected_token_many(t, if comma {
+                    vec![Terminal::Comma, Terminal::BraceRight]
+                } else {
+                    vec![Terminal::Literal, Terminal::BraceRight]
+                }, r)
+            }
+        }
+    }
+
+    fn parse_array(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
+        let p1 = self.expect_token(r, Terminal::BracketLeft)?.from();
+        let mut elems = Elements::new();
+        let mut comma = false;
+        loop {
+            let t = self.next_token(r)?;
+            match t.term() {
+                Terminal::BracketRight => {
+                    let span = Span {
+                        from: p1,
+                        to: t.to(),
+                    };
+                    return Ok(NodeRef::array(elems).with_span(span));
+                }
+                Terminal::Comma if comma => {
+                    comma = false;
+                }
+                _ if !comma => {
+                    self.push_token(t);
+                    let value = self.parse_value(r)?;
+                    elems.push(value);
+                    comma = true;
+                }
+                _ => return ParseErr::unexpected_token(t, r)
+            }
+        }
+    }
+
+    fn parse_literal<'a>(&mut self, t: Token, r: &'a mut dyn CharReader) -> Result<(), Error> {
+        let s = r.slice_pos(t.from(), t.to())?;
+        self.buf.clear();
+        self.buf.reserve(s.len());
+        let mut chars = s[1..s.len() - 1].chars();
+        while let Some(c) = chars.next() {
+            if c == '\\' {
+                let c = chars.next();
+                match c {
+                    Some('\\') => self.buf.push('\\'),
+                    Some('\'') => self.buf.push('\''),
+                    Some('\"') => self.buf.push('\"'),
+                    Some('t') => self.buf.push('\t'),
+                    Some('r') => self.buf.push('\r'),
+                    Some('n') => self.buf.push('\n'),
                     _ => return ParseErr::invalid_escape(r),
                 }
-            } else if is_ident_char(c) {
-                s.push(c);
             } else {
-                enc = true;
-                s.push(c);
+                self.buf.push(c);
             }
-            r.next_char()?;
         }
-        //debug_assert_eq!(r.position(), t.to());
-        r.seek(p)?;
-        Ok(if enc {
-            ()
-        } else {
-            ()
-        })
-    }*/
+        Ok(())
+    }
 }
 
 impl Default for Parser {
@@ -471,38 +560,5 @@ impl Default for Parser {
 mod tests {
     use super::*;
 
-    #[test]
-    fn json_lexing() {
-        let json = r#"
-        {
-            "glossary": {
-                "title": "example glossary",
-                "GlossDiv": {
-                    "title": "S",
-                    "GlossList": {
-                        "GlossEntry": {
-                            "ID": "SGML",
-                            "SortAs": "SGML",
-                            "GlossTerm": "Standard Generalized Markup Language",
-                            "Acronym": "SGML",
-                            "Abbrev": "ISO 8879:1986",
-                            "GlossDef": {
-                                "para": "A meta-markup language, used to create markup languages such as DocBook.",
-                                "GlossSeeAlso": ["GML", "XML"]
-                            },
-                            "GlossSee": "markup"
-                        }
-                    }
-                }
-            }
-        }
-        "#;
 
-        let mut r = MemCharReader::new(json.as_bytes());
-        let mut p = Parser::new();
-
-        while let Ok(t) = p.lex(&mut r) {
-            print!("{}", t);
-        }
-    }
 }
