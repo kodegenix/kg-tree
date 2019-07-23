@@ -25,4 +25,4 @@ after_success:
   - sudo make install
   - cd ../..
   - rm -rf kcov-master
-  - kcov --coveralls-id=$TRAVIS_JOB_ID --verify --exclude-pattern=/.cargo,/usr/lib target/cov target/debug/kg_utils-*
+  - kcov --coveralls-id=$TRAVIS_JOB_ID --verify --exclude-pattern=/.cargo,/usr/lib target/cov target/debug/kg_tree-*
