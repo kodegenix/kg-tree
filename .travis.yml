@@ -15,6 +15,7 @@ addons:
       - libdw-dev
       - zlib1g-dev
       - binutils-dev
+      - libiberty-dev
       - cmake
     sources:
       - kalakris-cmake
