@@ -29,4 +29,4 @@ script:
   - cargo test
 
 after_success:
-  - cargo coveralls --verbose
+  - cargo coveralls --verbose --exclude-pattern=/.cargo,/usr/lib,tests/
