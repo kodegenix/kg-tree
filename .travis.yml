@@ -4,7 +4,7 @@ rust:
 
 cache: cargo
 
-sudo: false
+sudo: required
 
 addons:
   apt:
@@ -24,6 +24,4 @@ before_script:
 script:
   - cargo build
   - cargo test
-
-after_success:
   - cargo coveralls
