@@ -9,6 +9,7 @@ sudo: required
 addons:
   apt:
     packages:
+      - libbfd-dev
       - libcurl4-openssl-dev
       - libelf-dev
       - libdw-dev
