@@ -12,6 +12,7 @@ addons:
       - libcurl4-openssl-dev
       - libelf-dev
       - libdw-dev
+      - zlib1g-dev
       - binutils-dev
       - cmake
     sources:
@@ -24,4 +25,4 @@ before_script:
 script:
   - cargo build
   - cargo test
-  - cargo coveralls
+  - cargo coveralls --verbose
