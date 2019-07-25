@@ -280,6 +280,20 @@ fn is_keylike(ch: char) -> bool {
         || ch == '_'
 }
 
+fn is_hex_char(ch: char) -> bool {
+    ('A' <= ch && ch <= 'F')
+    || ('a' <= ch && ch <= 'f')
+    || ('0' <= ch && ch <= '9')
+}
+
+fn is_oct_char(ch: char) -> bool {
+    ('0' <= ch && ch <= '7')
+}
+
+fn is_bin_char(ch: char) -> bool {
+    ch == '0' || ch == '1'
+}
+
 impl Parser {
     pub fn new() -> Parser {
         Parser {
@@ -348,6 +362,17 @@ impl Parser {
             Ok(Token::new(term, p1, p2))
         }
 
+        /// consumes characters after specific prefix
+        fn consume_int_prefix(r: &mut dyn CharReader, f: &dyn Fn(char) -> bool, p1: Position) -> Result<Token, Error> {
+            if let Some('_') = r.next_char()? {
+                // underscore is not allowed between prefix and number
+                return ParseErr::invalid_input(r)
+            }
+            r.skip_while(&|c| f(c) || c == '_')?;
+            let p2 = r.position();
+            return Ok(Token::new(Terminal::Integer, p1, p2));
+        }
+
         r.skip_until(&|c: char| {
             !(c.is_whitespace() && c != '\n' && c != '\r')
         })?;
@@ -371,7 +396,6 @@ impl Parser {
                     ParseErr::invalid_input(r)
                 }
             }
-
             Some('t') => {
                 if r.match_str_term("true", &is_non_alphanumeric)? {
                     consume(r, 4, Terminal::True)
@@ -386,34 +410,8 @@ impl Parser {
                     ParseErr::invalid_input(r)
                 }
             }
-            Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
-                let p1 = r.position();
-                r.next_char()?;
-                r.skip_while(&|c| c.is_digit(10))?;
-                match r.peek_char(0)? {
-                    Some('.') => {
-                        if Some('.') == r.peek_char(1)? {
-                            let p2 = r.position();
-                            return Ok(Token::new(Terminal::Integer, p1, p2));
-                        }
-                        r.next_char()?;
-                        r.skip_while(&|c| c.is_digit(10))?;
-                        match r.peek_char(0)? {
-                            Some('e') | Some('E') => process_scientific_notation(r, p1),
-                            _ => {
-                                let p2 = r.position();
-                                Ok(Token::new(Terminal::Float, p1, p2))
-                            }
-                        }
-                    }
-                    Some('e') | Some('E') => process_scientific_notation(r, p1),
-                    _ => {
-                        let p2 = r.position();
-                        Ok(Token::new(Terminal::Integer, p1, p2))
-                    }
-                }
-            }
             Some('\"') => {
+                // handle basic strings
                 let p1 = r.position();
 
                 let mut multiline = false;
@@ -453,6 +451,7 @@ impl Parser {
                 }
             }
             Some('\'') => {
+                // handle literal strings
                 let p1 = r.position();
 
                 let mut multiline = false;
@@ -488,6 +487,41 @@ impl Parser {
                         literal: true,
                         multiline,
                     }, p1, p2))
+                }
+            }
+            Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
+                let p1 = r.position();
+                let next = r.next_char()?;
+                if c == '0' {
+                    match next {
+                        Some('x') => return consume_int_prefix(r, &|c| is_hex_char(c), p1),
+                        Some('o') => return consume_int_prefix(r, &|c| is_oct_char(c), p1),
+                        Some('b') => return consume_int_prefix(r, &|c| is_bin_char(c), p1),
+                        _ => {}
+                    }
+                }
+                r.skip_while(&|c| c.is_digit(10) || c == '_')?;
+                match r.peek_char(0)? {
+                    Some('.') => {
+                        if Some('.') == r.peek_char(1)? {
+                            let p2 = r.position();
+                            return Ok(Token::new(Terminal::Integer, p1, p2));
+                        }
+                        r.next_char()?;
+                        r.skip_while(&|c| c.is_digit(10) || c == '_')?;
+                        match r.peek_char(0)? {
+                            Some('e') | Some('E') => process_scientific_notation(r, p1),
+                            _ => {
+                                let p2 = r.position();
+                                Ok(Token::new(Terminal::Float, p1, p2))
+                            }
+                        }
+                    }
+                    Some('e') | Some('E') => process_scientific_notation(r, p1),
+                    _ => {
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Integer, p1, p2))
+                    }
                 }
             }
             Some(c) if is_keylike(c) => {
@@ -898,6 +932,123 @@ mod tests {
                 Terminal::End,
             ];
 
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn integers() {
+            let input: &str = r#"+99
+            42
+            0
+            -17"#;
+
+            let terms = vec![
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+        #[test]
+        fn integers_underscores() {
+            let input: &str = r#"1_000
+            -5_349_221
+            1_2_3_4_5"#;
+
+            let terms = vec![
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+        #[test]
+        fn integers_hex() {
+            let input: &str = r#"0xDEADBEEF
+            0xdeadbeef
+            0xdead_beef"#;
+
+            let terms = vec![
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn integers_oct() {
+            let input: &str = r#"0o01234567
+            0o755"#;
+
+            let terms = vec![
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn integers_bin() {
+            let input: &str = r#"0b11010110"#;
+
+            let terms = vec![
+                Terminal::Integer,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn floats() {
+            let input: &str = r#"+1.0
+            3.1415
+            -0.01
+            5e+22
+            1e6
+            2E-2
+            6.626e-34"#;
+
+            let terms = vec![
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn floats_underscores() {
+            let input: &str = r#"224_617.44e-34"#;
+
+            let terms = vec![
+                Terminal::Float,
+                Terminal::End,
+            ];
             assert_terms!(input, terms);
         }
     }
