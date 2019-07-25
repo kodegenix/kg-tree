@@ -30,3 +30,4 @@ script:
 
 after_success:
   - cargo coveralls --verbose --exclude-pattern=/.cargo,/usr/lib,tests/
+  - ls -la target/kcov
