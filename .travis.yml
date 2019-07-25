@@ -36,5 +36,17 @@ script:
   - cargo test
 
 after_success:
-  - cargo kcov --coveralls
+  - cargo kcov --verbose --coveralls
+  - ls -la target/
   - ls -la target/cov
+  - ls -la target/kcov
+  - ls -la /home/travis/build/kodegenix/kg-tree/target
+  - ls -la /home/travis/build/kodegenix/kg-tree/target/cov
+  - ls -la /home/travis/build/kodegenix/kg-tree/target/kcov
+  - cargo kcov --verbose
+  - ls -la target/
+  - ls -la target/cov
+  - ls -la target/kcov
+  - ls -la /home/travis/build/kodegenix/kg-tree/target
+  - ls -la /home/travis/build/kodegenix/kg-tree/target/cov
+  - ls -la /home/travis/build/kodegenix/kg-tree/target/kcov
