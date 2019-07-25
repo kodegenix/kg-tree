@@ -860,7 +860,7 @@ impl NodeRef {
         }
     }
 
-    pub (crate) fn with_span(self, span: Span) -> NodeRef {
+    pub fn with_span(self, span: Span) -> NodeRef {
         self.data_mut().metadata_mut().set_span(Some(span));
         self
     }

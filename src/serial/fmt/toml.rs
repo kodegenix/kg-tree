@@ -282,8 +282,8 @@ fn is_keylike(ch: char) -> bool {
 
 fn is_hex_char(ch: char) -> bool {
     ('A' <= ch && ch <= 'F')
-    || ('a' <= ch && ch <= 'f')
-    || ('0' <= ch && ch <= '9')
+        || ('a' <= ch && ch <= 'f')
+        || ('0' <= ch && ch <= '9')
 }
 
 fn is_oct_char(ch: char) -> bool {
@@ -292,6 +292,30 @@ fn is_oct_char(ch: char) -> bool {
 
 fn is_bin_char(ch: char) -> bool {
     ch == '0' || ch == '1'
+}
+
+fn parse_integer(t: Token, value: Cow<str>) -> Result<NodeRef, Error> {
+    let value = value.replace("_", "");
+    let mut radix = 10;
+    let val = if value.starts_with("0x") {
+        radix = 16;
+        &value[2..]
+    } else if value.starts_with("0o") {
+        radix = 8;
+        &value[2..]
+    } else if value.starts_with("0b") {
+        radix = 2;
+        &value[2..]
+    } else {
+        &value[..]
+    };
+
+    let num: i64 = i64::from_str_radix(val, radix).map_err(|err| ParseErr::InvalidIntegerLiteral {
+        err,
+        from: t.from(),
+        to: t.to(),
+    })?;
+    Ok(NodeRef::integer(num).with_span(t.span()))
 }
 
 impl Parser {
@@ -366,11 +390,23 @@ impl Parser {
         fn consume_int_prefix(r: &mut dyn CharReader, f: &dyn Fn(char) -> bool, p1: Position) -> Result<Token, Error> {
             if let Some('_') = r.next_char()? {
                 // underscore is not allowed between prefix and number
-                return ParseErr::invalid_input(r)
+                return ParseErr::invalid_input(r);
             }
             r.skip_while(&|c| f(c) || c == '_')?;
             let p2 = r.position();
             return Ok(Token::new(Terminal::Integer, p1, p2));
+        }
+
+        fn consume_keylike(r: &mut dyn CharReader) -> Result<LexToken<Terminal>, ParseDiag> {
+            let p1 = r.position();
+            while let Some(k) = r.next_char()? {
+                if !is_keylike(k) {
+                    break;
+                }
+            }
+
+            let p2 = r.position();
+            Ok(Token::new(Terminal::Keylike, p1, p2))
         }
 
         r.skip_until(&|c: char| {
@@ -524,17 +560,7 @@ impl Parser {
                     }
                 }
             }
-            Some(c) if is_keylike(c) => {
-                let p1 = r.position();
-                while let Some(k) = r.next_char()? {
-                    if !is_keylike(k) {
-                        break;
-                    }
-                }
-
-                let p2 = r.position();
-                Ok(Token::new(Terminal::Keylike, p1, p2))
-            }
+            Some(c) if is_keylike(c) => consume_keylike(r),
 
             // TODO date types https://github.com/toml-lang/toml#offset-date-time
             Some(_) => {
@@ -566,43 +592,81 @@ impl Parser {
 
     pub fn parse(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
         self.token_queue.clear();
-        self.parse_value(r)
+        let mut root = NodeRef::object(LinkedHashMap::new());
+        self.parse_inner(r, &mut root)?;
+        Ok(root)
+    }
+
+    fn parse_kv(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<(), Error> {
+        let t = self.expect_token(r, Terminal::Keylike)?;
+        let _ = self.expect_token(r, Terminal::Equals)?;
+        let key = r.slice_pos(t.from(), t.to())?.into_owned();
+        if !key.contains(".") {
+            let val = self.parse_value(r)?;
+            parent.add_child(None, Some(key.into()), val);
+        } else {
+            // TODO handle dotted keys
+        }
+
+        Ok(())
     }
 
     fn parse_value(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
-        unimplemented!()
+        let t = self.next_token(r)?;
+
+        match t.term() {
+//            Terminal::String { .. } => {}
+//            Terminal::BraceLeft => {}
+//            Terminal::BracketLeft => {}
+//            Terminal::Float => {}
+            Terminal::Integer => {
+                let value = r.slice_pos(t.from(), t.to())?;
+                parse_integer(t, value)
+            },
+            _ => {
+                return ParseErr::unexpected_token_many(t, vec![
+                    Terminal::String { multiline: true, literal: true },
+                    Terminal::BraceLeft,
+                    Terminal::BracketLeft,
+                    Terminal::Float,
+                    Terminal::Integer], r);
+            }
+        }
+    }
+
+    fn parse_inner(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<(), Error> {
+        let mut t = self.next_token(r)?;
+
+        let mut current = parent.clone();
+
+        loop {
+            match t.term() {
+                Terminal::Keylike => {
+                    self.push_token(t);
+                    self.parse_kv(r, &mut current)?;
+                }
+
+                Terminal::Newline => self.parse_inner(r, parent)?,
+                Terminal::Comment => self.parse_inner(r, parent)?,
+//            Terminal::Equals => {},
+//            Terminal::BraceLeft => {},
+//            Terminal::BraceRight => {},
+//            Terminal::BracketLeft => {},
+//            Terminal::BracketRight => {},
+//            Terminal::Colon => {},
+//            Terminal::Comma => {},
+//            Terminal::Period => {},
+//            Terminal::Integer => {},
+//            Terminal::Float => {},
+                Terminal::End => return Ok(()),
+                _ => unimplemented!()
+            };
+            t = self.next_token(r)?;
+        }
     }
 
     fn parse_object(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
         unimplemented!()
-    }
-
-    fn parse_array(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
-        let p1 = self.expect_token(r, Terminal::BracketLeft)?.from();
-        let mut elems = Elements::new();
-        let mut comma = false;
-        loop {
-            let t = self.next_token(r)?;
-            match t.term() {
-                Terminal::BracketRight => {
-                    let span = Span {
-                        from: p1,
-                        to: t.to(),
-                    };
-                    return Ok(NodeRef::array(elems).with_span(span));
-                }
-                Terminal::Comma if comma => {
-                    comma = false;
-                }
-                _ if !comma => {
-                    self.push_token(t);
-                    let value = self.parse_value(r)?;
-                    elems.push(value);
-                    comma = true;
-                }
-                _ => return ParseErr::unexpected_token(t, r)
-            }
-        }
     }
 
     fn parse_literal<'a>(&mut self, t: Token, r: &'a mut dyn CharReader) -> Result<(), Error> {
@@ -895,7 +959,7 @@ mod tests {
             let input: &str = r#"'literal string'"#;
 
             let terms = vec![
-                Terminal::String { literal: true, multiline: false},
+                Terminal::String { literal: true, multiline: false },
                 Terminal::End,
             ];
 
@@ -911,7 +975,7 @@ mod tests {
             '''"#;
 
             let terms = vec![
-                Terminal::String { literal: true, multiline: true},
+                Terminal::String { literal: true, multiline: true },
                 Terminal::End,
             ];
 
@@ -928,7 +992,7 @@ mod tests {
             '''"#;
 
             let terms = vec![
-                Terminal::String { literal: true, multiline: true},
+                Terminal::String { literal: true, multiline: true },
                 Terminal::End,
             ];
 
@@ -954,6 +1018,7 @@ mod tests {
             ];
             assert_terms!(input, terms);
         }
+
         #[test]
         fn integers_underscores() {
             let input: &str = r#"1_000
@@ -970,6 +1035,7 @@ mod tests {
             ];
             assert_terms!(input, terms);
         }
+
         #[test]
         fn integers_hex() {
             let input: &str = r#"0xDEADBEEF
