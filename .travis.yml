@@ -21,13 +21,20 @@ addons:
       - kalakris-cmake
 
 before_script:
-  - cargo install cargo-travis || echo "cargo-travis already installed"
-  - export PATH=$HOME/.cargo/bin:$PATH
+  - wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz
+  - tar xzf master.tar.gz
+  - cd kcov-master
+  - mkdir build
+  - cd build
+  - cmake ..
+  - make
+  - sudo make install
 
 script:
+  - cargo install cargo-kcov
   - cargo build
   - cargo test
 
 after_success:
-  - cargo coveralls --verbose --exclude-pattern=/.cargo,/usr/lib,tests/
-  - ls -la target/kcov
+  - cargo kcov --coveralls
+  - ls -la target/cov
