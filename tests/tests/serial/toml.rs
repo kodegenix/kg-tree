@@ -193,6 +193,40 @@ fn basic_string() {
 }
 
 #[test]
+fn bare_keys() {
+    let input = r#"
+        key = "value1"
+        bare_key = "value2"
+        bare-key = "value3"
+        1234 = "value4"
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("value1", node.get_key("key").into_string());
+    assert_eq!("value2", node.get_key("bare_key").into_string());
+    assert_eq!("value3", node.get_key("bare-key").into_string());
+    assert_eq!("value4", node.get_key("1234").into_string());
+}
+#[test]
+fn quoted_keys() {
+    let input = r#"
+        "127.0.0.1" = "value1"
+        "character encoding" = "value2"
+        "ʎǝʞ" = "value3"
+        'key2' = "value4"
+        'quoted "value"' = "value5"
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("value1", node.get_key("127.0.0.1").into_string());
+    assert_eq!("value2", node.get_key("character encoding").into_string());
+    assert_eq!("value3", node.get_key("ʎǝʞ").into_string());
+    assert_eq!("value4", node.get_key("key2").into_string());
+    assert_eq!("value5", node.get_key("quoted \"value\"").into_string());
+}
+
+
+#[test]
 fn basic_multiline_string() {
     let input = "str1 = \"\"\"\nsome basic\nmultiline\nstring\\n \\t \\\"\"\"\"";
 

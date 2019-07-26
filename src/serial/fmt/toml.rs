@@ -75,6 +75,11 @@ pub enum ParseErr {
         token: Token,
     },
     #[display(fmt = "unexpected symbol {token}, expected {expected}")]
+    UnexpectedTokenStr {
+        token: Token,
+        expected: String,
+    },
+    #[display(fmt = "unexpected symbol {token}, expected {expected}")]
     UnexpectedTokenOne {
         token: Token,
         expected: Terminal,
@@ -212,6 +217,13 @@ impl ParseErr {
     }
 
     #[inline]
+    pub fn unexpected_token_str<T>(token: Token, expected: &str, r: &mut dyn CharReader) -> Result<T, Error> {
+        Err(parse_diag!(ParseErr::UnexpectedTokenStr {expected: expected.to_string(), token }, r, {
+            token.from(), token.to() => "unexpected token"
+        }))
+    }
+
+    #[inline]
     pub fn unexpected_token_one<T>(token: Token, expected: Terminal, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErr::UnexpectedTokenOne { token, expected }, r, {
             token.from(), token.to() => "unexpected token"
@@ -224,6 +236,7 @@ impl ParseErr {
             token.from(), token.to() => "unexpected token"
         }))
     }
+
 
     pub fn mixed_array_type<T>(r: &mut dyn CharReader, node: NodeRef, expected: Kind) -> Result<T, Error> {
         let from = node.data().metadata().span().unwrap().from;
@@ -362,7 +375,7 @@ fn is_sign(ch: char) -> bool {
     ch == '-' || ch == '+'
 }
 
-fn parse_integer(t: Token, value: Cow<str>) -> Result<NodeRef, Error> {
+fn parse_integer(t: Token, value: Cow<str>) -> Result<i64, Error> {
     let value = value.replace("_", "");
     let mut radix = 10;
     let val = if value.starts_with("0x") {
@@ -383,21 +396,21 @@ fn parse_integer(t: Token, value: Cow<str>) -> Result<NodeRef, Error> {
         from: t.from(),
         to: t.to(),
     })?;
-    Ok(NodeRef::integer(num).with_span(t.span()))
+    Ok(num)
 }
 
-fn parse_float(t: Token, value: Cow<str>) -> Result<NodeRef, Error> {
+fn parse_float(t: Token, value: Cow<str>) -> Result<f64, Error> {
     if value == "inf" ||
         value == "+inf" {
-        return Ok(NodeRef::float(std::f64::INFINITY).with_span(t.span()));
+        return Ok(std::f64::INFINITY);
     }
     if value == "-inf" {
-        return Ok(NodeRef::float(std::f64::NEG_INFINITY).with_span(t.span()));
+        return Ok(std::f64::NEG_INFINITY);
     }
     if value == "nan" ||
         value == "+nan" ||
         value == "-nan" {
-        return Ok(NodeRef::float(std::f64::NAN).with_span(t.span()));
+        return Ok(std::f64::NAN);
     }
 
     let s = value.replace("_", "");
@@ -407,7 +420,7 @@ fn parse_float(t: Token, value: Cow<str>) -> Result<NodeRef, Error> {
         from: t.from(),
         to: t.to(),
     })?;
-    Ok(NodeRef::float(num).with_span(t.span()))
+    Ok(num)
 }
 
 fn check_eol(r: &mut dyn CharReader, multiline: bool) -> Result<(), Error> {
@@ -421,6 +434,7 @@ fn check_eol(r: &mut dyn CharReader, multiline: bool) -> Result<(), Error> {
     }
     Ok(())
 }
+
 impl Parser {
     pub fn new() -> Parser {
         Parser {
@@ -737,21 +751,24 @@ impl Parser {
 
         loop {
             match t.term() {
-                Terminal::Keylike => {
+                Terminal::Keylike | Terminal::Integer | Terminal::Float => {
                     self.push_token(t);
                     self.parse_kv(r, &mut current)?;
                 }
-
-                Terminal::String { .. } => {
-                    // TODO quoted keys
-                    unimplemented!("quoted keys")
+                Terminal::String { literal, multiline } => {
+                    if multiline {
+                        // FIXME better error
+                        return ParseErr::unexpected_token_str(t, " STRING", r);
+                    }
+                    self.push_token(t);
+                    self.parse_kv(r, &mut current)?
                 }
                 Terminal::BracketLeft => {
                     // TODO tables
                     unimplemented!("Tables")
                 }
-                Terminal::Newline => {},
-                Terminal::Comment => {},
+                Terminal::Newline => {}
+                Terminal::Comment => {}
                 Terminal::End => return Ok(()),
                 _ => {
                     return ParseErr::unexpected_token_many(t, vec![
@@ -766,9 +783,34 @@ impl Parser {
     }
 
     fn parse_kv(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<(), Error> {
-        let t = self.expect_token(r, Terminal::Keylike)?;
+        let t = self.next_token(r)?;
+        let key = match t.term() {
+            Terminal::String { .. } => {
+                self.parse_string(t, r)?;
+                self.buf.clone()
+            }
+            Terminal::Keylike => {
+                r.slice_pos(t.from(), t.to())?.into_owned()
+            }
+            Terminal::Integer => {
+                let value = r.slice_pos(t.from(), t.to())?;
+                let num = parse_integer(t, value)?;
+                format!("{}", num)
+            }
+            Terminal::Float => {
+                let value = r.slice_pos(t.from(), t.to())?;
+                let num = parse_float(t, value)?;
+                format!("{}", num)
+            }
+            _ => {
+                return ParseErr::unexpected_token_many(t,
+                                                       vec![Terminal::Keylike,
+                                                            Terminal::String { multiline: true, literal: true }
+                                                       ], r);
+            }
+        };
+
         let _ = self.expect_token(r, Terminal::Equals)?;
-        let key = r.slice_pos(t.from(), t.to())?.into_owned();
         if !key.contains(".") {
             let val = self.parse_value(r)?;
             parent.add_child(None, Some(key.into()), val);
@@ -784,7 +826,8 @@ impl Parser {
 
         match t.term() {
             Terminal::String { .. } => {
-                self.parse_string(t, r)
+                self.parse_string(t, r)?;
+                Ok(NodeRef::string(&self.buf).with_span(t.span()))
             }
             Terminal::BraceLeft => {
                 // TODO Inline table
@@ -796,11 +839,13 @@ impl Parser {
             }
             Terminal::Float => {
                 let value = r.slice_pos(t.from(), t.to())?;
-                parse_float(t, value)
+                let num = parse_float(t, value)?;
+                Ok(NodeRef::float(num).with_span(t.span()))
             }
             Terminal::Integer => {
                 let value = r.slice_pos(t.from(), t.to())?;
-                parse_integer(t, value)
+                let num = parse_integer(t, value)?;
+                Ok(NodeRef::integer(num).with_span(t.span()))
             }
             Terminal::True => Ok(NodeRef::boolean(true).with_span(t.span())),
             Terminal::False => Ok(NodeRef::boolean(false).with_span(t.span())),
@@ -855,7 +900,7 @@ impl Parser {
         }
     }
 
-    fn parse_string<'a>(&mut self, t: Token, r: &'a mut dyn CharReader) -> Result<NodeRef, Error> {
+    fn parse_string<'a>(&mut self, t: Token, r: &'a mut dyn CharReader) -> Result<(), Error> {
         fn prepare_multiline(val: &str) -> &str {
             // trim quotes
             let val = &val[3..val.len() - 3];
@@ -873,7 +918,6 @@ impl Parser {
         } else {
             unreachable!()
         };
-
         let s = r.slice_pos(t.from(), t.to())?;
 
         let val = if multiline {
@@ -883,11 +927,13 @@ impl Parser {
         };
 
         if literal {
-            Ok(NodeRef::string(val).with_span(t.span()))
+            self.buf.clear();
+            self.buf.reserve(val.len());
+            self.buf.push_str(val);
         } else {
             let mut chars = val.chars();
             self.buf.clear();
-            self.buf.reserve(s.len());
+            self.buf.reserve(val.len());
             while let Some(c) = chars.next() {
                 if c == '\\' {
                     let c = chars.next();
@@ -902,18 +948,18 @@ impl Parser {
                         // FIXME ws https://github.com/toml-lang/toml#string
                         Some('u') => {
                             unimplemented!()
-                        },
+                        }
                         Some('U') => {
                             unimplemented!()
-                        },
+                        }
                         _ => return ParseErr::invalid_escape(r),
                     }
                 } else {
                     self.buf.push(c);
                 }
             }
-            Ok(NodeRef::string(&self.buf).with_span(t.span()))
         }
+        Ok(())
     }
 }
 
