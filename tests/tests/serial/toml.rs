@@ -26,10 +26,10 @@ fn integer() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(99, node.get_key("int1").to_int());
-    assert_eq!(42, node.get_key("int2").to_int());
-    assert_eq!(0, node.get_key("int3").to_int());
-    assert_eq!(-17, node.get_key("int4").to_int());
+    assert_eq!(99, node.get_key("int1").into_int());
+    assert_eq!(42, node.get_key("int2").into_int());
+    assert_eq!(0, node.get_key("int3").into_int());
+    assert_eq!(-17, node.get_key("int4").into_int());
 }
 
 #[test]
@@ -41,9 +41,9 @@ fn integer_underscore() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(1_000, node.get_key("int1").to_int());
-    assert_eq!(5_349_221, node.get_key("int2").to_int());
-    assert_eq!(1_2_3_4_5, node.get_key("int3").to_int());
+    assert_eq!(1_000, node.get_key("int1").into_int());
+    assert_eq!(5_349_221, node.get_key("int2").into_int());
+    assert_eq!(1_2_3_4_5, node.get_key("int3").into_int());
 }
 
 #[test]
@@ -62,15 +62,15 @@ fn integer_prefix() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(0xdeadbeef, node.get_key("hex1").to_int());
-    assert_eq!(0xdeadbeef, node.get_key("hex2").to_int());
-    assert_eq!(0xdead_beef, node.get_key("hex3").to_int());
+    assert_eq!(0xdeadbeef, node.get_key("hex1").into_int());
+    assert_eq!(0xdeadbeef, node.get_key("hex2").into_int());
+    assert_eq!(0xdead_beef, node.get_key("hex3").into_int());
 
-    assert_eq!(0o01234567, node.get_key("oct1").to_int());
-    assert_eq!(0o755, node.get_key("oct2").to_int());
+    assert_eq!(0o01234567, node.get_key("oct1").into_int());
+    assert_eq!(0o755, node.get_key("oct2").into_int());
 
-    assert_eq!(0b11010110, node.get_key("bin1").to_int());
-    assert_eq!(0b11010110, node.get_key("bin2").to_int());
+    assert_eq!(0b11010110, node.get_key("bin1").into_int());
+    assert_eq!(0b11010110, node.get_key("bin2").into_int());
 }
 
 #[test]
@@ -88,15 +88,15 @@ fn floats() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(1.0, node.get_key("flt1").to_float());
-    assert_eq!(3.1415, node.get_key("flt2").to_float());
-    assert_eq!(-0.01, node.get_key("flt3").to_float());
+    assert_eq!(1.0, node.get_key("flt1").into_float());
+    assert_eq!(3.1415, node.get_key("flt2").into_float());
+    assert_eq!(-0.01, node.get_key("flt3").into_float());
 
-    assert_eq!(5e+22, node.get_key("flt4").to_float());
-    assert_eq!(1e6, node.get_key("flt5").to_float());
-    assert_eq!(-2E-2, node.get_key("flt6").to_float());
+    assert_eq!(5e+22, node.get_key("flt4").into_float());
+    assert_eq!(1e6, node.get_key("flt5").into_float());
+    assert_eq!(-2E-2, node.get_key("flt6").into_float());
 
-    assert_eq!(6.626e-34, node.get_key("flt7").to_float());
+    assert_eq!(6.626e-34, node.get_key("flt7").into_float());
 }
 
 #[test]
@@ -114,15 +114,15 @@ fn floats_underscore() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(1.0, node.get_key("flt1").to_float());
-    assert_eq!(3.1415, node.get_key("flt2").to_float());
-    assert_eq!(-0.01, node.get_key("flt3").to_float());
+    assert_eq!(1.0, node.get_key("flt1").into_float());
+    assert_eq!(3.1415, node.get_key("flt2").into_float());
+    assert_eq!(-0.01, node.get_key("flt3").into_float());
 
-    assert_eq!(5e+22, node.get_key("flt4").to_float());
-    assert_eq!(1e6, node.get_key("flt5").to_float());
-    assert_eq!(-2E-2, node.get_key("flt6").to_float());
+    assert_eq!(5e+22, node.get_key("flt4").into_float());
+    assert_eq!(1e6, node.get_key("flt5").into_float());
+    assert_eq!(-2E-2, node.get_key("flt6").into_float());
 
-    assert_eq!(66.626e-34, node.get_key("flt7").to_float());
+    assert_eq!(66.626e-34, node.get_key("flt7").into_float());
 }
 
 #[test]
@@ -138,13 +138,13 @@ fn floats_special() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(std::f64::INFINITY, node.get_key("sf1").to_float());
-    assert_eq!(std::f64::INFINITY, node.get_key("sf2").to_float());
-    assert_eq!(std::f64::NEG_INFINITY, node.get_key("sf3").to_float());
+    assert_eq!(std::f64::INFINITY, node.get_key("sf1").into_float());
+    assert_eq!(std::f64::INFINITY, node.get_key("sf2").into_float());
+    assert_eq!(std::f64::NEG_INFINITY, node.get_key("sf3").into_float());
 
-    assert!(node.get_key("sf4").to_float().is_nan());
-    assert!(node.get_key("sf5").to_float().is_nan());
-    assert!(node.get_key("sf6").to_float().is_nan());
+    assert!(node.get_key("sf4").into_float().is_nan());
+    assert!(node.get_key("sf5").into_float().is_nan());
+    assert!(node.get_key("sf6").into_float().is_nan());
 }
 
 #[test]
@@ -155,9 +155,54 @@ fn booleans() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(true, node.get_key("bool1").to_bool());
-    assert_eq!(false, node.get_key("bool2").to_bool());
+    assert_eq!(true, node.get_key("bool1").into_bool());
+    assert_eq!(false, node.get_key("bool2").into_bool());
 }
+
+#[test]
+fn literal_string() {
+    let input = r#"
+        str1 = ' literal string \n \t \u1234'
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(" literal string \\n \\t \\u1234", node.get_key("str1").into_string());
+}
+
+#[test]
+fn literal_multiline_string() {
+    let input = r#"
+        str1 = '''
+multiline
+literal string
+'''
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("multiline\nliteral string\n", node.get_key("str1").into_string());
+}
+
+#[test]
+fn basic_string() {
+    let input = r#"
+        str1 = "some basic string\n \t \" '"
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("some basic string\n \t \" '", node.get_key("str1").into_string());
+}
+
+#[test]
+fn basic_multiline_string() {
+    let input = "str1 = \"\"\"\nsome basic\nmultiline\nstring\\n \\t \\\"\"\"\"";
+
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("some basic\nmultiline\nstring\n \t \"", node.get_key("str1").into_string());
+}
+
+
+
 
 #[test]
 fn comments() {
