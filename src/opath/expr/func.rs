@@ -1334,62 +1334,6 @@ mod tests {
             }
         }
     "#;
-
-    mod diags_example {
-        use super::*;
-
-        #[derive(Debug, Display, Detail)]
-        #[diag(code_offset = 800)]
-        pub enum TestErr {
-            #[display(fmt = "unknown function '{name}'")]
-            PlainErr { name: String },
-            #[display(fmt = "TestErr2 occured: {det}", det = "err.detail()")]
-            TestErr2 { err: Box<dyn Diag> },
-        }
-
-        #[derive(Debug, Display, Detail)]
-        #[diag(code_offset = 900)]
-        pub enum TestErr2 {
-            #[display(fmt = "Another plain error '{name}'")]
-            AnotherPlainErr { name: String },
-            #[display(fmt = "TestERR: {detail}", detail = "err.detail()")]
-            TestErr { err: Box<dyn Diag> },
-        }
-
-        fn test_err() -> Result<(), BasicDiag> {
-            match test_err2() {
-                Ok(_) => panic!(),
-                Err(err) => {
-                    let detail = TestErr::TestErr2 { err: Box::new(err) };
-                    Err(BasicDiag::from(detail))
-                }
-            }
-        }
-
-        fn test_err2() -> Result<(), BasicDiag> {
-            let detail = TestErr2::AnotherPlainErr {
-                name: "inner".to_string(),
-            };
-            Err(BasicDiag::from(detail))
-        }
-
-        #[test]
-        fn test_diag() {
-            let res = test_err();
-            println!("{}", res.unwrap_err());
-        }
-
-        #[test]
-        fn errors_test() {
-            let n = NodeRef::from_json(r#"{}"#).unwrap();
-
-            let expr = Opath::parse("parse('{\"aaaa\":-}', 'json')").unwrap();
-            let mut res = expr.apply(&n, &n).unwrap();
-            eprintln!("res = {:?}", res);
-        }
-
-    }
-
     fn test_node<'a>() -> NodeRef {
         NodeRef::from_json(TEST_JSON).unwrap()
     }

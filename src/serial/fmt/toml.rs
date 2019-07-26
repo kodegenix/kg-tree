@@ -294,6 +294,10 @@ fn is_bin_char(ch: char) -> bool {
     ch == '0' || ch == '1'
 }
 
+fn is_sign(ch: char) -> bool {
+    ch == '-' || ch == '+'
+}
+
 fn parse_integer(t: Token, value: Cow<str>) -> Result<NodeRef, Error> {
     let value = value.replace("_", "");
     let mut radix = 10;
@@ -316,6 +320,30 @@ fn parse_integer(t: Token, value: Cow<str>) -> Result<NodeRef, Error> {
         to: t.to(),
     })?;
     Ok(NodeRef::integer(num).with_span(t.span()))
+}
+
+fn parse_float(t: Token, value: Cow<str>) -> Result<NodeRef, Error> {
+    if value == "inf" ||
+        value == "+inf" {
+        return Ok(NodeRef::float(std::f64::INFINITY).with_span(t.span()))
+    }
+    if value == "-inf"{
+        return Ok(NodeRef::float(std::f64::NEG_INFINITY).with_span(t.span()))
+    }
+    if value == "nan" ||
+        value == "+nan" ||
+        value == "-nan"{
+        return Ok(NodeRef::float(std::f64::NAN).with_span(t.span()))
+    }
+
+    let s = value.replace("_", "");
+
+    let num: f64 = s.parse().map_err(|err| ParseErr::InvalidFloatLiteral {
+        err,
+        from: t.from(),
+        to: t.to(),
+    })?;
+    Ok(NodeRef::float(num).with_span(t.span()))
 }
 
 impl Parser {
@@ -388,6 +416,7 @@ impl Parser {
 
         /// consumes characters after specific prefix
         fn consume_int_prefix(r: &mut dyn CharReader, f: &dyn Fn(char) -> bool, p1: Position) -> Result<Token, Error> {
+            r.next_char()?;
             if let Some('_') = r.next_char()? {
                 // underscore is not allowed between prefix and number
                 return ParseErr::invalid_input(r);
@@ -432,18 +461,32 @@ impl Parser {
                     ParseErr::invalid_input(r)
                 }
             }
+            Some('i') => {
+                if r.match_str_term("inf", &is_non_alphanumeric)? {
+                    consume(r, 3, Terminal::Float)
+                } else {
+                    consume_keylike(r)
+                }
+            }
+            Some('n') => {
+                if r.match_str_term("nan", &is_non_alphanumeric)? {
+                    consume(r, 3, Terminal::Float)
+                } else {
+                    consume_keylike(r)
+                }
+            }
             Some('t') => {
                 if r.match_str_term("true", &is_non_alphanumeric)? {
                     consume(r, 4, Terminal::True)
                 } else {
-                    ParseErr::invalid_input(r)
+                    consume_keylike(r)
                 }
             }
             Some('f') => {
                 if r.match_str_term("false", &is_non_alphanumeric)? {
                     consume(r, 5, Terminal::False)
                 } else {
-                    ParseErr::invalid_input(r)
+                    consume_keylike(r)
                 }
             }
             Some('\"') => {
@@ -527,15 +570,30 @@ impl Parser {
             }
             Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
                 let p1 = r.position();
-                let next = r.next_char()?;
-                if c == '0' {
-                    match next {
-                        Some('x') => return consume_int_prefix(r, &|c| is_hex_char(c), p1),
-                        Some('o') => return consume_int_prefix(r, &|c| is_oct_char(c), p1),
-                        Some('b') => return consume_int_prefix(r, &|c| is_bin_char(c), p1),
-                        _ => {}
+                let next = r.peek_char(1)?;
+
+                match (c, next) {
+                    // Check integers prefix notation
+                    ('0', Some('x')) => return consume_int_prefix(r, &|c| is_hex_char(c), p1),
+                    ('0', Some('o')) => return consume_int_prefix(r, &|c| is_oct_char(c), p1),
+                    ('0', Some('b')) => return consume_int_prefix(r, &|c| is_bin_char(c), p1),
+
+                    // Check special floats
+
+                    (first, Some('i')) if is_sign(first) => {
+                        if r.match_str_term(&format!("{}inf", first), &is_non_alphanumeric)? {
+                            return consume(r, 4, Terminal::Float)
+                        }
                     }
+                    (first, Some('n')) if is_sign(first) => {
+                        if r.match_str_term(&format!("{}nan", first), &is_non_alphanumeric)? {
+                            return consume(r, 4, Terminal::Float)
+                        }
+                    }
+                    _ => {}
                 }
+
+                r.next_char()?;
                 r.skip_while(&|c| c.is_digit(10) || c == '_')?;
                 match r.peek_char(0)? {
                     Some('.') => {
@@ -618,11 +676,16 @@ impl Parser {
 //            Terminal::String { .. } => {}
 //            Terminal::BraceLeft => {}
 //            Terminal::BracketLeft => {}
-//            Terminal::Float => {}
+            Terminal::Float => {
+                let value = r.slice_pos(t.from(), t.to())?;
+                parse_float(t, value)
+            }
             Terminal::Integer => {
                 let value = r.slice_pos(t.from(), t.to())?;
                 parse_integer(t, value)
             },
+            Terminal::True => Ok(NodeRef::boolean(true).with_span(t.span())),
+            Terminal::False => Ok(NodeRef::boolean(false).with_span(t.span())),
             _ => {
                 return ParseErr::unexpected_token_many(t, vec![
                     Terminal::String { multiline: true, literal: true },
