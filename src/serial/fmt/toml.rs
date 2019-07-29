@@ -321,8 +321,8 @@ pub enum Terminal {
     Comment,
     #[display(fmt = "'='")]
     Equals,
-    #[display(fmt = "KEYLIKE")]
-    Keylike,
+    #[display(fmt = "BARE_KEY")]
+    BareKey,
     #[display(fmt = "'{{'")]
     BraceLeft,
     #[display(fmt = "'}}'")]
@@ -362,7 +362,7 @@ pub struct Parser {
     buf: String,
 }
 
-fn is_keylike(ch: char) -> bool {
+fn is_bare(ch: char) -> bool {
     ('A' <= ch && ch <= 'Z')
         || ('a' <= ch && ch <= 'z')
         || ('0' <= ch && ch <= '9')
@@ -528,16 +528,16 @@ impl Parser {
             return Ok(Token::new(Terminal::Integer, p1, p2));
         }
 
-        fn consume_keylike(r: &mut dyn CharReader) -> Result<LexToken<Terminal>, ParseDiag> {
+        fn consume_bare_key(r: &mut dyn CharReader) -> Result<LexToken<Terminal>, ParseDiag> {
             let p1 = r.position();
             while let Some(k) = r.next_char()? {
-                if !is_keylike(k) {
+                if !is_bare(k) {
                     break;
                 }
             }
 
             let p2 = r.position();
-            Ok(Token::new(Terminal::Keylike, p1, p2))
+            Ok(Token::new(Terminal::BareKey, p1, p2))
         }
 
         r.skip_until(&|c: char| {
@@ -567,28 +567,28 @@ impl Parser {
                 if r.match_str_term("inf", &is_non_alphanumeric)? {
                     consume(r, 3, Terminal::Float)
                 } else {
-                    consume_keylike(r)
+                    consume_bare_key(r)
                 }
             }
             Some('n') => {
                 if r.match_str_term("nan", &is_non_alphanumeric)? {
                     consume(r, 3, Terminal::Float)
                 } else {
-                    consume_keylike(r)
+                    consume_bare_key(r)
                 }
             }
             Some('t') => {
                 if r.match_str_term("true", &is_non_alphanumeric)? {
                     consume(r, 4, Terminal::True)
                 } else {
-                    consume_keylike(r)
+                    consume_bare_key(r)
                 }
             }
             Some('f') => {
                 if r.match_str_term("false", &is_non_alphanumeric)? {
                     consume(r, 5, Terminal::False)
                 } else {
-                    consume_keylike(r)
+                    consume_bare_key(r)
                 }
             }
             Some('\"') => {
@@ -721,7 +721,7 @@ impl Parser {
                     }
                 }
             }
-            Some(c) if is_keylike(c) => consume_keylike(r),
+            Some(c) if is_bare(c) => consume_bare_key(r),
 
             // TODO date types https://github.com/toml-lang/toml#offset-date-time
             Some(_) => {
@@ -764,7 +764,7 @@ impl Parser {
 
         loop {
             match t.term() {
-                Terminal::Keylike | Terminal::Integer | Terminal::Float => {
+                Terminal::BareKey | Terminal::Integer | Terminal::Float => {
                     self.push_token(t);
                     self.parse_kv(r, &mut current)?;
                 }
@@ -786,7 +786,7 @@ impl Parser {
                 _ => {
                     return ParseErrDetail::unexpected_token_many(t, vec![
                         Terminal::String { multiline: true, literal: true },
-                        Terminal::Keylike,
+                        Terminal::BareKey,
                         Terminal::BracketLeft,
                     ], r);
                 }
@@ -805,7 +805,7 @@ impl Parser {
                     self.parse_string(token, r)?;
                     self.buf.clone()
                 }
-                Terminal::Keylike => {
+                Terminal::BareKey => {
                     r.slice_pos(token.from(), token.to())?.into_owned()
                 }
                 Terminal::Integer => {
@@ -821,8 +821,8 @@ impl Parser {
                 }
                 _ => {
                     return ParseErrDetail::unexpected_token_many(token,
-                                                                 vec![Terminal::Keylike,
-                                                                Terminal::String { multiline: true, literal: true }
+                                                                 vec![Terminal::BareKey,
+                                                                      Terminal::String { multiline: true, literal: true }
                                                            ], r);
                 }
             };
@@ -1148,17 +1148,17 @@ mod tests {
         }
 
         #[test]
-        fn keylike() {
+        fn bare_keys() {
             let input: &str = r#"key
             bare_key
             bare-key"#;
 
             let terms = vec![
-                Terminal::Keylike,
+                Terminal::BareKey,
                 Terminal::Newline,
-                Terminal::Keylike,
+                Terminal::BareKey,
                 Terminal::Newline,
-                Terminal::Keylike,
+                Terminal::BareKey,
                 Terminal::End,
             ];
 
@@ -1170,11 +1170,11 @@ mod tests {
             let input: &str = r#"key.after_dot.a"#;
 
             let terms = vec![
-                Terminal::Keylike,
+                Terminal::BareKey,
                 Terminal::Period,
-                Terminal::Keylike,
+                Terminal::BareKey,
                 Terminal::Period,
-                Terminal::Keylike,
+                Terminal::BareKey,
                 Terminal::End,
             ];
 
