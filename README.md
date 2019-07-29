@@ -7,6 +7,18 @@
 
 Generic object tree with Opath query language, similar to XPath.
 
+## Builds statuses for Rust channels
+
+| stable            | beta              | nightly           |
+|-------------------|-------------------|-------------------|
+| [![Build1][3]][4] | [![Build2][2]][4] | [![Build3][1]][4] |
+
+[1]: https://travis-matrix-badges.herokuapp.com/repos/kodegenix/kg-tree/branches/master/1
+[2]: https://travis-matrix-badges.herokuapp.com/repos/kodegenix/kg-tree/branches/master/2
+[3]: https://travis-matrix-badges.herokuapp.com/repos/kodegenix/kg-tree/branches/master/3
+[4]: https://travis-ci.org/kodegenix/kg-tree
+
+
 ## Opath
 Simple language for object tree lookup and transformation, similar to XPath in function.
 
@@ -160,9 +172,7 @@ Licensed under either of
 
 at your option.
 
-`SPDX-License-Identifier: Apache-2.0 OR MIT`
-
-### Contribution
+## Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any
