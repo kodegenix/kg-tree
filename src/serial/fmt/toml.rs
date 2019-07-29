@@ -853,7 +853,7 @@ impl Parser {
                         return ParseErrDetail::key_redefined(r, token, prev, &key)
                     }
 
-                    current.add_child(None, Some(key.into()), val);
+                    current.add_child(None, Some(key.into()), val).unwrap();
                     return Ok(())
                 }
                 _ => {
@@ -935,7 +935,7 @@ impl Parser {
                     let value = self.parse_value(r)?;
                     if !elems.is_empty() {
                         let array_type = elems.get(0).unwrap().data().kind();
-                        if array_type == value.data().kind() {
+                        if array_type != value.data().kind() {
                             return ParseErrDetail::mixed_array_type(r, value, array_type);
                         }
                         elems.push(value);

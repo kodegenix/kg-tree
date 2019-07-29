@@ -338,16 +338,69 @@ fn redefined_key_nested_2() {
     assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
 }
 
-
 #[test]
-fn comments() {
+fn arrays() {
     let input = r#"
-        # comment
-        # is discarded
+        arr1 = [ 1, 2, 3 ]
+        arr2 = [ "red", "yellow", "green" ]
+        arr3 = [ "all", 'strings', """are the same""", '''type''']
     "#;
     let node: NodeRef = parse_node!(input);
 
-    let expected = NodeRef::object(LinkedHashMap::new());
+    assert_eq!(1, node.get_key("arr1").as_array_ext()[0].as_int_ext());
+    assert_eq!(2, node.get_key("arr1").as_array_ext()[1].as_int_ext());
+    assert_eq!(3, node.get_key("arr1").as_array_ext()[2].as_int_ext());
 
-    assert!(node.is_identical_deep(&expected));
+    assert_eq!("red", node.get_key("arr2").as_array_ext()[0].as_string_ext());
+    assert_eq!("yellow", node.get_key("arr2").as_array_ext()[1].as_string_ext());
+    assert_eq!("green", node.get_key("arr2").as_array_ext()[2].as_string_ext());
+
+    assert_eq!("all", node.get_key("arr3").as_array_ext()[0].as_string_ext());
+    assert_eq!("strings", node.get_key("arr3").as_array_ext()[1].as_string_ext());
+    assert_eq!("are the same", node.get_key("arr3").as_array_ext()[2].as_string_ext());
+    assert_eq!("type", node.get_key("arr3").as_array_ext()[3].as_string_ext());
+
+}
+
+#[test]
+fn arrays_of_arrays() {
+    let input = r#"
+        arr1 = [ [ 1, 2 ], [3, 4, 5] ]
+        arr2 = [ [ 1, 2 ], ["a", "b", "c"] ]
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(1, node.get_key("arr1").as_array_ext()[0].as_array_ext()[0].as_int_ext());
+    assert_eq!(2, node.get_key("arr1").as_array_ext()[0].as_array_ext()[1].as_int_ext());
+    assert_eq!(3, node.get_key("arr1").as_array_ext()[1].as_array_ext()[0].as_int_ext());
+    assert_eq!(4, node.get_key("arr1").as_array_ext()[1].as_array_ext()[1].as_int_ext());
+    assert_eq!(5, node.get_key("arr1").as_array_ext()[1].as_array_ext()[2].as_int_ext());
+
+    assert_eq!(1, node.get_key("arr2").as_array_ext()[0].as_array_ext()[0].as_int_ext());
+    assert_eq!(2, node.get_key("arr2").as_array_ext()[0].as_array_ext()[1].as_int_ext());
+    assert_eq!("a", node.get_key("arr2").as_array_ext()[1].as_array_ext()[0].as_string_ext());
+    assert_eq!("b", node.get_key("arr2").as_array_ext()[1].as_array_ext()[1].as_string_ext());
+    assert_eq!("c", node.get_key("arr2").as_array_ext()[1].as_array_ext()[2].as_string_ext());
+}
+
+#[test]
+fn array_mixed_types() {
+    let input = r#"
+        arr1 = [ 1, 2.0 ]
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::MixedArrayType {..});
+}
+
+#[test]
+fn array_mixed_types_2() {
+    let input = r#"
+        arr1 = [ 1, "string" ]
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::MixedArrayType {..});
 }
