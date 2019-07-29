@@ -777,8 +777,14 @@ impl Parser {
                     self.parse_kv(r, &mut current)?
                 }
                 Terminal::BracketLeft => {
-                    // TODO tables
-                    unimplemented!("Tables")
+                    // parse table
+
+                    let from = t.from();
+                    let (node, key) = self.parse_key(r, parent)?;
+                    let to = self.expect_token(r, Terminal::BracketRight)?.to();
+                    let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
+                    node.add_child(None, Some(key.into()), table.clone()).unwrap();
+                    current = table
                 }
                 Terminal::Newline => {}
                 Terminal::Comment => {}
@@ -795,7 +801,7 @@ impl Parser {
         }
     }
 
-    fn parse_kv(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<(), Error> {
+    fn parse_key(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<(NodeRef, String), Error> {
         let mut token = self.next_token(r)?;
         let mut current = parent.clone();
         let mut key = String::new();
@@ -823,7 +829,7 @@ impl Parser {
                     return ParseErrDetail::unexpected_token_many(token,
                                                                  vec![Terminal::BareKey,
                                                                       Terminal::String { multiline: true, literal: true }
-                                                           ], r);
+                                                                 ], r);
                 }
             };
             let next = self.next_token(r)?;
@@ -834,39 +840,36 @@ impl Parser {
                         if child.is_object() {
                             current = child;
                         } else {
-                            let prev = child.data().metadata().span().unwrap();
+                            let prev = child.data().metadata().span().expect("Node should always have span");
                             return ParseErrDetail::key_redefined(r, token, prev, &key)
                         }
                     } else {
-                        let new = NodeRef::object(LinkedHashMap::new());
+                        let new = NodeRef::object(LinkedHashMap::new()).with_span(token.span());
                         current.add_child(None, Some(key.into()), new.clone()).unwrap();
                         current = new;
                     }
                     token = self.next_token(r)?;
                     continue
                 }
-                Terminal::Equals => {
-                    let val = self.parse_value(r)?;
-
+                _ => {
                     if let Some(child) = current.get_child_key(&key) {
-                        let prev = child.data().metadata().span().unwrap();
+                        let prev = child.data().metadata().span().expect("Node should always have span");
                         return ParseErrDetail::key_redefined(r, token, prev, &key)
                     }
 
-                    current.add_child(None, Some(key.into()), val).unwrap();
-                    return Ok(())
-                }
-                _ => {
-                    return ParseErrDetail::unexpected_token_many(token,
-                                                                 vec![Terminal::Period,
-                                                                Terminal::Equals
-                                                           ], r);
+                    self.push_token(next);
+                    return Ok((current.clone(), key));
                 }
             }
             token = next;
-
         }
+    }
 
+    fn parse_kv(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<(), Error> {
+        let (node, key) = self.parse_key(r, parent)?;
+        self.expect_token(r, Terminal::Equals)?;
+        let val = self.parse_value(r)?;
+        node.add_child(None, Some(key.into()), val).unwrap();
         Ok(())
     }
 
@@ -909,8 +912,14 @@ impl Parser {
         }
     }
 
-    fn parse_table(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
-        unimplemented!()
+    fn parse_table_key(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<NodeRef, Error> {
+        self.expect_token(r,Terminal::BracketLeft)?;
+        let (node, key) = self.parse_key(r, parent)?;
+        self.expect_token(r, Terminal::BracketRight)?;
+
+        let table = NodeRef::object(LinkedHashMap::new());
+        node.add_child(None, Some(key.into()), table.clone()).unwrap();
+        Ok(table)
     }
 
     fn parse_array(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {

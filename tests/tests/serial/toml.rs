@@ -293,6 +293,7 @@ fn dotted_keys() {
     assert_eq!(true, node.get_key("site").get_key("google.com").as_bool_ext());
     assert_eq!(true, node.get_key("quoted part").get_key("value").as_bool_ext());
 }
+
 #[test]
 fn dotted_keys_nested() {
     let input = r#"
@@ -403,4 +404,92 @@ fn array_mixed_types_2() {
     let err: ParseDiag = parse_node_err!(input);
 
     assert_err!(err, TomlParseErrDetail::MixedArrayType {..});
+}
+
+#[test]
+fn empty_table() {
+    let input = r#"
+        [table]
+    "#;
+    let node: NodeRef = parse_node!(input);
+    assert!(node.get_key("table").is_object())
+}
+
+#[test]
+fn single_table() {
+    let input = r#"
+        [table-1]
+        key1 = "some string"
+        key2 = 123
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("some string", node.get_key("table-1").get_key("key1").as_string_ext());
+    assert_eq!(123, node.get_key("table-1").get_key("key2").as_int_ext());
+}
+
+#[test]
+fn multiple_tables() {
+    let input = r#"
+        [table-1]
+        key1 = "some string"
+        key2 = 123
+        [table-2]
+        key1 = "another string"
+        key2 = 456
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("some string", node.get_key("table-1").get_key("key1").as_string_ext());
+    assert_eq!(123, node.get_key("table-1").get_key("key2").as_int_ext());
+
+    assert_eq!("another string", node.get_key("table-2").get_key("key1").as_string_ext());
+    assert_eq!(456, node.get_key("table-2").get_key("key2").as_int_ext());
+}
+
+
+#[test]
+fn table_dotted_key() {
+    let input = r#"
+        [dog."tater.man"]
+        type.name = "pug"
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("pug", node.get_key("dog")
+                                .get_key("tater.man")
+                                .get_key("type")
+                                .get_key("name").as_string_ext());
+}
+
+#[test]
+fn redefined_table() {
+    let input = r#"
+        [a]
+        b = 1
+
+        [a]
+        c = 2
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
+}
+
+#[test]
+fn redefined_table_nested() {
+    let input = r#"
+        [a]
+        b = 1
+
+        [a.b]
+        c = 2
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    println!("{}", err);
+
+    // TODO fix quote
+    panic!();
+    assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
 }
