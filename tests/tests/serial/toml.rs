@@ -1,5 +1,6 @@
-use kg_diag::{MemCharReader, Span};
+use kg_diag::{MemCharReader, Span, Diag};
 use crate::serial::TomlParser as Parser;
+use crate::serial::TomlParseErrDetail;
 use kg_tree::NodeRef;
 use kg_utils::collections::LinkedHashMap;
 use crate::tests::serial::NodeRefExt;
@@ -16,6 +17,34 @@ macro_rules! parse_node {
             }
 }
 
+macro_rules! parse_node_err {
+            ($input: expr) => {
+                {
+                    let mut r = kg_diag::MemCharReader::new($input.as_bytes());
+                    let mut parser = crate::serial::TomlParser::new();
+                    let err = parser.parse(&mut r).expect_err("Error expected");
+                    err
+                }
+            }
+}
+
+use kg_diag::ParseDiag;
+macro_rules! assert_err {
+            ($err: expr, $variant: pat) => {
+               let detail = $err.detail().downcast_ref::<TomlParseErrDetail>()
+                    .expect("cannot downcast to TomlParseErrorDetail");
+
+                match detail {
+                    $variant => {}
+                    err => {
+                        panic!("Expected error {} got {:?}", stringify!($variant), err)
+                    }
+                }
+            }
+}
+
+
+
 #[test]
 fn integer() {
     let input = r#"
@@ -26,10 +55,10 @@ fn integer() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(99, node.get_key("int1").into_int());
-    assert_eq!(42, node.get_key("int2").into_int());
-    assert_eq!(0, node.get_key("int3").into_int());
-    assert_eq!(-17, node.get_key("int4").into_int());
+    assert_eq!(99, node.get_key("int1").as_int_ext());
+    assert_eq!(42, node.get_key("int2").as_int_ext());
+    assert_eq!(0, node.get_key("int3").as_int_ext());
+    assert_eq!(-17, node.get_key("int4").as_int_ext());
 }
 
 #[test]
@@ -41,9 +70,9 @@ fn integer_underscore() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(1_000, node.get_key("int1").into_int());
-    assert_eq!(5_349_221, node.get_key("int2").into_int());
-    assert_eq!(1_2_3_4_5, node.get_key("int3").into_int());
+    assert_eq!(1_000, node.get_key("int1").as_int_ext());
+    assert_eq!(5_349_221, node.get_key("int2").as_int_ext());
+    assert_eq!(1_2_3_4_5, node.get_key("int3").as_int_ext());
 }
 
 #[test]
@@ -62,15 +91,15 @@ fn integer_prefix() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(0xdeadbeef, node.get_key("hex1").into_int());
-    assert_eq!(0xdeadbeef, node.get_key("hex2").into_int());
-    assert_eq!(0xdead_beef, node.get_key("hex3").into_int());
+    assert_eq!(0xdeadbeef, node.get_key("hex1").as_int_ext());
+    assert_eq!(0xdeadbeef, node.get_key("hex2").as_int_ext());
+    assert_eq!(0xdead_beef, node.get_key("hex3").as_int_ext());
 
-    assert_eq!(0o01234567, node.get_key("oct1").into_int());
-    assert_eq!(0o755, node.get_key("oct2").into_int());
+    assert_eq!(0o01234567, node.get_key("oct1").as_int_ext());
+    assert_eq!(0o755, node.get_key("oct2").as_int_ext());
 
-    assert_eq!(0b11010110, node.get_key("bin1").into_int());
-    assert_eq!(0b11010110, node.get_key("bin2").into_int());
+    assert_eq!(0b11010110, node.get_key("bin1").as_int_ext());
+    assert_eq!(0b11010110, node.get_key("bin2").as_int_ext());
 }
 
 #[test]
@@ -88,15 +117,15 @@ fn floats() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(1.0, node.get_key("flt1").into_float());
-    assert_eq!(3.1415, node.get_key("flt2").into_float());
-    assert_eq!(-0.01, node.get_key("flt3").into_float());
+    assert_eq!(1.0, node.get_key("flt1").as_float_ext());
+    assert_eq!(3.1415, node.get_key("flt2").as_float_ext());
+    assert_eq!(-0.01, node.get_key("flt3").as_float_ext());
 
-    assert_eq!(5e+22, node.get_key("flt4").into_float());
-    assert_eq!(1e6, node.get_key("flt5").into_float());
-    assert_eq!(-2E-2, node.get_key("flt6").into_float());
+    assert_eq!(5e+22, node.get_key("flt4").as_float_ext());
+    assert_eq!(1e6, node.get_key("flt5").as_float_ext());
+    assert_eq!(-2E-2, node.get_key("flt6").as_float_ext());
 
-    assert_eq!(6.626e-34, node.get_key("flt7").into_float());
+    assert_eq!(6.626e-34, node.get_key("flt7").as_float_ext());
 }
 
 #[test]
@@ -114,15 +143,15 @@ fn floats_underscore() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(1.0, node.get_key("flt1").into_float());
-    assert_eq!(3.1415, node.get_key("flt2").into_float());
-    assert_eq!(-0.01, node.get_key("flt3").into_float());
+    assert_eq!(1.0, node.get_key("flt1").as_float_ext());
+    assert_eq!(3.1415, node.get_key("flt2").as_float_ext());
+    assert_eq!(-0.01, node.get_key("flt3").as_float_ext());
 
-    assert_eq!(5e+22, node.get_key("flt4").into_float());
-    assert_eq!(1e6, node.get_key("flt5").into_float());
-    assert_eq!(-2E-2, node.get_key("flt6").into_float());
+    assert_eq!(5e+22, node.get_key("flt4").as_float_ext());
+    assert_eq!(1e6, node.get_key("flt5").as_float_ext());
+    assert_eq!(-2E-2, node.get_key("flt6").as_float_ext());
 
-    assert_eq!(66.626e-34, node.get_key("flt7").into_float());
+    assert_eq!(66.626e-34, node.get_key("flt7").as_float_ext());
 }
 
 #[test]
@@ -138,13 +167,13 @@ fn floats_special() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(std::f64::INFINITY, node.get_key("sf1").into_float());
-    assert_eq!(std::f64::INFINITY, node.get_key("sf2").into_float());
-    assert_eq!(std::f64::NEG_INFINITY, node.get_key("sf3").into_float());
+    assert_eq!(std::f64::INFINITY, node.get_key("sf1").as_float_ext());
+    assert_eq!(std::f64::INFINITY, node.get_key("sf2").as_float_ext());
+    assert_eq!(std::f64::NEG_INFINITY, node.get_key("sf3").as_float_ext());
 
-    assert!(node.get_key("sf4").into_float().is_nan());
-    assert!(node.get_key("sf5").into_float().is_nan());
-    assert!(node.get_key("sf6").into_float().is_nan());
+    assert!(node.get_key("sf4").as_float_ext().is_nan());
+    assert!(node.get_key("sf5").as_float_ext().is_nan());
+    assert!(node.get_key("sf6").as_float_ext().is_nan());
 }
 
 #[test]
@@ -155,8 +184,8 @@ fn booleans() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(true, node.get_key("bool1").into_bool());
-    assert_eq!(false, node.get_key("bool2").into_bool());
+    assert_eq!(true, node.get_key("bool1").as_bool_ext());
+    assert_eq!(false, node.get_key("bool2").as_bool_ext());
 }
 
 #[test]
@@ -193,6 +222,15 @@ fn basic_string() {
 }
 
 #[test]
+fn basic_multiline_string() {
+    let input = "str1 = \"\"\"\nsome basic\nmultiline\nstring\\n \\t \\\"\"\"\"";
+
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("some basic\nmultiline\nstring\n \t \"", node.get_key("str1").as_string_ext());
+}
+
+#[test]
 fn bare_keys() {
     let input = r#"
         key = "value1"
@@ -202,11 +240,12 @@ fn bare_keys() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("value1", node.get_key("key").into_string());
-    assert_eq!("value2", node.get_key("bare_key").into_string());
-    assert_eq!("value3", node.get_key("bare-key").into_string());
-    assert_eq!("value4", node.get_key("1234").into_string());
+    assert_eq!("value1", node.get_key("key").as_string_ext());
+    assert_eq!("value2", node.get_key("bare_key").as_string_ext());
+    assert_eq!("value3", node.get_key("bare-key").as_string_ext());
+    assert_eq!("value4", node.get_key("1234").as_string_ext());
 }
+
 #[test]
 fn quoted_keys() {
     let input = r#"
@@ -218,31 +257,93 @@ fn quoted_keys() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("value1", node.get_key("127.0.0.1").into_string());
-    assert_eq!("value2", node.get_key("character encoding").into_string());
-    assert_eq!("value3", node.get_key("ʎǝʞ").into_string());
-    assert_eq!("value4", node.get_key("key2").into_string());
-    assert_eq!("value5", node.get_key("quoted \"value\"").into_string());
+    assert_eq!("value1", node.get_key("127.0.0.1").as_string_ext());
+    assert_eq!("value2", node.get_key("character encoding").as_string_ext());
+    assert_eq!("value3", node.get_key("ʎǝʞ").as_string_ext());
+    assert_eq!("value4", node.get_key("key2").as_string_ext());
+    assert_eq!("value5", node.get_key("quoted \"value\"").as_string_ext());
 }
-
 
 #[test]
-fn basic_multiline_string() {
-    let input = "str1 = \"\"\"\nsome basic\nmultiline\nstring\\n \\t \\\"\"\"\"";
-
+fn dotted_keys_bare() {
+    let input = r#"
+        physical.color = "orange"
+        physical.shape = "round"
+    "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("some basic\nmultiline\nstring\n \t \"", node.get_key("str1").into_string());
+    assert_eq!("orange", node.get_key("physical").get_key("color").as_string_ext());
+    assert_eq!("round", node.get_key("physical").get_key("shape").as_string_ext());
 }
 
+#[test]
+fn dotted_keys() {
+    let input = r#"
+        name = "Orange"
+        physical.color = "orange"
+        physical.shape = "round"
+        site."google.com" = true
+        "quoted part".value = true
+    "#;
+    let node: NodeRef = parse_node!(input);
 
+    assert_eq!("Orange", node.get_key("name").as_string_ext());
+    assert_eq!("orange", node.get_key("physical").get_key("color").as_string_ext());
+    assert_eq!("round", node.get_key("physical").get_key("shape").as_string_ext());
+    assert_eq!(true, node.get_key("site").get_key("google.com").as_bool_ext());
+    assert_eq!(true, node.get_key("quoted part").get_key("value").as_bool_ext());
+}
+#[test]
+fn dotted_keys_nested() {
+    let input = r#"
+        a.b.c = 1
+        a.d = 2
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(1, node.get_key("a").get_key("b").get_key("c").as_int_ext());
+    assert_eq!(2, node.get_key("a").get_key("d").as_int_ext());
+}
+
+#[test]
+fn redefined_key() {
+    let input = r#"
+            name = "Tom"
+            name = "Pradyun"
+            "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
+}
+
+#[test]
+fn redefined_key_nested() {
+    let input = r#"
+        a.b = 1
+        a.b.c = 2
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
+}
+
+#[test]
+fn redefined_key_nested_2() {
+    let input = r#"
+        a.b.c = 4
+        a.b.c = 2
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
+}
 
 
 #[test]
 fn comments() {
     let input = r#"
-    # comment
-    # is discarded
+        # comment
+        # is discarded
     "#;
     let node: NodeRef = parse_node!(input);
 

@@ -11,7 +11,7 @@ pub type Token = LexToken<Terminal>;
 
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 1200)]
-pub enum ParseErr {
+pub enum ParseErrDetail {
     #[display(fmt = "invalid escape")]
     InvalidEscape {
         from: Position,
@@ -93,18 +93,23 @@ pub enum ParseErr {
     MixedArrayType {
         expected: ValueType,
     },
+
+    #[display(fmt = "key '{key}' defined multiple times")]
+    RedefinedKey {
+        key: String
+    },
     #[display(fmt = "unclosed {a0}")]
     UnclosedGroup(Terminal),
 }
 
 
-impl ParseErr {
+impl ParseErrDetail {
     pub fn invalid_escape<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
             Some(_) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidEscape {
+                parse_diag!(ParseErrDetail::InvalidEscape {
                     from: p1,
                     to: p2
                 }, r, {
@@ -112,7 +117,7 @@ impl ParseErr {
                 })
             }
             None => {
-                parse_diag!(ParseErr::UnexpectedEoi {
+                parse_diag!(ParseErrDetail::UnexpectedEoi {
                     pos: p1,
                 }, r, {
                     p1, p1 => "unexpected end of input",
@@ -127,7 +132,7 @@ impl ParseErr {
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidChar {
+                parse_diag!(ParseErrDetail::InvalidChar {
                     input: c,
                     from: p1,
                     to: p2
@@ -136,7 +141,7 @@ impl ParseErr {
                 })
             }
             None => {
-                parse_diag!(ParseErr::UnexpectedEoi {
+                parse_diag!(ParseErrDetail::UnexpectedEoi {
                     pos: p1,
                 }, r, {
                     p1, p1 => "unexpected end of input",
@@ -151,7 +156,7 @@ impl ParseErr {
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidCharOne {
+                parse_diag!(ParseErrDetail::InvalidCharOne {
                     input: c,
                     from: p1,
                     to: p2,
@@ -161,7 +166,7 @@ impl ParseErr {
                 })
             }
             None => {
-                parse_diag!(ParseErr::UnexpectedEoiOne {
+                parse_diag!(ParseErrDetail::UnexpectedEoiOne {
                     pos: p1,
                     expected,
                 }, r, {
@@ -177,7 +182,7 @@ impl ParseErr {
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidCharMany {
+                parse_diag!(ParseErrDetail::InvalidCharMany {
                     input: c,
                     from: p1,
                     to: p2,
@@ -187,7 +192,7 @@ impl ParseErr {
                 })
             }
             None => {
-                parse_diag!(ParseErr::UnexpectedEoiMany {
+                parse_diag!(ParseErrDetail::UnexpectedEoiMany {
                     pos: p1,
                     expected,
                 }, r, {
@@ -201,7 +206,7 @@ impl ParseErr {
     #[inline]
     pub fn unexpected_eoi_str<T>(r: &mut dyn CharReader, expected: String) -> Result<T, Error> {
         let pos = r.position();
-        Err(parse_diag!(ParseErr::UnexpectedEoiOneString {
+        Err(parse_diag!(ParseErrDetail::UnexpectedEoiOneString {
             pos,
             expected,
         }, r, {
@@ -211,28 +216,28 @@ impl ParseErr {
 
     #[inline]
     pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErr::UnexpectedToken { token }, r, {
+        Err(parse_diag!(ParseErrDetail::UnexpectedToken { token }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
 
     #[inline]
     pub fn unexpected_token_str<T>(token: Token, expected: &str, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErr::UnexpectedTokenStr {expected: expected.to_string(), token }, r, {
+        Err(parse_diag!(ParseErrDetail::UnexpectedTokenStr {expected: expected.to_string(), token }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
 
     #[inline]
     pub fn unexpected_token_one<T>(token: Token, expected: Terminal, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErr::UnexpectedTokenOne { token, expected }, r, {
+        Err(parse_diag!(ParseErrDetail::UnexpectedTokenOne { token, expected }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
 
     #[inline]
     pub fn unexpected_token_many<T>(token: Token, expected: Vec<Terminal>, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErr::UnexpectedTokenMany { token, expected }, r, {
+        Err(parse_diag!(ParseErrDetail::UnexpectedTokenMany { token, expected }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
@@ -241,15 +246,23 @@ impl ParseErr {
     pub fn mixed_array_type<T>(r: &mut dyn CharReader, node: NodeRef, expected: Kind) -> Result<T, Error> {
         let from = node.data().metadata().span().unwrap().from;
         let to = node.data().metadata().span().unwrap().to;
-        Err(parse_diag!(ParseErr::MixedArrayType { expected: expected.into() }, r, {
+        Err(parse_diag!(ParseErrDetail::MixedArrayType { expected: expected.into() }, r, {
             from, to => "unexpected type"
         }))
     }
 
     pub fn unexpected_eol<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p = r.position();
-        Err(parse_diag!(ParseErr::UnexpectedEol, r, {
+        Err(parse_diag!(ParseErrDetail::UnexpectedEol, r, {
             p, p => "unexpected end of line"
+        }))
+    }
+
+    pub fn key_redefined<T>(r: &mut dyn CharReader, redefined: Token, prev: Span, key: &str) -> Result<T, Error> {
+        let p = r.position();
+        Err(parse_diag!(ParseErrDetail::RedefinedKey{key: key.to_string()}, r, {
+            redefined.from(), redefined.to() => "key redefined here",
+            prev.from, prev.to => "previously defined here",
         }))
     }
 }
@@ -391,7 +404,7 @@ fn parse_integer(t: Token, value: Cow<str>) -> Result<i64, Error> {
         &value[..]
     };
 
-    let num: i64 = i64::from_str_radix(val, radix).map_err(|err| ParseErr::InvalidIntegerLiteral {
+    let num: i64 = i64::from_str_radix(val, radix).map_err(|err| ParseErrDetail::InvalidIntegerLiteral {
         err,
         from: t.from(),
         to: t.to(),
@@ -415,7 +428,7 @@ fn parse_float(t: Token, value: Cow<str>) -> Result<f64, Error> {
 
     let s = value.replace("_", "");
 
-    let num: f64 = s.parse().map_err(|err| ParseErr::InvalidFloatLiteral {
+    let num: f64 = s.parse().map_err(|err| ParseErrDetail::InvalidFloatLiteral {
         err,
         from: t.from(),
         to: t.to(),
@@ -429,7 +442,7 @@ fn check_eol(r: &mut dyn CharReader, multiline: bool) -> Result<(), Error> {
     }
     if let Some(c) = r.peek_char(0)? {
         if c == '\n' || c == '\r' {
-            return ParseErr::unexpected_eol(r);
+            return ParseErrDetail::unexpected_eol(r);
         }
     }
     Ok(())
@@ -461,7 +474,7 @@ impl Parser {
                         let p2 = r.position();
                         Ok(Token::new(Terminal::Float, p1, p2))
                     } else {
-                        ParseErr::invalid_input_many(r, vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+                        ParseErrDetail::invalid_input_many(r, vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
                     }
                 }
                 Some(c) if c.is_digit(10) => {
@@ -470,7 +483,7 @@ impl Parser {
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Float, p1, p2))
                 }
-                _ => ParseErr::invalid_input_many(r, vec!['-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']),
+                _ => ParseErrDetail::invalid_input_many(r, vec!['-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']),
             }
         }
 
@@ -495,7 +508,7 @@ impl Parser {
                         r.next_char()?;
                         break;
                     } else {
-                        return ParseErr::invalid_input(r);
+                        return ParseErrDetail::invalid_input(r);
                     }
                 }
             }
@@ -508,7 +521,7 @@ impl Parser {
             r.next_char()?;
             if let Some('_') = r.next_char()? {
                 // underscore is not allowed between prefix and number
-                return ParseErr::invalid_input(r);
+                return ParseErrDetail::invalid_input(r);
             }
             r.skip_while(&|c| f(c) || c == '_')?;
             let p2 = r.position();
@@ -547,7 +560,7 @@ impl Parser {
                 if let Some('\n') = r.peek_char(1)? {
                     consume(r, 2, Terminal::Newline)
                 } else {
-                    ParseErr::invalid_input(r)
+                    ParseErrDetail::invalid_input(r)
                 }
             }
             Some('i') => {
@@ -588,7 +601,7 @@ impl Parser {
                     if let Some('\"') = r.next_char()? {
                         multiline = true;
                     } else {
-                        return ParseErr::invalid_input_one(r, '\"');
+                        return ParseErrDetail::invalid_input_one(r, '\"');
                     }
                 }
 
@@ -609,7 +622,7 @@ impl Parser {
                     }
                 }
                 if r.eof() {
-                    ParseErr::invalid_input_one(r, '\"')
+                    ParseErrDetail::invalid_input_one(r, '\"')
                 } else {
                     r.next_char()?;
                     let p2 = r.position();
@@ -629,7 +642,7 @@ impl Parser {
                     if let Some('\'') = r.next_char()? {
                         multiline = true;
                     } else {
-                        return ParseErr::invalid_input_one(r, '\'');
+                        return ParseErrDetail::invalid_input_one(r, '\'');
                     }
                 }
 
@@ -649,7 +662,7 @@ impl Parser {
                 }
 
                 if r.eof() {
-                    ParseErr::invalid_input_one(r, '\'')
+                    ParseErrDetail::invalid_input_one(r, '\'')
                 } else {
                     r.next_char()?;
                     let p2 = r.position();
@@ -712,7 +725,7 @@ impl Parser {
 
             // TODO date types https://github.com/toml-lang/toml#offset-date-time
             Some(_) => {
-                ParseErr::invalid_input(r)
+                ParseErrDetail::invalid_input(r)
             }
         }
     }
@@ -734,7 +747,7 @@ impl Parser {
         if t.term() == term {
             Ok(t)
         } else {
-            ParseErr::unexpected_token_one(t, term, r)
+            ParseErrDetail::unexpected_token_one(t, term, r)
         }
     }
 
@@ -758,7 +771,7 @@ impl Parser {
                 Terminal::String { literal, multiline } => {
                     if multiline {
                         // FIXME better error
-                        return ParseErr::unexpected_token_str(t, " STRING", r);
+                        return ParseErrDetail::unexpected_token_str(t, " STRING", r);
                     }
                     self.push_token(t);
                     self.parse_kv(r, &mut current)?
@@ -771,7 +784,7 @@ impl Parser {
                 Terminal::Comment => {}
                 Terminal::End => return Ok(()),
                 _ => {
-                    return ParseErr::unexpected_token_many(t, vec![
+                    return ParseErrDetail::unexpected_token_many(t, vec![
                         Terminal::String { multiline: true, literal: true },
                         Terminal::Keylike,
                         Terminal::BracketLeft,
@@ -783,41 +796,77 @@ impl Parser {
     }
 
     fn parse_kv(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<(), Error> {
-        let t = self.next_token(r)?;
-        let key = match t.term() {
-            Terminal::String { .. } => {
-                self.parse_string(t, r)?;
-                self.buf.clone()
-            }
-            Terminal::Keylike => {
-                r.slice_pos(t.from(), t.to())?.into_owned()
-            }
-            Terminal::Integer => {
-                let value = r.slice_pos(t.from(), t.to())?;
-                let num = parse_integer(t, value)?;
-                format!("{}", num)
-            }
-            Terminal::Float => {
-                let value = r.slice_pos(t.from(), t.to())?;
-                let num = parse_float(t, value)?;
-                format!("{}", num)
-            }
-            _ => {
-                return ParseErr::unexpected_token_many(t,
-                                                       vec![Terminal::Keylike,
-                                                            Terminal::String { multiline: true, literal: true }
-                                                       ], r);
-            }
-        };
+        let mut token = self.next_token(r)?;
+        let mut current = parent.clone();
+        let mut key = String::new();
+        loop {
+            key = match token.term() {
+                Terminal::String { .. } => {
+                    self.parse_string(token, r)?;
+                    self.buf.clone()
+                }
+                Terminal::Keylike => {
+                    r.slice_pos(token.from(), token.to())?.into_owned()
+                }
+                Terminal::Integer => {
+                    let value = r.slice_pos(token.from(), token.to())?;
+                    value.into()
+                }
+                Terminal::Float => {
+                    // FIXME handle floats as keys.
+                    // for example: `3.14159 = "pi"`
+                    // should be parsed to: { "3": { "14159": "pi" } }
+                    let value = r.slice_pos(token.from(), token.to())?;
+                    value.into()
+                }
+                _ => {
+                    return ParseErrDetail::unexpected_token_many(token,
+                                                                 vec![Terminal::Keylike,
+                                                                Terminal::String { multiline: true, literal: true }
+                                                           ], r);
+                }
+            };
+            let next = self.next_token(r)?;
 
-        let _ = self.expect_token(r, Terminal::Equals)?;
-        if !key.contains(".") {
-            let val = self.parse_value(r)?;
-            parent.add_child(None, Some(key.into()), val);
-        } else {
-            // TODO handle dotted keys
-            unimplemented!("dotted key")
+            match next.term() {
+                Terminal::Period => {
+                    if let Some(child) = current.get_child_key(&key) {
+                        if child.is_object() {
+                            current = child;
+                        } else {
+                            let prev = child.data().metadata().span().unwrap();
+                            return ParseErrDetail::key_redefined(r, token, prev, &key)
+                        }
+                    } else {
+                        let new = NodeRef::object(LinkedHashMap::new());
+                        current.add_child(None, Some(key.into()), new.clone()).unwrap();
+                        current = new;
+                    }
+                    token = self.next_token(r)?;
+                    continue
+                }
+                Terminal::Equals => {
+                    let val = self.parse_value(r)?;
+
+                    if let Some(child) = current.get_child_key(&key) {
+                        let prev = child.data().metadata().span().unwrap();
+                        return ParseErrDetail::key_redefined(r, token, prev, &key)
+                    }
+
+                    current.add_child(None, Some(key.into()), val);
+                    return Ok(())
+                }
+                _ => {
+                    return ParseErrDetail::unexpected_token_many(token,
+                                                                 vec![Terminal::Period,
+                                                                Terminal::Equals
+                                                           ], r);
+                }
+            }
+            token = next;
+
         }
+
         Ok(())
     }
 
@@ -850,7 +899,7 @@ impl Parser {
             Terminal::True => Ok(NodeRef::boolean(true).with_span(t.span())),
             Terminal::False => Ok(NodeRef::boolean(false).with_span(t.span())),
             _ => {
-                return ParseErr::unexpected_token_many(t, vec![
+                return ParseErrDetail::unexpected_token_many(t, vec![
                     Terminal::String { multiline: true, literal: true },
                     Terminal::BraceLeft,
                     Terminal::BracketLeft,
@@ -887,7 +936,7 @@ impl Parser {
                     if !elems.is_empty() {
                         let array_type = elems.get(0).unwrap().data().kind();
                         if array_type == value.data().kind() {
-                            return ParseErr::mixed_array_type(r, value, array_type);
+                            return ParseErrDetail::mixed_array_type(r, value, array_type);
                         }
                         elems.push(value);
                     } else {
@@ -895,7 +944,7 @@ impl Parser {
                     }
                     comma = true;
                 }
-                _ => return ParseErr::unexpected_token(t, r)
+                _ => return ParseErrDetail::unexpected_token(t, r)
             }
         }
     }
@@ -952,7 +1001,7 @@ impl Parser {
                         Some('U') => {
                             unimplemented!()
                         }
-                        _ => return ParseErr::invalid_escape(r),
+                        _ => return ParseErrDetail::invalid_escape(r),
                     }
                 } else {
                     self.buf.push(c);
@@ -1051,9 +1100,9 @@ mod tests {
 
             let err = parser.lex(&mut r).unwrap_err();
 
-            let detail = err.detail().downcast_ref::<ParseErr>().unwrap();
+            let detail = err.detail().downcast_ref::<ParseErrDetail>().unwrap();
 
-            if let ParseErr::InvalidChar { .. } = detail {
+            if let ParseErrDetail::InvalidChar { .. } = detail {
                 // Ok
             } else {
                 panic!("InvalidChar Error expected")

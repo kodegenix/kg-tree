@@ -10,6 +10,7 @@ mod ser;
 mod de;
 mod fmt;
 pub use fmt::toml::Parser as TomlParser;
+pub use fmt::toml::ParseErrDetail as TomlParseErrDetail;
 pub use fmt::json::Parser as JsonParser;
 
 #[cfg(test)]
