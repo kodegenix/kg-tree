@@ -674,6 +674,8 @@ fn array_of_tables() {
     "#;
     let node: NodeRef = parse_node!(input);
 
+    println!("{}", node.to_json_pretty());
+
     let products = node.get_key("products").as_array_ext();
 
     assert_eq!("Hammer", products[0].get_key("name").as_string_ext());
@@ -684,4 +686,41 @@ fn array_of_tables() {
     assert_eq!("Nail", products[2].get_key("name").as_string_ext());
     assert_eq!(284758393, products[2].get_key("sku").as_int_ext());
     assert_eq!("gray", products[2].get_key("color").as_string_ext());
+}
+
+#[test]
+fn nested_array_of_tables() {
+    let input = r#"
+        [[fruit]]
+          name = "apple"
+
+          [fruit.physical]
+            color = "red"
+            shape = "round"
+
+          [[fruit.variety]]
+            name = "red delicious"
+
+          [[fruit.variety]]
+            name = "granny smith"
+
+        [[fruit]]
+          name = "banana"
+
+          [[fruit.variety]]
+            name = "plantain"
+    "#;
+    let node: NodeRef = parse_node!(input);
+    println!("{}", node.to_json_pretty());
+
+    let fruit = node.get_key("fruit").as_array_ext();
+
+    assert_eq!("apple", fruit[0].get_key("name").as_string_ext());
+    assert_eq!("red", fruit[0].get_key("physical").get_key("color").as_string_ext());
+    assert_eq!("round", fruit[0].get_key("physical").get_key("shape").as_string_ext());
+    assert_eq!("red delicious", fruit[0].get_key("variety").as_array_ext()[0].get_key("name").as_string_ext());
+    assert_eq!("granny smith", fruit[0].get_key("variety").as_array_ext()[1].get_key("name").as_string_ext());
+
+    assert_eq!("banana", fruit[1].get_key("name").as_string_ext());
+    assert_eq!("plantain", fruit[1].get_key("variety").as_array_ext()[0].get_key("name").as_string_ext());
 }

@@ -795,7 +795,10 @@ impl Parser {
                 Terminal::BracketLeft => {
                     let next = self.next_token(r)?;
                     if next.term() == BracketLeft {
-                        unimplemented!()
+                        self.push_token(t);
+                        self.push_token(next);
+                        current = self.parse_array_of_tables(r, &mut current)?;
+
                     } else {
                         self.push_token(t);
                         self.push_token(next);
@@ -869,7 +872,12 @@ impl Parser {
             match next.term() {
                 Terminal::Period => {
                     if let Some(child) = current.get_child_key(&key) {
-                        if child.is_object() {
+
+                        if child.is_array() {
+                            let current = child.get_child_index(child.data().children_count().unwrap() -1).unwrap();
+                        } else
+
+                        if child.is_object(){
                             current = child;
                         } else {
                             let prev = child
@@ -962,8 +970,7 @@ impl Parser {
     }
 
     fn parse_table(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<NodeRef, Error> {
-        let t = self.expect_token(r, Terminal::BracketLeft)?;
-        let from = t.from();
+        let from = self.expect_token(r, Terminal::BracketLeft)?.from();
         let (node, key) = self.parse_key(r, parent)?;
         let to = self.expect_token(r, Terminal::BracketRight)?.to();
         let table =
@@ -1005,6 +1012,49 @@ impl Parser {
         }
 
         Ok(table)
+    }
+
+    fn parse_array_of_tables(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<NodeRef, Error> {
+        let from = self.expect_token(r, Terminal::BracketLeft)?.from();
+        self.expect_token(r, Terminal::BracketLeft)?;
+
+        let (array_parent, key) = self.parse_key(r, parent)?;
+        self.expect_token(r, Terminal::BracketRight)?;
+        let to = self.expect_token(r, Terminal::BracketRight)?.to();
+
+        let mut table = NodeRef::object(LinkedHashMap::new());
+
+        if let Some(array) = array_parent.get_child_key(&key) {
+            if array.is_array() {
+                let count = array.data().children_count().unwrap();
+                array.add_child(Some(count-1), None, table.clone()).unwrap();
+            } else {
+                unimplemented!()
+            }
+        } else {
+            let array = NodeRef::array(vec![table.clone()]).with_span(Span::with_pos(from, to));
+            array_parent.add_child(None, Some(key.into()), array).unwrap();
+        }
+        unimplemented!();
+
+        Ok(table)
+
+
+
+
+
+
+
+//                        let from = t.from();
+//                        let (node, key) = self.parse_key(r, parent)?;
+//                        self.expect_token(r, Terminal::BracketRight)?;
+//                        let to = self.expect_token(r, Terminal::BracketRight)?.to();
+//
+//                        let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
+//                        node.add_child(None, Some(key.into()), table.clone())
+//                            .unwrap();
+//                        Ok(table)
+
     }
 
     fn parse_array(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<NodeRef, Error> {
