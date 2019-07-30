@@ -915,12 +915,12 @@ impl Parser {
     fn parse_kv(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<(), Error> {
         let (node, key) = self.parse_key(r, parent)?;
         self.expect_token(r, Terminal::Equals)?;
-        let val = self.parse_value(r)?;
+        let val = self.parse_value(r, parent)?;
         node.add_child(None, Some(key.into()), val).unwrap();
         Ok(())
     }
 
-    fn parse_value(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
+    fn parse_value(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<NodeRef, Error> {
         let t = self.next_token(r)?;
 
         match t.term() {
@@ -929,12 +929,12 @@ impl Parser {
                 Ok(NodeRef::string(&self.buf).with_span(t.span()))
             }
             Terminal::BraceLeft => {
-                // TODO Inline table
-                unimplemented!("Inline table")
+                self.push_token(t);
+                self.parse_inline_table(r, parent)
             }
             Terminal::BracketLeft => {
                 self.push_token(t);
-                self.parse_array(r)
+                self.parse_array(r, parent)
             }
             Terminal::Float => {
                 let value = r.slice_pos(t.from(), t.to())?;
@@ -967,22 +967,41 @@ impl Parser {
         }
     }
 
-    fn parse_table_key(
-        &mut self,
-        r: &mut dyn CharReader,
-        parent: &mut NodeRef,
-    ) -> Result<NodeRef, Error> {
-        self.expect_token(r, Terminal::BracketLeft)?;
-        let (node, key) = self.parse_key(r, parent)?;
-        self.expect_token(r, Terminal::BracketRight)?;
+    fn parse_inline_table(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<NodeRef, Error> {
+        let from = self.expect_token(r, Terminal::BraceLeft)?.from();
 
-        let table = NodeRef::object(LinkedHashMap::new());
-        node.add_child(None, Some(key.into()), table.clone())
-            .unwrap();
+        let mut table = NodeRef::object(LinkedHashMap::new());
+        loop {
+            let (mut node, key) = self.parse_key(r, &mut table)?;
+            self.expect_token(r, Terminal::Equals)?;
+            let val = self.parse_value(r, &mut node)?;
+            node.add_child(None, Some(key.into()), val).unwrap();
+
+            let next = self.next_token(r)?;
+
+            match next.term() {
+                Terminal::Comma => {},
+                Terminal::BraceRight => {
+                    table = table.with_span(Span::with_pos(from, next.to()));
+                    break
+                }
+                _=> {
+                    return ParseErrDetail::unexpected_token_many(
+                        next,
+                        vec![
+                            Terminal::Comma,
+                            Terminal::BraceRight,
+                        ],
+                        r,
+                    );
+                }
+            }
+        }
+
         Ok(table)
     }
 
-    fn parse_array(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
+    fn parse_array(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<NodeRef, Error> {
         let p1 = self.expect_token(r, Terminal::BracketLeft)?.from();
         let mut elems = Elements::new();
         let mut comma = false;
@@ -1001,7 +1020,7 @@ impl Parser {
                 }
                 _ if !comma => {
                     self.push_token(t);
-                    let value = self.parse_value(r)?;
+                    let value = self.parse_value(r, parent)?;
                     if !elems.is_empty() {
                         let array_type = elems.get(0).unwrap().data().kind();
                         if array_type != value.data().kind() {

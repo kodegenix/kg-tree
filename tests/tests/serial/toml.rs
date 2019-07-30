@@ -10,8 +10,8 @@ macro_rules! parse_node {
         let mut r = kg_diag::MemCharReader::new($input.as_bytes());
         let mut parser = crate::serial::TomlParser::new();
         parser.parse(&mut r).unwrap_or_else(|err| {
-            println!("{}", err);
-            panic!()
+            eprintln!("{}", err);
+            panic!("Error parsing node!")
         })
     }};
 }
@@ -574,9 +574,37 @@ fn redefined_table_nested() {
     "#;
     let err: ParseDiag = parse_node_err!(input);
 
-    println!("{}", err);
-
-    // TODO fix quote
-    panic!();
     assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
+}
+
+#[test]
+fn inline_tables() {
+    let input = r#"
+        name = { first = "Tom", last = "Preston-Werner" }
+        point = { x = 1, y = 2 }
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("Tom", node.get_key("name")
+        .get_key("first").as_string_ext());
+
+    assert_eq!("Preston-Werner", node.get_key("name")
+        .get_key("last").as_string_ext());
+
+    assert_eq!(1, node.get_key("point")
+        .get_key("x").as_int_ext());
+    assert_eq!(2, node.get_key("point")
+        .get_key("y").as_int_ext());
+}
+
+#[test]
+fn inline_tables_nested() {
+    let input = r#"
+        animal = { type.name = "pug" }
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("pug", node.get_key("animal")
+        .get_key("type")
+        .get_key("name").as_string_ext());
 }
