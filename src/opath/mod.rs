@@ -8,7 +8,7 @@ pub use self::expr::func::{
 pub use self::expr::parse::{Error as OpathParseError, Parser};
 use self::expr::*;
 pub use self::expr::{
-    Env, ExprErrorDetail, ExprResult, NodeBuf, NodeSet, Scope, ScopeMut, FuncCallErrorDetail
+    Env, ExprErrorDetail, ExprResult, FuncCallErrorDetail, NodeBuf, NodeSet, Scope, ScopeMut,
 };
 pub use self::interpolation::Interpolation;
 pub use self::matcher::NodePathMatcher;

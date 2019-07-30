@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use heapsize::HeapSizeOf;
-use kg_diag::*;
 use kg_diag::io::fs;
+use kg_diag::*;
 use kg_symbol::Symbol;
 use kg_utils::collections::LinkedHashMap;
 

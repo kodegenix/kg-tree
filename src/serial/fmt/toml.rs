@@ -8,15 +8,11 @@ pub type Error = ParseDiag;
 
 pub type Token = LexToken<Terminal>;
 
-
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 1200)]
 pub enum ParseErrDetail {
     #[display(fmt = "invalid escape")]
-    InvalidEscape {
-        from: Position,
-        to: Position,
-    },
+    InvalidEscape { from: Position, to: Position },
     #[display(fmt = "invalid character '{input}'")]
     InvalidChar {
         input: char,
@@ -30,7 +26,10 @@ pub enum ParseErrDetail {
         to: Position,
         expected: char,
     },
-    #[display(fmt = "invalid character '{input}', expected one of: {expected}", expected = "ListDisplay(expected)")]
+    #[display(
+        fmt = "invalid character '{input}', expected one of: {expected}",
+        expected = "ListDisplay(expected)"
+    )]
     InvalidCharMany {
         input: char,
         from: Position,
@@ -50,58 +49,40 @@ pub enum ParseErrDetail {
         to: Position,
     },
     #[display(fmt = "unexpected end of input")]
-    UnexpectedEoi {
-        pos: Position,
-    },
+    UnexpectedEoi { pos: Position },
     #[display(fmt = "unexpected end of line")]
     UnexpectedEol,
     #[display(fmt = "unexpected end of input, expected '{expected}'")]
-    UnexpectedEoiOne {
-        pos: Position,
-        expected: char,
-    },
-    #[display(fmt = "unexpected end of input, expected one of: {expected}", expected = "ListDisplay(expected)")]
-    UnexpectedEoiMany {
-        pos: Position,
-        expected: Vec<char>,
-    },
+    UnexpectedEoiOne { pos: Position, expected: char },
+    #[display(
+        fmt = "unexpected end of input, expected one of: {expected}",
+        expected = "ListDisplay(expected)"
+    )]
+    UnexpectedEoiMany { pos: Position, expected: Vec<char> },
     #[display(fmt = "unexpected end of input, expected \"{expected}\"")]
-    UnexpectedEoiOneString {
-        pos: Position,
-        expected: String,
-    },
+    UnexpectedEoiOneString { pos: Position, expected: String },
     #[display(fmt = "unexpected symbol {token}")]
-    UnexpectedToken {
-        token: Token,
-    },
+    UnexpectedToken { token: Token },
     #[display(fmt = "unexpected symbol {token}, expected {expected}")]
-    UnexpectedTokenStr {
-        token: Token,
-        expected: String,
-    },
+    UnexpectedTokenStr { token: Token, expected: String },
     #[display(fmt = "unexpected symbol {token}, expected {expected}")]
-    UnexpectedTokenOne {
-        token: Token,
-        expected: Terminal,
-    },
-    #[display(fmt = "unexpected symbol {token}, expected one of: {expected}", expected = "ListDisplay(expected)")]
+    UnexpectedTokenOne { token: Token, expected: Terminal },
+    #[display(
+        fmt = "unexpected symbol {token}, expected one of: {expected}",
+        expected = "ListDisplay(expected)"
+    )]
     UnexpectedTokenMany {
         token: Token,
         expected: Vec<Terminal>,
     },
     #[display(fmt = "array types mixed, expected type {expected}")]
-    MixedArrayType {
-        expected: ValueType,
-    },
+    MixedArrayType { expected: ValueType },
 
     #[display(fmt = "key '{key}' defined multiple times")]
-    RedefinedKey {
-        key: String
-    },
+    RedefinedKey { key: String },
     #[display(fmt = "unclosed {a0}")]
     UnclosedGroup(Terminal),
 }
-
 
 impl ParseErrDetail {
     pub fn invalid_escape<T>(r: &mut dyn CharReader) -> Result<T, Error> {
@@ -116,13 +97,11 @@ impl ParseErrDetail {
                     p1, p2 => "invalid escape",
                 })
             }
-            None => {
-                parse_diag!(ParseErrDetail::UnexpectedEoi {
-                    pos: p1,
-                }, r, {
-                    p1, p1 => "unexpected end of input",
-                })
-            }
+            None => parse_diag!(ParseErrDetail::UnexpectedEoi {
+                pos: p1,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
         };
         Err(err)
     }
@@ -140,13 +119,11 @@ impl ParseErrDetail {
                     p1, p2 => "invalid character",
                 })
             }
-            None => {
-                parse_diag!(ParseErrDetail::UnexpectedEoi {
-                    pos: p1,
-                }, r, {
-                    p1, p1 => "unexpected end of input",
-                })
-            }
+            None => parse_diag!(ParseErrDetail::UnexpectedEoi {
+                pos: p1,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
         };
         Err(err)
     }
@@ -165,14 +142,12 @@ impl ParseErrDetail {
                     p1, p2 => "invalid character",
                 })
             }
-            None => {
-                parse_diag!(ParseErrDetail::UnexpectedEoiOne {
-                    pos: p1,
-                    expected,
-                }, r, {
-                    p1, p1 => "unexpected end of input",
-                })
-            }
+            None => parse_diag!(ParseErrDetail::UnexpectedEoiOne {
+                pos: p1,
+                expected,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
         };
         Err(err)
     }
@@ -191,14 +166,12 @@ impl ParseErrDetail {
                     p1, p2 => "invalid character",
                 })
             }
-            None => {
-                parse_diag!(ParseErrDetail::UnexpectedEoiMany {
-                    pos: p1,
-                    expected,
-                }, r, {
-                    p1, p1 => "unexpected end of input",
-                })
-            }
+            None => parse_diag!(ParseErrDetail::UnexpectedEoiMany {
+                pos: p1,
+                expected,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
         };
         Err(err)
     }
@@ -222,33 +195,56 @@ impl ParseErrDetail {
     }
 
     #[inline]
-    pub fn unexpected_token_str<T>(token: Token, expected: &str, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErrDetail::UnexpectedTokenStr {expected: expected.to_string(), token }, r, {
-            token.from(), token.to() => "unexpected token"
-        }))
+    pub fn unexpected_token_str<T>(
+        token: Token,
+        expected: &str,
+        r: &mut dyn CharReader,
+    ) -> Result<T, Error> {
+        Err(
+            parse_diag!(ParseErrDetail::UnexpectedTokenStr {expected: expected.to_string(), token }, r, {
+                token.from(), token.to() => "unexpected token"
+            }),
+        )
     }
 
     #[inline]
-    pub fn unexpected_token_one<T>(token: Token, expected: Terminal, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErrDetail::UnexpectedTokenOne { token, expected }, r, {
-            token.from(), token.to() => "unexpected token"
-        }))
+    pub fn unexpected_token_one<T>(
+        token: Token,
+        expected: Terminal,
+        r: &mut dyn CharReader,
+    ) -> Result<T, Error> {
+        Err(
+            parse_diag!(ParseErrDetail::UnexpectedTokenOne { token, expected }, r, {
+                token.from(), token.to() => "unexpected token"
+            }),
+        )
     }
 
     #[inline]
-    pub fn unexpected_token_many<T>(token: Token, expected: Vec<Terminal>, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErrDetail::UnexpectedTokenMany { token, expected }, r, {
-            token.from(), token.to() => "unexpected token"
-        }))
+    pub fn unexpected_token_many<T>(
+        token: Token,
+        expected: Vec<Terminal>,
+        r: &mut dyn CharReader,
+    ) -> Result<T, Error> {
+        Err(
+            parse_diag!(ParseErrDetail::UnexpectedTokenMany { token, expected }, r, {
+                token.from(), token.to() => "unexpected token"
+            }),
+        )
     }
 
-
-    pub fn mixed_array_type<T>(r: &mut dyn CharReader, node: NodeRef, expected: Kind) -> Result<T, Error> {
+    pub fn mixed_array_type<T>(
+        r: &mut dyn CharReader,
+        node: NodeRef,
+        expected: Kind,
+    ) -> Result<T, Error> {
         let from = node.data().metadata().span().unwrap().from;
         let to = node.data().metadata().span().unwrap().to;
-        Err(parse_diag!(ParseErrDetail::MixedArrayType { expected: expected.into() }, r, {
-            from, to => "unexpected type"
-        }))
+        Err(
+            parse_diag!(ParseErrDetail::MixedArrayType { expected: expected.into() }, r, {
+                from, to => "unexpected type"
+            }),
+        )
     }
 
     pub fn unexpected_eol<T>(r: &mut dyn CharReader) -> Result<T, Error> {
@@ -258,12 +254,19 @@ impl ParseErrDetail {
         }))
     }
 
-    pub fn key_redefined<T>(r: &mut dyn CharReader, redefined: Token, prev: Span, key: &str) -> Result<T, Error> {
+    pub fn key_redefined<T>(
+        r: &mut dyn CharReader,
+        redefined: Token,
+        prev: Span,
+        key: &str,
+    ) -> Result<T, Error> {
         let p = r.position();
-        Err(parse_diag!(ParseErrDetail::RedefinedKey{key: key.to_string()}, r, {
-            redefined.from(), redefined.to() => "key redefined here",
-            prev.from, prev.to => "previously defined here",
-        }))
+        Err(
+            parse_diag!(ParseErrDetail::RedefinedKey{key: key.to_string()}, r, {
+                redefined.from(), redefined.to() => "key redefined here",
+                prev.from, prev.to => "previously defined here",
+            }),
+        )
     }
 }
 
@@ -355,7 +358,6 @@ pub enum Terminal {
 
 impl LexTerm for Terminal {}
 
-
 #[derive(Debug)]
 pub struct Parser {
     token_queue: VecDeque<Token>,
@@ -371,9 +373,7 @@ fn is_bare(ch: char) -> bool {
 }
 
 fn is_hex_char(ch: char) -> bool {
-    ('A' <= ch && ch <= 'F')
-        || ('a' <= ch && ch <= 'f')
-        || ('0' <= ch && ch <= '9')
+    ('A' <= ch && ch <= 'F') || ('a' <= ch && ch <= 'f') || ('0' <= ch && ch <= '9')
 }
 
 fn is_oct_char(ch: char) -> bool {
@@ -404,35 +404,35 @@ fn parse_integer(t: Token, value: Cow<str>) -> Result<i64, Error> {
         &value[..]
     };
 
-    let num: i64 = i64::from_str_radix(val, radix).map_err(|err| ParseErrDetail::InvalidIntegerLiteral {
-        err,
-        from: t.from(),
-        to: t.to(),
-    })?;
+    let num: i64 =
+        i64::from_str_radix(val, radix).map_err(|err| ParseErrDetail::InvalidIntegerLiteral {
+            err,
+            from: t.from(),
+            to: t.to(),
+        })?;
     Ok(num)
 }
 
 fn parse_float(t: Token, value: Cow<str>) -> Result<f64, Error> {
-    if value == "inf" ||
-        value == "+inf" {
+    if value == "inf" || value == "+inf" {
         return Ok(std::f64::INFINITY);
     }
     if value == "-inf" {
         return Ok(std::f64::NEG_INFINITY);
     }
-    if value == "nan" ||
-        value == "+nan" ||
-        value == "-nan" {
+    if value == "nan" || value == "+nan" || value == "-nan" {
         return Ok(std::f64::NAN);
     }
 
     let s = value.replace("_", "");
 
-    let num: f64 = s.parse().map_err(|err| ParseErrDetail::InvalidFloatLiteral {
-        err,
-        from: t.from(),
-        to: t.to(),
-    })?;
+    let num: f64 = s
+        .parse()
+        .map_err(|err| ParseErrDetail::InvalidFloatLiteral {
+            err,
+            from: t.from(),
+            to: t.to(),
+        })?;
     Ok(num)
 }
 
@@ -458,23 +458,31 @@ impl Parser {
 
     fn lex(&mut self, r: &mut dyn CharReader) -> Result<Token, Error> {
         #[inline]
-        fn process_scientific_notation(r: &mut dyn CharReader, p1: Position) -> Result<Token, Error> {
+        fn process_scientific_notation(
+            r: &mut dyn CharReader,
+            p1: Position,
+        ) -> Result<Token, Error> {
             r.next_char()?;
             match r.peek_char(0)? {
                 Some('-') | Some('+') => {
                     r.skip_chars(1)?;
                     let mut has_digits = false;
-                    r.skip_while_mut(&mut |c| if c.is_digit(10) {
-                        has_digits = true;
-                        true
-                    } else {
-                        false
+                    r.skip_while_mut(&mut |c| {
+                        if c.is_digit(10) {
+                            has_digits = true;
+                            true
+                        } else {
+                            false
+                        }
                     })?;
                     if has_digits {
                         let p2 = r.position();
                         Ok(Token::new(Terminal::Float, p1, p2))
                     } else {
-                        ParseErrDetail::invalid_input_many(r, vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+                        ParseErrDetail::invalid_input_many(
+                            r,
+                            vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+                        )
                     }
                 }
                 Some(c) if c.is_digit(10) => {
@@ -483,7 +491,10 @@ impl Parser {
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Float, p1, p2))
                 }
-                _ => ParseErrDetail::invalid_input_many(r, vec!['-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']),
+                _ => ParseErrDetail::invalid_input_many(
+                    r,
+                    vec!['-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+                ),
             }
         }
 
@@ -517,7 +528,11 @@ impl Parser {
         }
 
         /// consumes characters after specific prefix
-        fn consume_int_prefix(r: &mut dyn CharReader, f: &dyn Fn(char) -> bool, p1: Position) -> Result<Token, Error> {
+        fn consume_int_prefix(
+            r: &mut dyn CharReader,
+            f: &dyn Fn(char) -> bool,
+            p1: Position,
+        ) -> Result<Token, Error> {
             r.next_char()?;
             if let Some('_') = r.next_char()? {
                 // underscore is not allowed between prefix and number
@@ -540,9 +555,7 @@ impl Parser {
             Ok(Token::new(Terminal::BareKey, p1, p2))
         }
 
-        r.skip_until(&|c: char| {
-            !(c.is_whitespace() && c != '\n' && c != '\r')
-        })?;
+        r.skip_until(&|c: char| !(c.is_whitespace() && c != '\n' && c != '\r'))?;
 
         match r.peek_char(0)? {
             None => Ok(Token::new(Terminal::End, r.position(), r.position())),
@@ -626,10 +639,14 @@ impl Parser {
                 } else {
                     r.next_char()?;
                     let p2 = r.position();
-                    Ok(Token::new(Terminal::String {
-                        literal: false,
-                        multiline,
-                    }, p1, p2))
+                    Ok(Token::new(
+                        Terminal::String {
+                            literal: false,
+                            multiline,
+                        },
+                        p1,
+                        p2,
+                    ))
                 }
             }
             Some('\'') => {
@@ -666,10 +683,14 @@ impl Parser {
                 } else {
                     r.next_char()?;
                     let p2 = r.position();
-                    Ok(Token::new(Terminal::String {
-                        literal: true,
-                        multiline,
-                    }, p1, p2))
+                    Ok(Token::new(
+                        Terminal::String {
+                            literal: true,
+                            multiline,
+                        },
+                        p1,
+                        p2,
+                    ))
                 }
             }
             Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
@@ -724,9 +745,7 @@ impl Parser {
             Some(c) if is_bare(c) => consume_bare_key(r),
 
             // TODO date types https://github.com/toml-lang/toml#offset-date-time
-            Some(_) => {
-                ParseErrDetail::invalid_input(r)
-            }
+            Some(_) => ParseErrDetail::invalid_input(r),
         }
     }
 
@@ -782,26 +801,39 @@ impl Parser {
                     let from = t.from();
                     let (node, key) = self.parse_key(r, parent)?;
                     let to = self.expect_token(r, Terminal::BracketRight)?.to();
-                    let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
-                    node.add_child(None, Some(key.into()), table.clone()).unwrap();
+                    let table =
+                        NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
+                    node.add_child(None, Some(key.into()), table.clone())
+                        .unwrap();
                     current = table
                 }
                 Terminal::Newline => {}
                 Terminal::Comment => {}
                 Terminal::End => return Ok(()),
                 _ => {
-                    return ParseErrDetail::unexpected_token_many(t, vec![
-                        Terminal::String { multiline: true, literal: true },
-                        Terminal::BareKey,
-                        Terminal::BracketLeft,
-                    ], r);
+                    return ParseErrDetail::unexpected_token_many(
+                        t,
+                        vec![
+                            Terminal::String {
+                                multiline: true,
+                                literal: true,
+                            },
+                            Terminal::BareKey,
+                            Terminal::BracketLeft,
+                        ],
+                        r,
+                    );
                 }
             };
             t = self.next_token(r)?;
         }
     }
 
-    fn parse_key(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<(NodeRef, String), Error> {
+    fn parse_key(
+        &mut self,
+        r: &mut dyn CharReader,
+        parent: &mut NodeRef,
+    ) -> Result<(NodeRef, String), Error> {
         let mut token = self.next_token(r)?;
         let mut current = parent.clone();
         let mut key = String::new();
@@ -811,9 +843,7 @@ impl Parser {
                     self.parse_string(token, r)?;
                     self.buf.clone()
                 }
-                Terminal::BareKey => {
-                    r.slice_pos(token.from(), token.to())?.into_owned()
-                }
+                Terminal::BareKey => r.slice_pos(token.from(), token.to())?.into_owned(),
                 Terminal::Integer => {
                     let value = r.slice_pos(token.from(), token.to())?;
                     value.into()
@@ -826,10 +856,17 @@ impl Parser {
                     value.into()
                 }
                 _ => {
-                    return ParseErrDetail::unexpected_token_many(token,
-                                                                 vec![Terminal::BareKey,
-                                                                      Terminal::String { multiline: true, literal: true }
-                                                                 ], r);
+                    return ParseErrDetail::unexpected_token_many(
+                        token,
+                        vec![
+                            Terminal::BareKey,
+                            Terminal::String {
+                                multiline: true,
+                                literal: true,
+                            },
+                        ],
+                        r,
+                    );
                 }
             };
             let next = self.next_token(r)?;
@@ -840,21 +877,31 @@ impl Parser {
                         if child.is_object() {
                             current = child;
                         } else {
-                            let prev = child.data().metadata().span().expect("Node should always have span");
-                            return ParseErrDetail::key_redefined(r, token, prev, &key)
+                            let prev = child
+                                .data()
+                                .metadata()
+                                .span()
+                                .expect("Node should always have span");
+                            return ParseErrDetail::key_redefined(r, token, prev, &key);
                         }
                     } else {
                         let new = NodeRef::object(LinkedHashMap::new()).with_span(token.span());
-                        current.add_child(None, Some(key.into()), new.clone()).unwrap();
+                        current
+                            .add_child(None, Some(key.into()), new.clone())
+                            .unwrap();
                         current = new;
                     }
                     token = self.next_token(r)?;
-                    continue
+                    continue;
                 }
                 _ => {
                     if let Some(child) = current.get_child_key(&key) {
-                        let prev = child.data().metadata().span().expect("Node should always have span");
-                        return ParseErrDetail::key_redefined(r, token, prev, &key)
+                        let prev = child
+                            .data()
+                            .metadata()
+                            .span()
+                            .expect("Node should always have span");
+                        return ParseErrDetail::key_redefined(r, token, prev, &key);
                     }
 
                     self.push_token(next);
@@ -902,23 +949,36 @@ impl Parser {
             Terminal::True => Ok(NodeRef::boolean(true).with_span(t.span())),
             Terminal::False => Ok(NodeRef::boolean(false).with_span(t.span())),
             _ => {
-                return ParseErrDetail::unexpected_token_many(t, vec![
-                    Terminal::String { multiline: true, literal: true },
-                    Terminal::BraceLeft,
-                    Terminal::BracketLeft,
-                    Terminal::Float,
-                    Terminal::Integer], r);
+                return ParseErrDetail::unexpected_token_many(
+                    t,
+                    vec![
+                        Terminal::String {
+                            multiline: true,
+                            literal: true,
+                        },
+                        Terminal::BraceLeft,
+                        Terminal::BracketLeft,
+                        Terminal::Float,
+                        Terminal::Integer,
+                    ],
+                    r,
+                );
             }
         }
     }
 
-    fn parse_table_key(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<NodeRef, Error> {
-        self.expect_token(r,Terminal::BracketLeft)?;
+    fn parse_table_key(
+        &mut self,
+        r: &mut dyn CharReader,
+        parent: &mut NodeRef,
+    ) -> Result<NodeRef, Error> {
+        self.expect_token(r, Terminal::BracketLeft)?;
         let (node, key) = self.parse_key(r, parent)?;
         self.expect_token(r, Terminal::BracketRight)?;
 
         let table = NodeRef::object(LinkedHashMap::new());
-        node.add_child(None, Some(key.into()), table.clone()).unwrap();
+        node.add_child(None, Some(key.into()), table.clone())
+            .unwrap();
         Ok(table)
     }
 
@@ -953,7 +1013,7 @@ impl Parser {
                     }
                     comma = true;
                 }
-                _ => return ParseErrDetail::unexpected_token(t, r)
+                _ => return ParseErrDetail::unexpected_token(t, r),
             }
         }
     }
@@ -968,7 +1028,9 @@ impl Parser {
                 &val[1..]
             } else if val.starts_with("\r\n") {
                 &val[2..]
-            } else { val }
+            } else {
+                val
+            }
         }
 
         let (literal, multiline) = if let Terminal::String { literal, multiline } = t.term() {
@@ -1004,12 +1066,8 @@ impl Parser {
                         Some('\"') => self.buf.push('\"'),      // quote
                         Some('\\') => self.buf.push('\\'),      // backslash
                         // FIXME ws https://github.com/toml-lang/toml#string
-                        Some('u') => {
-                            unimplemented!()
-                        }
-                        Some('U') => {
-                            unimplemented!()
-                        }
+                        Some('u') => unimplemented!(),
+                        Some('U') => unimplemented!(),
                         _ => return ParseErrDetail::invalid_escape(r),
                     }
                 } else {
@@ -1027,7 +1085,6 @@ impl Default for Parser {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1043,7 +1100,7 @@ mod tests {
                 let token = parser.lex(&mut r).unwrap();
 
                 assert_eq!(token.term(), term);
-            }
+            };
         }
 
         macro_rules! assert_terms {
@@ -1055,7 +1112,7 @@ mod tests {
                     let token = parser.lex(&mut r).expect("Cannot get token!");
                     assert_eq!(token.term(), t);
                 }
-            }
+            };
         }
 
         #[test]
@@ -1122,11 +1179,7 @@ mod tests {
         fn comment_lf() {
             let input: &str = "#comment\n";
 
-            let terms = vec![
-                Terminal::Comment,
-                Terminal::Newline,
-                Terminal::End,
-            ];
+            let terms = vec![Terminal::Comment, Terminal::Newline, Terminal::End];
             assert_terms!(input, terms);
         }
 
@@ -1134,11 +1187,7 @@ mod tests {
         fn comment_crlf() {
             let input: &str = "#comment\r\n";
 
-            let terms = vec![
-                Terminal::Comment,
-                Terminal::Newline,
-                Terminal::End,
-            ];
+            let terms = vec![Terminal::Comment, Terminal::Newline, Terminal::End];
             assert_terms!(input, terms);
         }
 
@@ -1194,10 +1243,7 @@ mod tests {
         fn true_token() {
             let input: &str = r#"true"#;
 
-            let terms = vec![
-                Terminal::True,
-                Terminal::End,
-            ];
+            let terms = vec![Terminal::True, Terminal::End];
 
             assert_terms!(input, terms);
         }
@@ -1208,9 +1254,15 @@ mod tests {
             "another basic string""#;
 
             let terms = vec![
-                Terminal::String { literal: false, multiline: false },
+                Terminal::String {
+                    literal: false,
+                    multiline: false,
+                },
                 Terminal::Newline,
-                Terminal::String { literal: false, multiline: false },
+                Terminal::String {
+                    literal: false,
+                    multiline: false,
+                },
                 Terminal::End,
             ];
 
@@ -1226,7 +1278,10 @@ mod tests {
             """"#;
 
             let terms = vec![
-                Terminal::String { literal: false, multiline: true },
+                Terminal::String {
+                    literal: false,
+                    multiline: true,
+                },
                 Terminal::End,
             ];
 
@@ -1242,7 +1297,10 @@ mod tests {
             """"#;
 
             let terms = vec![
-                Terminal::String { literal: false, multiline: true },
+                Terminal::String {
+                    literal: false,
+                    multiline: true,
+                },
                 Terminal::End,
             ];
 
@@ -1258,7 +1316,10 @@ mod tests {
             """"#;
 
             let terms = vec![
-                Terminal::String { literal: false, multiline: true },
+                Terminal::String {
+                    literal: false,
+                    multiline: true,
+                },
                 Terminal::End,
             ];
 
@@ -1274,7 +1335,10 @@ mod tests {
             """"#;
 
             let terms = vec![
-                Terminal::String { literal: false, multiline: true },
+                Terminal::String {
+                    literal: false,
+                    multiline: true,
+                },
                 Terminal::End,
             ];
 
@@ -1286,7 +1350,10 @@ mod tests {
             let input: &str = r#"'literal string'"#;
 
             let terms = vec![
-                Terminal::String { literal: true, multiline: false },
+                Terminal::String {
+                    literal: true,
+                    multiline: false,
+                },
                 Terminal::End,
             ];
 
@@ -1302,7 +1369,10 @@ mod tests {
             '''"#;
 
             let terms = vec![
-                Terminal::String { literal: true, multiline: true },
+                Terminal::String {
+                    literal: true,
+                    multiline: true,
+                },
                 Terminal::End,
             ];
 
@@ -1319,7 +1389,10 @@ mod tests {
             '''"#;
 
             let terms = vec![
-                Terminal::String { literal: true, multiline: true },
+                Terminal::String {
+                    literal: true,
+                    multiline: true,
+                },
                 Terminal::End,
             ];
 
@@ -1398,10 +1471,7 @@ mod tests {
         fn integers_bin() {
             let input: &str = r#"0b11010110"#;
 
-            let terms = vec![
-                Terminal::Integer,
-                Terminal::End,
-            ];
+            let terms = vec![Terminal::Integer, Terminal::End];
             assert_terms!(input, terms);
         }
 
@@ -1438,10 +1508,7 @@ mod tests {
         fn floats_underscores() {
             let input: &str = r#"224_617.44e-34"#;
 
-            let terms = vec![
-                Terminal::Float,
-                Terminal::End,
-            ];
+            let terms = vec![Terminal::Float, Terminal::End];
             assert_terms!(input, terms);
         }
     }

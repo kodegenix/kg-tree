@@ -8,15 +8,11 @@ pub type Error = ParseDiag;
 
 pub type Token = LexToken<Terminal>;
 
-
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 400)]
 pub enum ParseErr {
     #[display(fmt = "invalid escape")]
-    InvalidEscape {
-        from: Position,
-        to: Position,
-    },
+    InvalidEscape { from: Position, to: Position },
     #[display(fmt = "invalid character '{input}'")]
     InvalidChar {
         input: char,
@@ -30,7 +26,10 @@ pub enum ParseErr {
         to: Position,
         expected: char,
     },
-    #[display(fmt = "invalid character '{input}', expected one of: {expected}", expected = "ListDisplay(expected)")]
+    #[display(
+        fmt = "invalid character '{input}', expected one of: {expected}",
+        expected = "ListDisplay(expected)"
+    )]
     InvalidCharMany {
         input: char,
         from: Position,
@@ -50,34 +49,24 @@ pub enum ParseErr {
         to: Position,
     },
     #[display(fmt = "unexpected end of input")]
-    UnexpectedEoi {
-        pos: Position,
-    },
+    UnexpectedEoi { pos: Position },
     #[display(fmt = "unexpected end of input, expected '{expected}'")]
-    UnexpectedEoiOne {
-        pos: Position,
-        expected: char,
-    },
-    #[display(fmt = "unexpected end of input, expected one of: {expected}", expected = "ListDisplay(expected)")]
-    UnexpectedEoiMany {
-        pos: Position,
-        expected: Vec<char>,
-    },
+    UnexpectedEoiOne { pos: Position, expected: char },
+    #[display(
+        fmt = "unexpected end of input, expected one of: {expected}",
+        expected = "ListDisplay(expected)"
+    )]
+    UnexpectedEoiMany { pos: Position, expected: Vec<char> },
     #[display(fmt = "unexpected end of input, expected \"{expected}\"")]
-    UnexpectedEoiOneString {
-        pos: Position,
-        expected: String,
-    },
+    UnexpectedEoiOneString { pos: Position, expected: String },
     #[display(fmt = "unexpected symbol {token}")]
-    UnexpectedToken {
-        token: Token,
-    },
+    UnexpectedToken { token: Token },
     #[display(fmt = "unexpected symbol {token}, expected {expected}")]
-    UnexpectedTokenOne {
-        token: Token,
-        expected: Terminal,
-    },
-    #[display(fmt = "unexpected symbol {token}, expected one of: {expected}", expected = "ListDisplay(expected)")]
+    UnexpectedTokenOne { token: Token, expected: Terminal },
+    #[display(
+        fmt = "unexpected symbol {token}, expected one of: {expected}",
+        expected = "ListDisplay(expected)"
+    )]
     UnexpectedTokenMany {
         token: Token,
         expected: Vec<Terminal>,
@@ -85,7 +74,6 @@ pub enum ParseErr {
     #[display(fmt = "unclosed {a0}")]
     UnclosedGroup(Terminal),
 }
-
 
 impl ParseErr {
     pub fn invalid_escape<T>(r: &mut dyn CharReader) -> Result<T, Error> {
@@ -100,13 +88,11 @@ impl ParseErr {
                     p1, p2 => "invalid escape",
                 })
             }
-            None => {
-                parse_diag!(ParseErr::UnexpectedEoi {
-                    pos: p1,
-                }, r, {
-                    p1, p1 => "unexpected end of input",
-                })
-            }
+            None => parse_diag!(ParseErr::UnexpectedEoi {
+                pos: p1,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
         };
         Err(err)
     }
@@ -124,13 +110,11 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => {
-                parse_diag!(ParseErr::UnexpectedEoi {
-                    pos: p1,
-                }, r, {
-                    p1, p1 => "unexpected end of input",
-                })
-            }
+            None => parse_diag!(ParseErr::UnexpectedEoi {
+                pos: p1,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
         };
         Err(err)
     }
@@ -149,14 +133,12 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => {
-                parse_diag!(ParseErr::UnexpectedEoiOne {
-                    pos: p1,
-                    expected,
-                }, r, {
-                    p1, p1 => "unexpected end of input",
-                })
-            }
+            None => parse_diag!(ParseErr::UnexpectedEoiOne {
+                pos: p1,
+                expected,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
         };
         Err(err)
     }
@@ -175,14 +157,12 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => {
-                parse_diag!(ParseErr::UnexpectedEoiMany {
-                    pos: p1,
-                    expected,
-                }, r, {
-                    p1, p1 => "unexpected end of input",
-                })
-            }
+            None => parse_diag!(ParseErr::UnexpectedEoiMany {
+                pos: p1,
+                expected,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
         };
         Err(err)
     }
@@ -206,20 +186,31 @@ impl ParseErr {
     }
 
     #[inline]
-    pub fn unexpected_token_one<T>(token: Token, expected: Terminal, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErr::UnexpectedTokenOne { token, expected }, r, {
-            token.from(), token.to() => "unexpected token"
-        }))
+    pub fn unexpected_token_one<T>(
+        token: Token,
+        expected: Terminal,
+        r: &mut dyn CharReader,
+    ) -> Result<T, Error> {
+        Err(
+            parse_diag!(ParseErr::UnexpectedTokenOne { token, expected }, r, {
+                token.from(), token.to() => "unexpected token"
+            }),
+        )
     }
 
     #[inline]
-    pub fn unexpected_token_many<T>(token: Token, expected: Vec<Terminal>, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErr::UnexpectedTokenMany { token, expected }, r, {
-            token.from(), token.to() => "unexpected token"
-        }))
+    pub fn unexpected_token_many<T>(
+        token: Token,
+        expected: Vec<Terminal>,
+        r: &mut dyn CharReader,
+    ) -> Result<T, Error> {
+        Err(
+            parse_diag!(ParseErr::UnexpectedTokenMany { token, expected }, r, {
+                token.from(), token.to() => "unexpected token"
+            }),
+        )
     }
 }
-
 
 #[derive(Debug, Display, PartialEq, Eq, Clone, Copy)]
 pub enum Terminal {
@@ -253,7 +244,6 @@ pub enum Terminal {
 
 impl LexTerm for Terminal {}
 
-
 #[derive(Debug)]
 pub struct Parser {
     token_queue: VecDeque<Token>,
@@ -270,23 +260,31 @@ impl Parser {
 
     fn lex(&mut self, r: &mut dyn CharReader) -> Result<Token, Error> {
         #[inline]
-        fn process_scientific_notation(r: &mut dyn CharReader, p1: Position) -> Result<Token, Error> {
+        fn process_scientific_notation(
+            r: &mut dyn CharReader,
+            p1: Position,
+        ) -> Result<Token, Error> {
             r.next_char()?;
             match r.peek_char(0)? {
                 Some('-') | Some('+') => {
                     r.skip_chars(1)?;
                     let mut has_digits = false;
-                    r.skip_while_mut(&mut |c| if c.is_digit(10) {
-                        has_digits = true;
-                        true
-                    } else {
-                        false
+                    r.skip_while_mut(&mut |c| {
+                        if c.is_digit(10) {
+                            has_digits = true;
+                            true
+                        } else {
+                            false
+                        }
                     })?;
                     if has_digits {
                         let p2 = r.position();
                         Ok(Token::new(Terminal::Float, p1, p2))
                     } else {
-                        ParseErr::invalid_input_many(r, vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
+                        ParseErr::invalid_input_many(
+                            r,
+                            vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+                        )
                     }
                 }
                 Some(c) if c.is_digit(10) => {
@@ -295,7 +293,10 @@ impl Parser {
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Float, p1, p2))
                 }
-                _ => ParseErr::invalid_input_many(r, vec!['-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9']),
+                _ => ParseErr::invalid_input_many(
+                    r,
+                    vec!['-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+                ),
             }
         }
 
@@ -381,9 +382,7 @@ impl Parser {
                     Ok(Token::new(Terminal::Literal, p1, p2))
                 }
             }
-            Some(_) => {
-                ParseErr::invalid_input(r)
-            }
+            Some(_) => ParseErr::invalid_input(r),
         }
     }
 
@@ -449,16 +448,20 @@ impl Parser {
                 self.parse_literal(t, r)?;
                 Ok(NodeRef::string(self.buf.clone()).with_span(t.span()))
             }
-            _ => ParseErr::unexpected_token_many(t, vec![
-                Terminal::BraceLeft,
-                Terminal::BracketLeft,
-                Terminal::Null,
-                Terminal::True,
-                Terminal::False,
-                Terminal::Integer,
-                Terminal::Float,
-                Terminal::Literal,
-            ], r)
+            _ => ParseErr::unexpected_token_many(
+                t,
+                vec![
+                    Terminal::BraceLeft,
+                    Terminal::BracketLeft,
+                    Terminal::Null,
+                    Terminal::True,
+                    Terminal::False,
+                    Terminal::Integer,
+                    Terminal::Float,
+                    Terminal::Literal,
+                ],
+                r,
+            ),
         }
     }
 
@@ -487,11 +490,17 @@ impl Parser {
                     props.insert(key, value);
                     comma = true;
                 }
-                _ => return ParseErr::unexpected_token_many(t, if comma {
-                    vec![Terminal::Comma, Terminal::BraceRight]
-                } else {
-                    vec![Terminal::Literal, Terminal::BraceRight]
-                }, r)
+                _ => {
+                    return ParseErr::unexpected_token_many(
+                        t,
+                        if comma {
+                            vec![Terminal::Comma, Terminal::BraceRight]
+                        } else {
+                            vec![Terminal::Literal, Terminal::BraceRight]
+                        },
+                        r,
+                    )
+                }
             }
         }
     }
@@ -519,7 +528,7 @@ impl Parser {
                     elems.push(value);
                     comma = true;
                 }
-                _ => return ParseErr::unexpected_token(t, r)
+                _ => return ParseErr::unexpected_token(t, r),
             }
         }
     }
@@ -555,10 +564,8 @@ impl Default for Parser {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
 
 }

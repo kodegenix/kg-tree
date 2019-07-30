@@ -38,15 +38,17 @@ impl NodeRefExt for NodeRef {
         assert!(self.is_array());
         match self.data().value() {
             Value::Array(elems) => elems.clone(),
-            _=> unreachable!()
+            _ => unreachable!(),
         }
     }
 
     fn get_key(&self, key: &str) -> NodeRef {
-        self.get_child_key(key).expect(&format!("key not found: '{}'", key))
+        self.get_child_key(key)
+            .expect(&format!("key not found: '{}'", key))
     }
 
     fn get_idx(&self, idx: usize) -> NodeRef {
-        self.get_child_index(idx).expect(&format!("index not found: '{}'", idx))
+        self.get_child_index(idx)
+            .expect(&format!("index not found: '{}'", idx))
     }
 }

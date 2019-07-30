@@ -1,49 +1,44 @@
-use kg_diag::{MemCharReader, Span, Diag};
-use crate::serial::TomlParser as Parser;
 use crate::serial::TomlParseErrDetail;
+use crate::serial::TomlParser as Parser;
+use crate::tests::serial::NodeRefExt;
+use kg_diag::{Diag, MemCharReader, Span};
 use kg_tree::NodeRef;
 use kg_utils::collections::LinkedHashMap;
-use crate::tests::serial::NodeRefExt;
 
 macro_rules! parse_node {
-            ($input: expr) => {
-                {
-                    let mut r = kg_diag::MemCharReader::new($input.as_bytes());
-                    let mut parser = crate::serial::TomlParser::new();
-                    parser.parse(&mut r).unwrap_or_else(|err|{
-                        println!("{}", err); panic!()
-                    })
-                }
-            }
+    ($input: expr) => {{
+        let mut r = kg_diag::MemCharReader::new($input.as_bytes());
+        let mut parser = crate::serial::TomlParser::new();
+        parser.parse(&mut r).unwrap_or_else(|err| {
+            println!("{}", err);
+            panic!()
+        })
+    }};
 }
 
 macro_rules! parse_node_err {
-            ($input: expr) => {
-                {
-                    let mut r = kg_diag::MemCharReader::new($input.as_bytes());
-                    let mut parser = crate::serial::TomlParser::new();
-                    let err = parser.parse(&mut r).expect_err("Error expected");
-                    err
-                }
-            }
+    ($input: expr) => {{
+        let mut r = kg_diag::MemCharReader::new($input.as_bytes());
+        let mut parser = crate::serial::TomlParser::new();
+        let err = parser.parse(&mut r).expect_err("Error expected");
+        err
+    }};
 }
 
 use kg_diag::ParseDiag;
 macro_rules! assert_err {
-            ($err: expr, $variant: pat) => {
-               let detail = $err.detail().downcast_ref::<TomlParseErrDetail>()
-                    .expect("cannot downcast to TomlParseErrorDetail");
+    ($err: expr, $variant: pat) => {
+        let detail = $err
+            .detail()
+            .downcast_ref::<TomlParseErrDetail>()
+            .expect("cannot downcast to TomlParseErrorDetail");
 
-                match detail {
-                    $variant => {}
-                    err => {
-                        panic!("Expected error {} got {:?}", stringify!($variant), err)
-                    }
-                }
-            }
+        match detail {
+            $variant => {}
+            err => panic!("Expected error {} got {:?}", stringify!($variant), err),
+        }
+    };
 }
-
-
 
 #[test]
 fn integer() {
@@ -195,7 +190,10 @@ fn literal_string() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(" literal string \\n \\t \\u1234", node.get_key("str1").into_string());
+    assert_eq!(
+        " literal string \\n \\t \\u1234",
+        node.get_key("str1").into_string()
+    );
 }
 
 #[test]
@@ -208,7 +206,10 @@ literal string
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("multiline\nliteral string\n", node.get_key("str1").into_string());
+    assert_eq!(
+        "multiline\nliteral string\n",
+        node.get_key("str1").into_string()
+    );
 }
 
 #[test]
@@ -218,7 +219,10 @@ fn basic_string() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("some basic string\n \t \" '", node.get_key("str1").into_string());
+    assert_eq!(
+        "some basic string\n \t \" '",
+        node.get_key("str1").into_string()
+    );
 }
 
 #[test]
@@ -227,7 +231,10 @@ fn basic_multiline_string() {
 
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("some basic\nmultiline\nstring\n \t \"", node.get_key("str1").as_string_ext());
+    assert_eq!(
+        "some basic\nmultiline\nstring\n \t \"",
+        node.get_key("str1").as_string_ext()
+    );
 }
 
 #[test]
@@ -272,8 +279,14 @@ fn dotted_keys_bare() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("orange", node.get_key("physical").get_key("color").as_string_ext());
-    assert_eq!("round", node.get_key("physical").get_key("shape").as_string_ext());
+    assert_eq!(
+        "orange",
+        node.get_key("physical").get_key("color").as_string_ext()
+    );
+    assert_eq!(
+        "round",
+        node.get_key("physical").get_key("shape").as_string_ext()
+    );
 }
 
 #[test]
@@ -288,10 +301,22 @@ fn dotted_keys() {
     let node: NodeRef = parse_node!(input);
 
     assert_eq!("Orange", node.get_key("name").as_string_ext());
-    assert_eq!("orange", node.get_key("physical").get_key("color").as_string_ext());
-    assert_eq!("round", node.get_key("physical").get_key("shape").as_string_ext());
-    assert_eq!(true, node.get_key("site").get_key("google.com").as_bool_ext());
-    assert_eq!(true, node.get_key("quoted part").get_key("value").as_bool_ext());
+    assert_eq!(
+        "orange",
+        node.get_key("physical").get_key("color").as_string_ext()
+    );
+    assert_eq!(
+        "round",
+        node.get_key("physical").get_key("shape").as_string_ext()
+    );
+    assert_eq!(
+        true,
+        node.get_key("site").get_key("google.com").as_bool_ext()
+    );
+    assert_eq!(
+        true,
+        node.get_key("quoted part").get_key("value").as_bool_ext()
+    );
 }
 
 #[test]
@@ -352,15 +377,35 @@ fn arrays() {
     assert_eq!(2, node.get_key("arr1").as_array_ext()[1].as_int_ext());
     assert_eq!(3, node.get_key("arr1").as_array_ext()[2].as_int_ext());
 
-    assert_eq!("red", node.get_key("arr2").as_array_ext()[0].as_string_ext());
-    assert_eq!("yellow", node.get_key("arr2").as_array_ext()[1].as_string_ext());
-    assert_eq!("green", node.get_key("arr2").as_array_ext()[2].as_string_ext());
+    assert_eq!(
+        "red",
+        node.get_key("arr2").as_array_ext()[0].as_string_ext()
+    );
+    assert_eq!(
+        "yellow",
+        node.get_key("arr2").as_array_ext()[1].as_string_ext()
+    );
+    assert_eq!(
+        "green",
+        node.get_key("arr2").as_array_ext()[2].as_string_ext()
+    );
 
-    assert_eq!("all", node.get_key("arr3").as_array_ext()[0].as_string_ext());
-    assert_eq!("strings", node.get_key("arr3").as_array_ext()[1].as_string_ext());
-    assert_eq!("are the same", node.get_key("arr3").as_array_ext()[2].as_string_ext());
-    assert_eq!("type", node.get_key("arr3").as_array_ext()[3].as_string_ext());
-
+    assert_eq!(
+        "all",
+        node.get_key("arr3").as_array_ext()[0].as_string_ext()
+    );
+    assert_eq!(
+        "strings",
+        node.get_key("arr3").as_array_ext()[1].as_string_ext()
+    );
+    assert_eq!(
+        "are the same",
+        node.get_key("arr3").as_array_ext()[2].as_string_ext()
+    );
+    assert_eq!(
+        "type",
+        node.get_key("arr3").as_array_ext()[3].as_string_ext()
+    );
 }
 
 #[test]
@@ -371,17 +416,47 @@ fn arrays_of_arrays() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(1, node.get_key("arr1").as_array_ext()[0].as_array_ext()[0].as_int_ext());
-    assert_eq!(2, node.get_key("arr1").as_array_ext()[0].as_array_ext()[1].as_int_ext());
-    assert_eq!(3, node.get_key("arr1").as_array_ext()[1].as_array_ext()[0].as_int_ext());
-    assert_eq!(4, node.get_key("arr1").as_array_ext()[1].as_array_ext()[1].as_int_ext());
-    assert_eq!(5, node.get_key("arr1").as_array_ext()[1].as_array_ext()[2].as_int_ext());
+    assert_eq!(
+        1,
+        node.get_key("arr1").as_array_ext()[0].as_array_ext()[0].as_int_ext()
+    );
+    assert_eq!(
+        2,
+        node.get_key("arr1").as_array_ext()[0].as_array_ext()[1].as_int_ext()
+    );
+    assert_eq!(
+        3,
+        node.get_key("arr1").as_array_ext()[1].as_array_ext()[0].as_int_ext()
+    );
+    assert_eq!(
+        4,
+        node.get_key("arr1").as_array_ext()[1].as_array_ext()[1].as_int_ext()
+    );
+    assert_eq!(
+        5,
+        node.get_key("arr1").as_array_ext()[1].as_array_ext()[2].as_int_ext()
+    );
 
-    assert_eq!(1, node.get_key("arr2").as_array_ext()[0].as_array_ext()[0].as_int_ext());
-    assert_eq!(2, node.get_key("arr2").as_array_ext()[0].as_array_ext()[1].as_int_ext());
-    assert_eq!("a", node.get_key("arr2").as_array_ext()[1].as_array_ext()[0].as_string_ext());
-    assert_eq!("b", node.get_key("arr2").as_array_ext()[1].as_array_ext()[1].as_string_ext());
-    assert_eq!("c", node.get_key("arr2").as_array_ext()[1].as_array_ext()[2].as_string_ext());
+    assert_eq!(
+        1,
+        node.get_key("arr2").as_array_ext()[0].as_array_ext()[0].as_int_ext()
+    );
+    assert_eq!(
+        2,
+        node.get_key("arr2").as_array_ext()[0].as_array_ext()[1].as_int_ext()
+    );
+    assert_eq!(
+        "a",
+        node.get_key("arr2").as_array_ext()[1].as_array_ext()[0].as_string_ext()
+    );
+    assert_eq!(
+        "b",
+        node.get_key("arr2").as_array_ext()[1].as_array_ext()[1].as_string_ext()
+    );
+    assert_eq!(
+        "c",
+        node.get_key("arr2").as_array_ext()[1].as_array_ext()[2].as_string_ext()
+    );
 }
 
 #[test]
@@ -424,7 +499,10 @@ fn single_table() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("some string", node.get_key("table-1").get_key("key1").as_string_ext());
+    assert_eq!(
+        "some string",
+        node.get_key("table-1").get_key("key1").as_string_ext()
+    );
     assert_eq!(123, node.get_key("table-1").get_key("key2").as_int_ext());
 }
 
@@ -440,13 +518,18 @@ fn multiple_tables() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("some string", node.get_key("table-1").get_key("key1").as_string_ext());
+    assert_eq!(
+        "some string",
+        node.get_key("table-1").get_key("key1").as_string_ext()
+    );
     assert_eq!(123, node.get_key("table-1").get_key("key2").as_int_ext());
 
-    assert_eq!("another string", node.get_key("table-2").get_key("key1").as_string_ext());
+    assert_eq!(
+        "another string",
+        node.get_key("table-2").get_key("key1").as_string_ext()
+    );
     assert_eq!(456, node.get_key("table-2").get_key("key2").as_int_ext());
 }
-
 
 #[test]
 fn table_dotted_key() {
@@ -456,10 +539,14 @@ fn table_dotted_key() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("pug", node.get_key("dog")
-                                .get_key("tater.man")
-                                .get_key("type")
-                                .get_key("name").as_string_ext());
+    assert_eq!(
+        "pug",
+        node.get_key("dog")
+            .get_key("tater.man")
+            .get_key("type")
+            .get_key("name")
+            .as_string_ext()
+    );
 }
 
 #[test]
