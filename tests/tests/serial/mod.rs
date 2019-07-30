@@ -9,6 +9,7 @@ pub trait NodeRefExt {
     fn as_bool_ext(&self) -> bool;
     fn as_string_ext(&self) -> String;
     fn as_array_ext(&self) -> Vec<NodeRef>;
+    fn is_empty_ext(&self) -> bool;
     fn get_key(&self, key: &str) -> NodeRef;
     fn get_idx(&self, idx: usize) -> NodeRef;
 }
@@ -40,6 +41,10 @@ impl NodeRefExt for NodeRef {
             Value::Array(elems) => elems.clone(),
             _ => unreachable!(),
         }
+    }
+
+    fn is_empty_ext(&self) -> bool {
+        self.data().children_count().expect("cannot get children count") == 0
     }
 
     fn get_key(&self, key: &str) -> NodeRef {

@@ -192,7 +192,7 @@ fn literal_string() {
 
     assert_eq!(
         " literal string \\n \\t \\u1234",
-        node.get_key("str1").into_string()
+        node.get_key("str1").as_string_ext()
     );
 }
 
@@ -208,7 +208,7 @@ literal string
 
     assert_eq!(
         "multiline\nliteral string\n",
-        node.get_key("str1").into_string()
+        node.get_key("str1").as_string_ext()
     );
 }
 
@@ -221,7 +221,7 @@ fn basic_string() {
 
     assert_eq!(
         "some basic string\n \t \" '",
-        node.get_key("str1").into_string()
+        node.get_key("str1").as_string_ext()
     );
 }
 
@@ -482,12 +482,26 @@ fn array_mixed_types_2() {
 }
 
 #[test]
+fn array_newline() {
+    let input = r#"
+        arr1 = [
+            1,
+         2,
+         3 ]
+    "#;
+    let node: NodeRef = parse_node!(input);
+    assert_eq!(1, node.get_key("arr1").as_array_ext()[0].as_int_ext());
+    assert_eq!(2, node.get_key("arr1").as_array_ext()[1].as_int_ext());
+    assert_eq!(3, node.get_key("arr1").as_array_ext()[2].as_int_ext());
+}
+
+#[test]
 fn empty_table() {
     let input = r#"
         [table]
     "#;
     let node: NodeRef = parse_node!(input);
-    assert!(node.get_key("table").is_object())
+    assert!(node.get_key("table").is_empty_ext())
 }
 
 #[test]
@@ -598,7 +612,7 @@ fn inline_tables() {
 }
 
 #[test]
-fn inline_tables_nested() {
+fn inline_tables_dotted_key() {
     let input = r#"
         animal = { type.name = "pug" }
     "#;
@@ -607,4 +621,67 @@ fn inline_tables_nested() {
     assert_eq!("pug", node.get_key("animal")
         .get_key("type")
         .get_key("name").as_string_ext());
+}
+
+#[test]
+fn inline_tables_nested() {
+    let input = r#"
+        table = { nested = {key = "value"} }
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("value", node.get_key("table")
+        .get_key("nested")
+        .get_key("key").as_string_ext());
+}
+
+#[test]
+fn array_of_inline_tables() {
+    let input = r#"
+        points = [ { x = 1, y = 2},
+                   { x = 7, y = 8} ]
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(1, node.get_key("points")
+        .as_array_ext()[0]
+        .get_key("x").as_int_ext());
+    assert_eq!(2, node.get_key("points")
+        .as_array_ext()[0]
+        .get_key("y").as_int_ext());
+
+    assert_eq!(7, node.get_key("points")
+        .as_array_ext()[1]
+        .get_key("x").as_int_ext());
+    assert_eq!(8, node.get_key("points")
+        .as_array_ext()[1]
+        .get_key("y").as_int_ext());
+}
+
+//#[test]
+fn array_of_tables() {
+    let input = r#"
+        [[products]]
+        name = "Hammer"
+        sku = 738594937
+
+        [[products]]
+
+        [[products]]
+        name = "Nail"
+        sku = 284758393
+        color = "gray"
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    let products = node.get_key("products").as_array_ext();
+
+    assert_eq!("Hammer", products[0].get_key("name").as_string_ext());
+    assert_eq!(738594937, products[0].get_key("sku").as_int_ext());
+
+    assert!(products[1].is_empty_ext());
+
+    assert_eq!("Nail", products[2].get_key("name").as_string_ext());
+    assert_eq!(284758393, products[2].get_key("sku").as_int_ext());
+    assert_eq!("gray", products[2].get_key("color").as_string_ext());
 }
