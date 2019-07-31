@@ -1,6 +1,7 @@
 use kg_tree::NodeRef;
 use kg_tree::Value;
 mod toml;
+mod json;
 
 /// Helper trait for testing
 pub trait NodeRefExt {
