@@ -80,6 +80,14 @@ fn booleans() {
 
 //#########################################
 
+//#[test] //FIXME MC Error should be expected.
+//fn brace_right_after_comma() {
+//    let input = r#"{"smt": 1,}"#;
+//    let node: NodeRef = parse_node!(input);
+//}
+
+//#########################################
+
 #[test]
 fn no_whitespace_after_curly_bracket() {
     let input = r#"{"int1": 421}"#;
@@ -100,7 +108,6 @@ fn no_whitespace_after_comma() {
 let input = r#""#;
 let input = r#"{}"#;
 let input = r#"{int: 1}"#;
-let input = r#"{"int": 1,}"#; //przecinek przed }, nie ma zabezpieczenia w parserze
 let input = r#"{"int":1}"#;
 let input = r#"{"int": 1 , "int2": 2}"#;
 let input = r#"{

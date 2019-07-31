@@ -469,10 +469,11 @@ impl Parser {
         let p1 = self.expect_token(r, Terminal::BraceLeft)?.from();
         let mut props = Properties::new();
         let mut comma = false;
+        let mut literal = true;
         loop {
             let t = self.next_token(r)?;
             match t.term() {
-                Terminal::BraceRight => {
+                Terminal::BraceRight if comma => {
                     let span = Span {
                         from: p1,
                         to: t.to(),
@@ -489,6 +490,14 @@ impl Parser {
                     let value = self.parse_value(r)?;
                     props.insert(key, value);
                     comma = true;
+                    literal = false;
+                }
+                _ if !literal => {
+                    return ParseErr::unexpected_token_one(
+                        t,
+                        Terminal::Literal,
+                        r,
+                    )
                 }
                 _ => {
                     return ParseErr::unexpected_token_many(
