@@ -748,30 +748,47 @@ fn multiple_array_of_tables() {
     assert_eq!("spike", animal[1].get_key("name").as_string_ext());
 }
 
-//#[test]
+#[test]
 fn redefined_table_as_array() {
     let input = r#"
-[[fruit]]
-  name = "apple"
+    [[fruit]]
+      name = "apple"
 
-  [[fruit.variety]]
-    name = "red delicious"
+      [fruit.variety]
+        name = "granny smith"
 
-  # This table conflicts with the previous table
-  [fruit.variety]
-    name = "granny smith"
+      [[fruit.variety]]
+        name = "red delicious"
     "#;
     let err: ParseDiag = parse_node_err!(input);
 
     assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
 }
 
+#[test]
+fn redefined_array_as_table() {
+    let input = r#"
+    [[fruit]]
+      name = "apple"
+
+      [[fruit.variety]]
+        name = "red delicious"
+
+      [fruit.variety]
+        name = "granny smith"
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
+}
+
+// FIXME ws
 //#[test]
-fn redefined_static_array_array_table() {
+fn redefined_static_array_as_array_of_tables() {
     let input = r#"
         fruit = []
 
-        [[fruit]] # Not allowed
+        [[fruit]]
     "#;
     let err: ParseDiag = parse_node_err!(input);
 

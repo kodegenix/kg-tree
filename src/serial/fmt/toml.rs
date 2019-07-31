@@ -2,8 +2,9 @@ use super::*;
 
 use kg_display::ListDisplay;
 
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashSet};
 use crate::serial::fmt::toml::Terminal::BracketLeft;
+use std::hash::{Hash, Hasher};
 
 pub type Error = ParseDiag;
 
@@ -257,13 +258,13 @@ impl ParseErrDetail {
 
     pub fn key_redefined<T>(
         r: &mut dyn CharReader,
-        redefined: Token,
+        redefined: Span,
         prev: Span,
         key: &str,
     ) -> Result<T, Error> {
         Err(
             parse_diag!(ParseErrDetail::RedefinedKey{key: key.to_string()}, r, {
-                redefined.from(), redefined.to() => "key redefined here",
+                redefined.from, redefined.to => "key redefined here",
                 prev.from, prev.to => "previously defined here",
             }),
         )
@@ -356,12 +357,6 @@ pub enum Terminal {
 
 impl LexTerm for Terminal {}
 
-#[derive(Debug)]
-pub struct Parser {
-    token_queue: VecDeque<Token>,
-    buf: String,
-}
-
 fn is_bare(ch: char) -> bool {
     ('A' <= ch && ch <= 'Z')
         || ('a' <= ch && ch <= 'z')
@@ -444,6 +439,12 @@ fn check_eol(r: &mut dyn CharReader, multiline: bool) -> Result<(), Error> {
         }
     }
     Ok(())
+}
+
+#[derive(Debug)]
+pub struct Parser {
+    token_queue: VecDeque<Token>,
+    buf: String,
 }
 
 impl Parser {
@@ -873,7 +874,9 @@ impl Parser {
                 Terminal::Period => {
                     if let Some(child) = current.get_child_key(&key) {
                         if child.is_array() {
-                            current = child.get_child_index(child.data().children_count().unwrap() -1).unwrap();
+                            // array of tables must have at least one element
+                            let idx = child.data().children_count().unwrap() - 1;
+                            current = child.get_child_index(idx).unwrap();
                         } else if child.is_object() {
                             current = child;
                         } else {
@@ -882,7 +885,7 @@ impl Parser {
                                 .metadata()
                                 .span()
                                 .expect("Node should always have span");
-                            return ParseErrDetail::key_redefined(r, token, prev, &key);
+                            return ParseErrDetail::key_redefined(r, token.span(), prev, &key);
                         }
                     } else {
                         let new = NodeRef::object(LinkedHashMap::new()).with_span(token.span());
@@ -904,7 +907,7 @@ impl Parser {
                                 .metadata()
                                 .span()
                                 .expect("Node should always have span");
-                            return ParseErrDetail::key_redefined(r, token, prev, &key);
+                            return ParseErrDetail::key_redefined(r, token.span(), prev, &key);
                         }
                     }
 
@@ -974,6 +977,19 @@ impl Parser {
         let from = self.expect_token(r, Terminal::BracketLeft)?.from();
         let (node, key) = self.parse_key(r, parent)?;
         let to = self.expect_token(r, Terminal::BracketRight)?.to();
+
+        if node.is_array() {
+            // attempt to override existing array by table
+            // array of tables cannot be empty
+            let node = node.get_child_index(node.data().children_count().unwrap() -1).unwrap();
+            let prev = node
+                .data()
+                .metadata()
+                .span()
+                .expect("Node should always have span");
+            return ParseErrDetail::key_redefined(r, Span::with_pos(from, to), prev, &key);
+        }
+
         let table =
             NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
         node.add_child(None, Some(key.into()), table.clone())
@@ -1019,19 +1035,19 @@ impl Parser {
         let from = self.expect_token(r, Terminal::BracketLeft)?.from();
         self.expect_token(r, Terminal::BracketLeft)?;
 
-        let (mut elem, key) = self.parse_key(r, parent)?;
+        let (mut node, key) = self.parse_key(r, parent)?;
 
         self.expect_token(r, Terminal::BracketRight)?;
         let to = self.expect_token(r, Terminal::BracketRight)?.to();
 
         let mut table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
 
-        if elem.is_array() {
-            let idx = elem.data().children_count().unwrap();
-            elem.add_child(Some(idx), None, table.clone()).unwrap();
+        if node.is_array() {
+            let idx = node.data().children_count().unwrap();
+            node.add_child(Some(idx), None, table.clone()).unwrap();
         } else {
             let array = NodeRef::array(vec![table.clone()]);
-            elem.add_child(None, Some(key.into()), array).unwrap();
+            node.add_child(None, Some(key.into()), array).unwrap();
         }
         Ok(table)
     }
