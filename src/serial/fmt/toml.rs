@@ -797,7 +797,7 @@ impl Parser {
                     if next.term() == BracketLeft {
                         self.push_token(t);
                         self.push_token(next);
-                        current = self.parse_array_of_tables(r, &mut current)?;
+                        current = self.parse_array_of_tables(r, parent)?;
 
                     } else {
                         self.push_token(t);
@@ -872,12 +872,9 @@ impl Parser {
             match next.term() {
                 Terminal::Period => {
                     if let Some(child) = current.get_child_key(&key) {
-
                         if child.is_array() {
-                            let current = child.get_child_index(child.data().children_count().unwrap() -1).unwrap();
-                        } else
-
-                        if child.is_object(){
+                            current = child.get_child_index(child.data().children_count().unwrap() -1).unwrap();
+                        } else if child.is_object() {
                             current = child;
                         } else {
                             let prev = child
@@ -899,12 +896,16 @@ impl Parser {
                 }
                 _ => {
                     if let Some(child) = current.get_child_key(&key) {
-                        let prev = child
-                            .data()
-                            .metadata()
-                            .span()
-                            .expect("Node should always have span");
-                        return ParseErrDetail::key_redefined(r, token, prev, &key);
+                        if child.is_array() {
+                            current = child;
+                        } else {
+                            let prev = child
+                                .data()
+                                .metadata()
+                                .span()
+                                .expect("Node should always have span");
+                            return ParseErrDetail::key_redefined(r, token, prev, &key);
+                        }
                     }
 
                     self.push_token(next);
@@ -1018,43 +1019,21 @@ impl Parser {
         let from = self.expect_token(r, Terminal::BracketLeft)?.from();
         self.expect_token(r, Terminal::BracketLeft)?;
 
-        let (array_parent, key) = self.parse_key(r, parent)?;
+        let (mut elem, key) = self.parse_key(r, parent)?;
+
         self.expect_token(r, Terminal::BracketRight)?;
         let to = self.expect_token(r, Terminal::BracketRight)?.to();
 
-        let mut table = NodeRef::object(LinkedHashMap::new());
+        let mut table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
 
-        if let Some(array) = array_parent.get_child_key(&key) {
-            if array.is_array() {
-                let count = array.data().children_count().unwrap();
-                array.add_child(Some(count-1), None, table.clone()).unwrap();
-            } else {
-                unimplemented!()
-            }
+        if elem.is_array() {
+            let idx = elem.data().children_count().unwrap();
+            elem.add_child(Some(idx), None, table.clone()).unwrap();
         } else {
-            let array = NodeRef::array(vec![table.clone()]).with_span(Span::with_pos(from, to));
-            array_parent.add_child(None, Some(key.into()), array).unwrap();
+            let array = NodeRef::array(vec![table.clone()]);
+            elem.add_child(None, Some(key.into()), array).unwrap();
         }
-        unimplemented!();
-
         Ok(table)
-
-
-
-
-
-
-
-//                        let from = t.from();
-//                        let (node, key) = self.parse_key(r, parent)?;
-//                        self.expect_token(r, Terminal::BracketRight)?;
-//                        let to = self.expect_token(r, Terminal::BracketRight)?.to();
-//
-//                        let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
-//                        node.add_child(None, Some(key.into()), table.clone())
-//                            .unwrap();
-//                        Ok(table)
-
     }
 
     fn parse_array(&mut self, r: &mut dyn CharReader, parent: &mut NodeRef) -> Result<NodeRef, Error> {

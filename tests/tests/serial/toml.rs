@@ -20,7 +20,10 @@ macro_rules! parse_node_err {
     ($input: expr) => {{
         let mut r = kg_diag::MemCharReader::new($input.as_bytes());
         let mut parser = crate::serial::TomlParser::new();
-        let err = parser.parse(&mut r).expect_err("Error expected");
+        let err = parser.parse(&mut r).map(|node|{
+            panic!("Error expected! got node: {}", node.to_json_pretty())
+        })
+        .unwrap_err();
         err
     }};
 }
@@ -41,7 +44,7 @@ macro_rules! assert_err {
 }
 
 #[test]
-fn integer() {
+fn integers() {
     let input = r#"
         int1 = +99
         int2 = 42
@@ -57,7 +60,7 @@ fn integer() {
 }
 
 #[test]
-fn integer_underscore() {
+fn integers_underscore() {
     let input = r#"
         int1 = 1_000
         int2 = 5_349_221
@@ -71,7 +74,7 @@ fn integer_underscore() {
 }
 
 #[test]
-fn integer_prefix() {
+fn integers_prefix() {
     let input = r#"
         hex1 = 0xDEADBEEF
         hex2 = 0xdeadbeef
@@ -658,7 +661,7 @@ fn array_of_inline_tables() {
         .get_key("y").as_int_ext());
 }
 
-//#[test]
+#[test]
 fn array_of_tables() {
     let input = r#"
         [[products]]
@@ -673,8 +676,6 @@ fn array_of_tables() {
         color = "gray"
     "#;
     let node: NodeRef = parse_node!(input);
-
-    println!("{}", node.to_json_pretty());
 
     let products = node.get_key("products").as_array_ext();
 
@@ -711,7 +712,6 @@ fn nested_array_of_tables() {
             name = "plantain"
     "#;
     let node: NodeRef = parse_node!(input);
-    println!("{}", node.to_json_pretty());
 
     let fruit = node.get_key("fruit").as_array_ext();
 
@@ -723,4 +723,57 @@ fn nested_array_of_tables() {
 
     assert_eq!("banana", fruit[1].get_key("name").as_string_ext());
     assert_eq!("plantain", fruit[1].get_key("variety").as_array_ext()[0].get_key("name").as_string_ext());
+}
+
+#[test]
+fn multiple_array_of_tables() {
+    let input = r#"
+        [[fruit]]
+          name = "apple"
+        [[fruit]]
+          name = "banana"
+        [[animal]]
+          name = "bob"
+        [[animal]]
+          name = "spike"
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    let fruit = node.get_key("fruit").as_array_ext();
+    assert_eq!("apple", fruit[0].get_key("name").as_string_ext());
+    assert_eq!("banana", fruit[1].get_key("name").as_string_ext());
+
+    let animal = node.get_key("animal").as_array_ext();
+    assert_eq!("bob", animal[0].get_key("name").as_string_ext());
+    assert_eq!("spike", animal[1].get_key("name").as_string_ext());
+}
+
+//#[test]
+fn redefined_table_as_array() {
+    let input = r#"
+[[fruit]]
+  name = "apple"
+
+  [[fruit.variety]]
+    name = "red delicious"
+
+  # This table conflicts with the previous table
+  [fruit.variety]
+    name = "granny smith"
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
+}
+
+//#[test]
+fn redefined_static_array_array_table() {
+    let input = r#"
+        fruit = []
+
+        [[fruit]] # Not allowed
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
 }
