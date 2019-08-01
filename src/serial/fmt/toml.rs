@@ -4,6 +4,7 @@ use kg_display::ListDisplay;
 
 use crate::serial::fmt::toml::Terminal::BracketLeft;
 use std::collections::VecDeque;
+use std::string::ParseError;
 
 pub type Error = ParseDiag;
 
@@ -64,8 +65,8 @@ pub enum ParseErrDetail {
     UnexpectedEoiOneString { pos: Position, expected: String },
     #[display(fmt = "unexpected symbol {token}")]
     UnexpectedToken { token: Token },
-    #[display(fmt = "unexpected symbol {token}, expected {expected}")]
-    UnexpectedTokenStr { token: Token, expected: String },
+    #[display(fmt = "cannot use multiline string as key")]
+    MultilineKey,
     #[display(fmt = "unexpected symbol {token}, expected {expected}")]
     UnexpectedTokenOne { token: Token, expected: Terminal },
     #[display(
@@ -109,11 +110,12 @@ impl ParseErrDetail {
 
     pub fn invalid_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
+        let invalid = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErrDetail::InvalidChar {
-                    input: c,
+                    input: invalid,
                     from: p1,
                     to: p2
                 }, r, {
@@ -177,38 +179,23 @@ impl ParseErrDetail {
         Err(err)
     }
 
-    #[inline]
-    pub fn unexpected_eoi_str<T>(r: &mut dyn CharReader, expected: String) -> Result<T, Error> {
-        let pos = r.position();
-        Err(parse_diag!(ParseErrDetail::UnexpectedEoiOneString {
-            pos,
-            expected,
-        }, r, {
-            pos, pos => "unexpected end of input",
-        }))
-    }
-
-    #[inline]
     pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErrDetail::UnexpectedToken { token }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
 
-    #[inline]
-    pub fn unexpected_token_str<T>(
+    pub fn multiline_key<T>(
         token: Token,
-        expected: &str,
         r: &mut dyn CharReader,
     ) -> Result<T, Error> {
         Err(
-            parse_diag!(ParseErrDetail::UnexpectedTokenStr {expected: expected.to_string(), token }, r, {
-                token.from(), token.to() => "unexpected token"
+            parse_diag!(ParseErrDetail::MultilineKey, r, {
+                token.from(), token.to() => "invalid multline string usage"
             }),
         )
     }
 
-    #[inline]
     pub fn unexpected_token_one<T>(
         token: Token,
         expected: Terminal,
@@ -221,7 +208,6 @@ impl ParseErrDetail {
         )
     }
 
-    #[inline]
     pub fn unexpected_token_many<T>(
         token: Token,
         expected: Vec<Terminal>,
@@ -385,6 +371,16 @@ pub enum Terminal {
     True,
     #[display(fmt = "'false'")]
     False,
+}
+
+impl Terminal {
+    /// returns tuple `(literal, multiline)`
+    fn unwrap_string(self) -> (bool, bool) {
+        match self {
+            Terminal::String {literal, multiline} => (literal, multiline),
+            _ => { panic!("Not a string!") }
+        }
+    }
 }
 
 impl LexTerm for Terminal {}
@@ -825,7 +821,7 @@ impl Parser {
                 } => {
                     if multiline {
                         // FIXME better error
-                        return ParseErrDetail::unexpected_token_str(t, " STRING", r);
+                        return ParseErrDetail::multiline_key(t, r);
                     }
                     self.push_token(t);
                     self.parse_kv(r, &mut current)?
@@ -968,7 +964,12 @@ impl Parser {
         self.expect_token(r, Terminal::Equals)?;
         let val = self.parse_value(r, parent)?;
         node.add_child(None, Some(key.into()), val).unwrap();
-        Ok(())
+        let next = self.next_token(r)?;
+        if next.term() == Terminal::Newline || next.term() == Terminal::End {
+            Ok(())
+        } else {
+            ParseErrDetail::unexpected_token_many(next, vec![Terminal::Newline, Terminal::End], r)
+        }
     }
 
     fn parse_value(
@@ -1163,11 +1164,7 @@ impl Parser {
             }
         }
 
-        let (literal, multiline) = if let Terminal::String { literal, multiline } = t.term() {
-            (literal, multiline)
-        } else {
-            unreachable!()
-        };
+        let (literal, multiline) = t.term().unwrap_string();
         let s = r.slice_pos(t.from(), t.to())?;
 
         let val = if multiline {

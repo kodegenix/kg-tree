@@ -1,9 +1,7 @@
 use crate::serial::TomlParseErrDetail;
-use crate::serial::TomlParser as Parser;
 use crate::tests::serial::NodeRefExt;
-use kg_diag::{Diag, MemCharReader, Span};
+use kg_diag::{Diag};
 use kg_tree::NodeRef;
-use kg_utils::collections::LinkedHashMap;
 
 macro_rules! parse_node {
     ($input: expr) => {{
@@ -41,6 +39,27 @@ macro_rules! assert_err {
             err => panic!("Expected error {} got {:?}", stringify!($variant), err),
         }
     };
+}
+
+#[test]
+fn invalid_input() {
+    let input = "%\
+    key=\"value\"";
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidChar {..});
+}
+
+#[test]
+fn multiple_kv_without_newline() {
+    let input = r#"
+        first = "Tom" last = "Preston-Werner"
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
 }
 
 #[test]
@@ -98,6 +117,17 @@ fn integers_prefix() {
 
     assert_eq!(0b11010110, node.get_key("bin1").as_int_ext());
     assert_eq!(0b11010110, node.get_key("bin2").as_int_ext());
+}
+
+#[test]
+fn integers_underscore_after_prefix() {
+    let input = r#"
+        hex1 = 0x_DEADBEEF
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidChar {..});
 }
 
 #[test]
@@ -175,6 +205,48 @@ fn floats_special() {
 }
 
 #[test]
+fn scientific_notation_invalid_input() {
+    let input = r#"
+        num = 1.2e-s
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidCharMany {..});
+}
+
+#[test]
+fn scientific_notation_invalid_input_2() {
+    let input = r#"
+        num = 1ee23
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidCharMany {..});
+}
+
+#[test]
+fn comment_invalid_eol() {
+    let input = "num = 1 #comment\raf";
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidChar {..});
+}
+
+#[test]
+fn parse_float_err() {
+    let input = r#"
+        num = -e1
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidFloatLiteral {..});
+}
+
+#[test]
 fn booleans() {
     let input = r#"
         bool1 = true
@@ -241,6 +313,111 @@ fn basic_multiline_string() {
 }
 
 #[test]
+fn basic_multiline_invalid_open() {
+    let input = r#"
+    val = ""aaa"""
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidCharOne {..});
+}
+
+#[test]
+fn basic_multiline_string_eoi() {
+    let input = r#"
+    val = """aaa""
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedEoiOne {..});
+}
+
+#[test]
+fn literal_multiline_invalid_open() {
+    let input = r#"
+    val = ''aaa'''
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidCharOne {..});
+}
+
+#[test]
+fn literal_multiline_string_eoi() {
+    let input = r#"
+    val = '''
+    aaa''
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedEoiOne {..});
+}
+
+
+#[test]
+fn basic_multiline_string_first_crlf() {
+    let input = "str1 = \"\"\"\r\nsecond line\"\"\"";
+
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(
+        "second line",
+        node.get_key("str1").as_string_ext()
+    );
+}
+
+#[test]
+fn basic_string_escapes() {
+    let input = r#"
+        str1 = "\b \t \n \f \r \" \\"
+    "#;
+
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(
+        "\u{0008} \t \n \u{000c} \r \" \\",
+        node.get_key("str1").as_string_ext()
+    );
+}
+
+// TODO
+//#[test]
+fn basic_string_custom_escapes() {
+    let input = r#"
+        str1 = "\u0022 \U"
+    "#;
+
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("\"", node.get_key("str1").as_string_ext());
+}
+
+#[test]
+fn basic_string_bad_escape() {
+    let input = r#"
+        str1 = "\h"
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidEscape {..});
+}
+
+#[test]
+fn basic_string_unexpected_eol() {
+    let input = "key=\"val\nue\"";
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedEol {..});
+}
+
+
+#[test]
 fn line_ending_backslash() {
     let input = r#"
         str1 = """
@@ -278,6 +455,48 @@ fn bare_keys() {
     assert_eq!("value2", node.get_key("bare_key").as_string_ext());
     assert_eq!("value3", node.get_key("bare-key").as_string_ext());
     assert_eq!("value4", node.get_key("1234").as_string_ext());
+}
+
+#[test]
+fn no_key_value() {
+    let input = r#"
+        = "no key name"
+            "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
+}
+
+#[test]
+fn unexpected_key_value() {
+    let input = r#"
+        key= # comment"
+            "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
+}
+
+
+#[test]
+fn multiline_string_as_key() {
+    let input = r#"
+"""mutliline
+key""" = "value"
+            "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::MultilineKey);
+}
+
+#[test]
+fn keys_unexpected_token() {
+    let input = r#"
+        dotted.key.=unexpected = "value1"
+            "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
 }
 
 #[test]
@@ -519,6 +738,18 @@ fn array_mixed_types() {
 }
 
 #[test]
+fn array_unexpected_token() {
+    let input = r#"
+        arr1 = [ 1 = ]
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedToken {..});
+}
+
+
+#[test]
 fn array_mixed_types_2() {
     let input = r#"
         arr1 = [ 1, "string" ]
@@ -723,6 +954,16 @@ fn array_of_inline_tables() {
             .get_key("y")
             .as_int_ext()
     );
+}
+
+#[test]
+fn inline_table_unexpected_token() {
+    let input = r#"
+table = { key = "value" =}
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
 }
 
 #[test]
