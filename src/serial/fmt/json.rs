@@ -473,7 +473,7 @@ impl Parser {
         loop {
             let t = self.next_token(r)?;
             match t.term() {
-                Terminal::BraceRight if comma => {
+                Terminal::BraceRight if (comma || literal) => {
                     let span = Span {
                         from: p1,
                         to: t.to(),
