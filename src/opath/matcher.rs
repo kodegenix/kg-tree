@@ -112,7 +112,7 @@ mod tests {
         let mut m = NodePathMatcher::new();
 
         let expr = Opath::parse("$.*").unwrap();
-        m.resolve(&expr, &n, &n);
+        m.resolve(&expr, &n, &n).unwrap();
 
         assert!(m.matches(&Opath::parse("$.pa").unwrap()));
     }
@@ -125,7 +125,7 @@ mod tests {
         let mut cache = NodePathLruCache::with_size(128);
 
         let expr = Opath::parse("$.*").unwrap();
-        m.resolve_cache(&expr, &n, &n, &mut cache);
+        m.resolve_cache(&expr, &n, &n, &mut cache).unwrap();
 
         assert!(m.matches(&Opath::parse("$.pa").unwrap()));
         assert_eq!(cache.len(), 3);

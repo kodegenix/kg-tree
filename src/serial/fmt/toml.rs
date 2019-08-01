@@ -4,7 +4,6 @@ use kg_display::ListDisplay;
 
 use crate::serial::fmt::toml::Terminal::BracketLeft;
 use std::collections::VecDeque;
-use std::string::ParseError;
 
 pub type Error = ParseDiag;
 
@@ -78,8 +77,7 @@ pub enum ParseErrDetail {
         expected: Vec<Terminal>,
     },
     #[display(fmt = "array types mixed, expected type {expected}")]
-    MixedArrayType { expected: ValueType },
-
+    MixedArrayType { expected: String },
     #[display(fmt = "key '{key}' defined multiple times")]
     RedefinedKey { key: String },
     #[display(fmt = "unclosed {a0}")]
@@ -110,12 +108,11 @@ impl ParseErrDetail {
 
     pub fn invalid_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
-        let invalid = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErrDetail::InvalidChar {
-                    input: invalid,
+                    input: c,
                     from: p1,
                     to: p2
                 }, r, {
@@ -185,15 +182,10 @@ impl ParseErrDetail {
         }))
     }
 
-    pub fn multiline_key<T>(
-        token: Token,
-        r: &mut dyn CharReader,
-    ) -> Result<T, Error> {
-        Err(
-            parse_diag!(ParseErrDetail::MultilineKey, r, {
-                token.from(), token.to() => "invalid multline string usage"
-            }),
-        )
+    pub fn multiline_key<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
+        Err(parse_diag!(ParseErrDetail::MultilineKey, r, {
+            token.from(), token.to() => "invalid multiline string usage"
+        }))
     }
 
     pub fn unexpected_token_one<T>(
@@ -227,6 +219,18 @@ impl ParseErrDetail {
     ) -> Result<T, Error> {
         let from = node.data().metadata().span().unwrap().from;
         let to = node.data().metadata().span().unwrap().to;
+
+        let expected = match expected {
+            Kind::Boolean => "boolean",
+            Kind::Integer => "integer",
+            Kind::Float => "float",
+            Kind::String => "string",
+            Kind::Array => "array",
+            Kind::Object => "table",
+            // there is no such types in TOML
+            Kind::Binary => unreachable!(), //should never happen
+            Kind::Null => unreachable!(), // should never happen
+        };
         Err(
             parse_diag!(ParseErrDetail::MixedArrayType { expected: expected.into() }, r, {
                 from, to => "unexpected type"
@@ -289,50 +293,6 @@ impl ParseErrDetail {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum ValueType {
-    Boolean,
-    Integer,
-    Float,
-    String,
-    Array,
-    Table,
-}
-
-impl ValueType {
-    pub fn as_str(&self) -> &'static str {
-        match *self {
-            ValueType::Boolean => "bool",
-            ValueType::Integer => "integer",
-            ValueType::Float => "float",
-            ValueType::String => "string",
-            ValueType::Array => "array",
-            ValueType::Table => "table",
-        }
-    }
-}
-
-impl From<Kind> for ValueType {
-    fn from(kind: Kind) -> Self {
-        match kind {
-            Kind::Null => unreachable!(),
-            Kind::Boolean => ValueType::Boolean,
-            Kind::Integer => ValueType::Integer,
-            Kind::Float => ValueType::Float,
-            Kind::String => ValueType::String,
-            Kind::Binary => unreachable!(),
-            Kind::Array => ValueType::Array,
-            Kind::Object => ValueType::Table,
-        }
-    }
-}
-
-impl std::fmt::Display for ValueType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
 #[derive(Debug, Display, PartialEq, Eq, Clone, Copy)]
 pub enum Terminal {
     #[display(fmt = "END")]
@@ -377,8 +337,8 @@ impl Terminal {
     /// returns tuple `(literal, multiline)`
     fn unwrap_string(self) -> (bool, bool) {
         match self {
-            Terminal::String {literal, multiline} => (literal, multiline),
-            _ => { panic!("Not a string!") }
+            Terminal::String { literal, multiline } => (literal, multiline),
+            _ => panic!("Not a string!"),
         }
     }
 }
@@ -749,10 +709,6 @@ impl Parser {
                 r.skip_while(&|c| c.is_digit(10) || c == '_')?;
                 match r.peek_char(0)? {
                     Some('.') => {
-                        if Some('.') == r.peek_char(1)? {
-                            let p2 = r.position();
-                            return Ok(Token::new(Terminal::Integer, p1, p2));
-                        }
                         r.next_char()?;
                         r.skip_while(&|c| c.is_digit(10) || c == '_')?;
                         match r.peek_char(0)? {
@@ -1086,12 +1042,12 @@ impl Parser {
         let from = self.expect_token(r, Terminal::BracketLeft)?.from();
         self.expect_token(r, Terminal::BracketLeft)?;
 
-        let (mut node, key) = self.parse_key(r, parent)?;
+        let (node, key) = self.parse_key(r, parent)?;
 
         self.expect_token(r, Terminal::BracketRight)?;
         let to = self.expect_token(r, Terminal::BracketRight)?.to();
 
-        let mut table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
+        let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
 
         if node.is_array() {
             if self.is_static_array(&node) {
@@ -1178,7 +1134,7 @@ impl Parser {
             self.buf.reserve(val.len());
             self.buf.push_str(val);
         } else {
-            let mut chars=  val.chars().peekable();
+            let mut chars = val.chars().peekable();
             self.buf.clear();
             self.buf.reserve(val.len());
             while let Some(c) = chars.next() {
@@ -1201,7 +1157,7 @@ impl Parser {
                                 if c.is_whitespace() {
                                     chars.next();
                                 } else {
-                                    break
+                                    break;
                                 }
                             }
                         }
@@ -1221,30 +1177,12 @@ impl Parser {
     }
 }
 
-impl Default for Parser {
-    fn default() -> Self {
-        Parser::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     mod lex {
         use super::*;
-
-        macro_rules! assert_term {
-            ($input: expr, $term: expr) => {
-                let mut r = MemCharReader::new(input.as_bytes());
-                let mut parser = Parser::new();
-
-                let token = parser.lex(&mut r).unwrap();
-
-                assert_eq!(token.term(), term);
-            };
-        }
-
         macro_rules! assert_terms {
             ($input: expr, $expected: expr) => {
                 let mut r = MemCharReader::new($input.as_bytes());

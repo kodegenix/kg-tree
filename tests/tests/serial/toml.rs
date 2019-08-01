@@ -1,6 +1,6 @@
 use crate::serial::TomlParseErrDetail;
 use crate::tests::serial::NodeRefExt;
-use kg_diag::{Diag};
+use kg_diag::Diag;
 use kg_tree::NodeRef;
 
 macro_rules! parse_node {
@@ -44,7 +44,7 @@ macro_rules! assert_err {
 #[test]
 fn invalid_input() {
     let input = "%\
-    key=\"value\"";
+                 key=\"value\"";
 
     let err: ParseDiag = parse_node_err!(input);
 
@@ -129,6 +129,20 @@ fn integers_underscore_after_prefix() {
 
     assert_err!(err, TomlParseErrDetail::InvalidChar {..});
 }
+
+#[test]
+fn integers_invalid_integer() {
+    let input = r#"
+        num = 99999999999999999999999999999999999999999
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    println!("{}", err);
+
+    assert_err!(err, TomlParseErrDetail::InvalidIntegerLiteral {..});
+}
+
 
 #[test]
 fn floats() {
@@ -357,17 +371,13 @@ fn literal_multiline_string_eoi() {
     assert_err!(err, TomlParseErrDetail::UnexpectedEoiOne {..});
 }
 
-
 #[test]
 fn basic_multiline_string_first_crlf() {
     let input = "str1 = \"\"\"\r\nsecond line\"\"\"";
 
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(
-        "second line",
-        node.get_key("str1").as_string_ext()
-    );
+    assert_eq!("second line", node.get_key("str1").as_string_ext());
 }
 
 #[test]
@@ -415,7 +425,6 @@ fn basic_string_unexpected_eol() {
 
     assert_err!(err, TomlParseErrDetail::UnexpectedEol {..});
 }
-
 
 #[test]
 fn line_ending_backslash() {
@@ -468,6 +477,16 @@ fn no_key_value() {
 }
 
 #[test]
+fn no_equals_after_key() {
+    let input = r#"
+        some.key no_equals
+            "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedTokenOne {..});
+}
+
+#[test]
 fn unexpected_key_value() {
     let input = r#"
         key= # comment"
@@ -476,7 +495,6 @@ fn unexpected_key_value() {
 
     assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
 }
-
 
 #[test]
 fn multiline_string_as_key() {
@@ -726,16 +744,21 @@ fn arrays_of_arrays() {
     );
 }
 
-#[test]
-fn array_mixed_types() {
-    let input = r#"
-        arr1 = [ 1, 2.0 ]
-    "#;
+macro_rules! test_mixed(
+    ($name:ident, $input:expr) => (
+        #[test]
+        fn $name() {
+            let err: ParseDiag = parse_node_err!($input);
+            assert_err!(err, TomlParseErrDetail::MixedArrayType {..});
+        }
+    )
+);
 
-    let err: ParseDiag = parse_node_err!(input);
-
-    assert_err!(err, TomlParseErrDetail::MixedArrayType {..});
-}
+test_mixed!{mixed_array_types_int, "arr1 = [ 1, 2.0 ]"}
+test_mixed!{mixed_array_types_string, "arr1 = [ \"1\", 2.0 ]"}
+test_mixed!{mixed_array_types_float, "arr1 = [ 1.0, 2 ]"}
+test_mixed!{mixed_array_types_array, "arr1 = [ [1], 2 ]"}
+test_mixed!{mixed_array_types_table, "arr1 = [ {k=\"v\"}, 2 ]"}
 
 #[test]
 fn array_unexpected_token() {
@@ -747,7 +770,6 @@ fn array_unexpected_token() {
 
     assert_err!(err, TomlParseErrDetail::UnexpectedToken {..});
 }
-
 
 #[test]
 fn array_mixed_types_2() {
