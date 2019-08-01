@@ -20,10 +20,10 @@ macro_rules! parse_node_err {
     ($input: expr) => {{
         let mut r = kg_diag::MemCharReader::new($input.as_bytes());
         let mut parser = crate::serial::TomlParser::new();
-        let err = parser.parse(&mut r).map(|node|{
-            panic!("Error expected! got node: {}", node.to_json_pretty())
-        })
-        .unwrap_err();
+        let err = parser
+            .parse(&mut r)
+            .map(|node| panic!("Error expected! got node: {}", node.to_json_pretty()))
+            .unwrap_err();
         err
     }};
 }
@@ -368,6 +368,17 @@ fn redefined_key_nested_2() {
 }
 
 #[test]
+fn redefined_key_nested_inline_tables() {
+    let input = r#"
+        a.b.c = {val = 3}
+        a.b.c = {val = 2}
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
+}
+
+#[test]
 fn arrays() {
     let input = r#"
         arr1 = [ 1, 2, 3 ]
@@ -602,16 +613,15 @@ fn inline_tables() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("Tom", node.get_key("name")
-        .get_key("first").as_string_ext());
+    assert_eq!("Tom", node.get_key("name").get_key("first").as_string_ext());
 
-    assert_eq!("Preston-Werner", node.get_key("name")
-        .get_key("last").as_string_ext());
+    assert_eq!(
+        "Preston-Werner",
+        node.get_key("name").get_key("last").as_string_ext()
+    );
 
-    assert_eq!(1, node.get_key("point")
-        .get_key("x").as_int_ext());
-    assert_eq!(2, node.get_key("point")
-        .get_key("y").as_int_ext());
+    assert_eq!(1, node.get_key("point").get_key("x").as_int_ext());
+    assert_eq!(2, node.get_key("point").get_key("y").as_int_ext());
 }
 
 #[test]
@@ -621,9 +631,13 @@ fn inline_tables_dotted_key() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("pug", node.get_key("animal")
-        .get_key("type")
-        .get_key("name").as_string_ext());
+    assert_eq!(
+        "pug",
+        node.get_key("animal")
+            .get_key("type")
+            .get_key("name")
+            .as_string_ext()
+    );
 }
 
 #[test]
@@ -633,9 +647,13 @@ fn inline_tables_nested() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("value", node.get_key("table")
-        .get_key("nested")
-        .get_key("key").as_string_ext());
+    assert_eq!(
+        "value",
+        node.get_key("table")
+            .get_key("nested")
+            .get_key("key")
+            .as_string_ext()
+    );
 }
 
 #[test]
@@ -646,19 +664,31 @@ fn array_of_inline_tables() {
     "#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(1, node.get_key("points")
-        .as_array_ext()[0]
-        .get_key("x").as_int_ext());
-    assert_eq!(2, node.get_key("points")
-        .as_array_ext()[0]
-        .get_key("y").as_int_ext());
+    assert_eq!(
+        1,
+        node.get_key("points").as_array_ext()[0]
+            .get_key("x")
+            .as_int_ext()
+    );
+    assert_eq!(
+        2,
+        node.get_key("points").as_array_ext()[0]
+            .get_key("y")
+            .as_int_ext()
+    );
 
-    assert_eq!(7, node.get_key("points")
-        .as_array_ext()[1]
-        .get_key("x").as_int_ext());
-    assert_eq!(8, node.get_key("points")
-        .as_array_ext()[1]
-        .get_key("y").as_int_ext());
+    assert_eq!(
+        7,
+        node.get_key("points").as_array_ext()[1]
+            .get_key("x")
+            .as_int_ext()
+    );
+    assert_eq!(
+        8,
+        node.get_key("points").as_array_ext()[1]
+            .get_key("y")
+            .as_int_ext()
+    );
 }
 
 #[test]
@@ -716,13 +746,40 @@ fn nested_array_of_tables() {
     let fruit = node.get_key("fruit").as_array_ext();
 
     assert_eq!("apple", fruit[0].get_key("name").as_string_ext());
-    assert_eq!("red", fruit[0].get_key("physical").get_key("color").as_string_ext());
-    assert_eq!("round", fruit[0].get_key("physical").get_key("shape").as_string_ext());
-    assert_eq!("red delicious", fruit[0].get_key("variety").as_array_ext()[0].get_key("name").as_string_ext());
-    assert_eq!("granny smith", fruit[0].get_key("variety").as_array_ext()[1].get_key("name").as_string_ext());
+    assert_eq!(
+        "red",
+        fruit[0]
+            .get_key("physical")
+            .get_key("color")
+            .as_string_ext()
+    );
+    assert_eq!(
+        "round",
+        fruit[0]
+            .get_key("physical")
+            .get_key("shape")
+            .as_string_ext()
+    );
+    assert_eq!(
+        "red delicious",
+        fruit[0].get_key("variety").as_array_ext()[0]
+            .get_key("name")
+            .as_string_ext()
+    );
+    assert_eq!(
+        "granny smith",
+        fruit[0].get_key("variety").as_array_ext()[1]
+            .get_key("name")
+            .as_string_ext()
+    );
 
     assert_eq!("banana", fruit[1].get_key("name").as_string_ext());
-    assert_eq!("plantain", fruit[1].get_key("variety").as_array_ext()[0].get_key("name").as_string_ext());
+    assert_eq!(
+        "plantain",
+        fruit[1].get_key("variety").as_array_ext()[0]
+            .get_key("name")
+            .as_string_ext()
+    );
 }
 
 #[test]
@@ -782,8 +839,7 @@ fn redefined_array_as_table() {
     assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
 }
 
-// FIXME ws
-//#[test]
+#[test]
 fn redefined_static_array_as_array_of_tables() {
     let input = r#"
         fruit = []
@@ -793,4 +849,26 @@ fn redefined_static_array_as_array_of_tables() {
     let err: ParseDiag = parse_node_err!(input);
 
     assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
+}
+
+#[test]
+fn redefined_static_array_as_array_of_tables_nested() {
+    let input = r#"
+        fruit.desc = ["aa"]
+
+        [[fruit.desc.val]]
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
+}
+
+#[test]
+fn ignore_key_whitespaces() {
+    let input = r#"
+        [ j . "ʞ" . 'l' ]
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert!(node.get_key("j").get_key("ʞ").get_key("l").is_empty_ext())
 }
