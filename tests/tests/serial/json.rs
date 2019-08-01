@@ -1,7 +1,9 @@
+use crate::serial::JsonParseErrDetail;
 use crate::serial::JsonParser as Parser;
 use crate::tests::serial::NodeRefExt;
 use kg_diag::MemCharReader;
 use kg_tree::NodeRef;
+use kg_diag::ParseDiag;
 
 macro_rules! parse_node {
     ($input: expr) => {{
@@ -12,6 +14,32 @@ macro_rules! parse_node {
             panic!("Error parsing node!")
         })
     }};
+}
+
+macro_rules! parse_node_err {
+    ($input: expr) => {{
+        let mut r = kg_diag::MemCharReader::new($input.as_bytes());
+        let mut parser = crate::serial::JsonParser::new();
+        let err = parser.parse(&mut r).map(|node|{
+            panic!("Error expected! got node: {}", node.to_json_pretty())
+        })
+        .unwrap_err();
+        err
+    }};
+}
+
+macro_rules! assert_err {
+    ($err: expr, $variant: pat) => {
+        let detail = $err
+            .detail()
+            .downcast_ref::<JsonParseErrDetail>()
+            .expect("cannot downcast to JsonParseErrDetail");
+
+        match detail {
+            $variant => {}
+            err => panic!("Expected error {} got {:?}", stringify!($variant), err),
+        }
+    };
 }
 
 #[test]
@@ -249,11 +277,11 @@ fn array_mixed_types() {
 
 //#########################################
 
-//#[test] //FIXME MC Error should be expected.
-//fn brace_right_after_comma() {
-//    let input = r#"{"smt": 1,}"#;
-//    let node: NodeRef = parse_node!(input);
-//}
+#[test] //FIXME MC Error should be expected.
+fn brace_right_after_comma() {
+    let input = r#"{"smt": 1,}"#;
+    let node: NodeRef = parse_node!(input);
+}
 
 #[test] //FIXME MC Error should be expected and parser should be fixed.
 fn square_bracket_right_after_comma() {

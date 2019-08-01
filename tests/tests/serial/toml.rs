@@ -4,6 +4,7 @@ use crate::tests::serial::NodeRefExt;
 use kg_diag::{Diag, MemCharReader, Span};
 use kg_tree::NodeRef;
 use kg_utils::collections::LinkedHashMap;
+use kg_diag::ParseDiag;
 
 macro_rules! parse_node {
     ($input: expr) => {{
@@ -28,7 +29,6 @@ macro_rules! parse_node_err {
     }};
 }
 
-use kg_diag::ParseDiag;
 macro_rules! assert_err {
     ($err: expr, $variant: pat) => {
         let detail = $err

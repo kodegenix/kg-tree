@@ -8,6 +8,7 @@ mod de;
 mod error;
 mod fmt;
 mod ser;
+pub use fmt::json::ParseErr as JsonParseErrDetail;
 pub use fmt::json::Parser as JsonParser;
 pub use fmt::toml::ParseErrDetail as TomlParseErrDetail;
 pub use fmt::toml::Parser as TomlParser;
