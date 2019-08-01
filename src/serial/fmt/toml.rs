@@ -1181,7 +1181,7 @@ impl Parser {
             self.buf.reserve(val.len());
             self.buf.push_str(val);
         } else {
-            let mut chars = val.chars();
+            let mut chars=  val.chars().peekable();
             self.buf.clear();
             self.buf.reserve(val.len());
             while let Some(c) = chars.next() {
@@ -1198,6 +1198,16 @@ impl Parser {
                         // FIXME ws https://github.com/toml-lang/toml#string
                         Some('u') => unimplemented!(),
                         Some('U') => unimplemented!(),
+                        Some(c) if c.is_whitespace() => {
+                            // handle line ending backslash
+                            while let Some(c) = chars.peek() {
+                                if c.is_whitespace() {
+                                    chars.next();
+                                } else {
+                                    break
+                                }
+                            }
+                        }
                         _ => return ParseErrDetail::invalid_escape(r),
                     }
                 } else {

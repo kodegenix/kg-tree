@@ -241,6 +241,30 @@ fn basic_multiline_string() {
 }
 
 #[test]
+fn line_ending_backslash() {
+    let input = r#"
+        str1 = """
+The quick brown \
+
+
+  fox jumps over \
+    the lazy dog."""
+
+str2 = """\
+       The quick brown \
+       fox jumps over \
+       the lazy dog.\
+       """
+    "#;
+    let phrase = "The quick brown fox jumps over the lazy dog.";
+
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(phrase, node.get_key("str1").as_string_ext());
+    assert_eq!(phrase, node.get_key("str2").as_string_ext());
+}
+
+#[test]
 fn bare_keys() {
     let input = r#"
         key = "value1"
@@ -290,6 +314,16 @@ fn dotted_keys_bare() {
         "round",
         node.get_key("physical").get_key("shape").as_string_ext()
     );
+}
+
+#[test]
+fn ignore_keys_whitespaces() {
+    let input = r#"
+        [ j . "ʞ" . 'l' ]
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert!(node.get_key("j").get_key("ʞ").get_key("l").is_empty_ext())
 }
 
 #[test]
@@ -861,14 +895,4 @@ fn redefined_static_array_as_array_of_tables_nested() {
     let err: ParseDiag = parse_node_err!(input);
 
     assert_err!(err, TomlParseErrDetail::RedefinedKey {..});
-}
-
-#[test]
-fn ignore_key_whitespaces() {
-    let input = r#"
-        [ j . "ʞ" . 'l' ]
-    "#;
-    let node: NodeRef = parse_node!(input);
-
-    assert!(node.get_key("j").get_key("ʞ").get_key("l").is_empty_ext())
 }
