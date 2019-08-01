@@ -45,7 +45,10 @@ impl NodeRefExt for NodeRef {
     }
 
     fn is_empty_ext(&self) -> bool {
-        self.data().children_count().expect("cannot get children count") == 0
+        self.data()
+            .children_count()
+            .expect("cannot get children count")
+            == 0
     }
 
     fn get_key(&self, key: &str) -> NodeRef {
