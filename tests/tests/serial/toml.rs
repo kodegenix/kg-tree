@@ -138,8 +138,6 @@ fn integers_invalid_integer() {
 
     let err: ParseDiag = parse_node_err!(input);
 
-    println!("{}", err);
-
     assert_err!(err, TomlParseErrDetail::InvalidIntegerLiteral {..});
 }
 
@@ -395,15 +393,26 @@ fn basic_string_escapes() {
 }
 
 // TODO
-//#[test]
+#[test]
 fn basic_string_custom_escapes() {
     let input = r#"
-        str1 = "\u0022 \U"
+        escape1 = "\u0022"
     "#;
 
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("\"", node.get_key("str1").as_string_ext());
+    assert_eq!("\"", node.get_key("escape1").as_string_ext());
+}
+
+#[test]
+fn basic_string_bad_custom_escape() {
+    let input = r#"
+        escape1 = "\uD800"
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidEscape {..});
 }
 
 #[test]

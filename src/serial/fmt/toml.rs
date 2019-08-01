@@ -1129,14 +1129,12 @@ impl Parser {
             &s[1..s.len() - 1]
         };
 
+        self.buf.clear();
+        self.buf.reserve(val.len());
         if literal {
-            self.buf.clear();
-            self.buf.reserve(val.len());
             self.buf.push_str(val);
         } else {
             let mut chars = val.chars().peekable();
-            self.buf.clear();
-            self.buf.reserve(val.len());
             while let Some(c) = chars.next() {
                 if c == '\\' {
                     let c = chars.next();
@@ -1148,9 +1146,38 @@ impl Parser {
                         Some('r') => self.buf.push('\r'),       // carriage return
                         Some('\"') => self.buf.push('\"'),      // quote
                         Some('\\') => self.buf.push('\\'),      // backslash
-                        // FIXME ws https://github.com/toml-lang/toml#string
-                        Some('u') => unimplemented!(),
-                        Some('U') => unimplemented!(),
+                        // TODO ws https://github.com/toml-lang/toml#string
+                        Some('u') => {
+                            let mut val = String::new();
+                            for i in 0..4 {
+                                if let Some(c) = chars.next() {
+                                    val.push(c)
+                                } else {
+                                    return ParseErrDetail::invalid_escape(r)
+                                }
+                            }
+                            let num: u32 =
+                                u32::from_str_radix(&val, 16).map_err(|err| ParseErrDetail::InvalidIntegerLiteral {
+                                    err,
+                                    from: t.from(),
+                                    to: t.to(),
+                                })?;
+
+                            // http://unicode.org/glossary/#unicode_scalar_value
+                            if (num <= 0xD7FFu32) || (num >= 0xE000u32 && num <= 0x10FFFFu32) {
+                                let unicode_chars = num.to_be_bytes();
+                                for c in &unicode_chars {
+                                    if *c as char != 0 as char {
+                                        self.buf.push(*c as char)
+                                    }
+                                }
+                            } else {
+                                return ParseErrDetail::invalid_escape(r)
+                            }
+                        },
+                        Some('U') => {
+                            unimplemented!()
+                        },
                         Some(c) if c.is_whitespace() => {
                             // handle line ending backslash
                             while let Some(c) = chars.peek() {
