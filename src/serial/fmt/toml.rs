@@ -1106,38 +1106,47 @@ impl Parser {
     }
 
     fn parse_string<'a>(&mut self, t: Token, r: &'a mut dyn CharReader) -> Result<(), Error> {
-        fn prepare_multiline(val: &str) -> &str {
+        fn prepare_multiline(r: &mut dyn CharReader) -> Result<(), Error> {
             // trim quotes
-            let val = &val[3..val.len() - 3];
+            r.skip_chars(3)?;
+
+            let c = r.peek_char(1)?.unwrap();
+            let next = r.peek_char(2)?.unwrap();
 
             // remove newline immediately following opening delimiter
-            if val.starts_with("\n") {
-                &val[1..]
-            } else if val.starts_with("\r\n") {
-                &val[2..]
-            } else {
-                val
+            if c == '\n' {
+                r.skip_chars(1)?;
+            } else if c == '\r' && next == '\n' {
+                r.skip_chars(2)?;
             }
+            Ok(())
         }
+        r.seek(t.from())?;
 
         let (literal, multiline) = t.term().unwrap_string();
-        let s = r.slice_pos(t.from(), t.to())?;
 
-        let val = if multiline {
-            prepare_multiline(&s)
+        let end_offset = t.to().offset;
+
+        if multiline {
+            prepare_multiline(r)?
         } else {
-            &s[1..s.len() - 1]
+            // just trim single quote
+            r.skip_chars(1)?;
         };
 
+        let start_offset = r.position().offset;
+
         self.buf.clear();
-        self.buf.reserve(val.len());
+        self.buf.reserve(end_offset - start_offset);
         if literal {
-            self.buf.push_str(val);
+            r.next_char()?;
+            let val = r.slice_pos(r.position(), t.to())?;
+            self.buf.push_str(&val);
         } else {
-            let mut chars = val.chars().peekable();
-            while let Some(c) = chars.next() {
+            while r.position().offset < end_offset-1 {
+                let c = r.next_char()?.unwrap();
                 if c == '\\' {
-                    let c = chars.next();
+                    let c = r.next_char()?;
                     match c {
                         Some('b') => self.buf.push('\u{0008}'), // backspace
                         Some('t') => self.buf.push('\t'),       // tab
@@ -1146,12 +1155,16 @@ impl Parser {
                         Some('r') => self.buf.push('\r'),       // carriage return
                         Some('\"') => self.buf.push('\"'),      // quote
                         Some('\\') => self.buf.push('\\'),      // backslash
-                        // TODO ws https://github.com/toml-lang/toml#string
                         Some('u') => {
+                            let p1 = r.position();
                             let mut val = String::new();
-                            for i in 0..4 {
-                                if let Some(c) = chars.next() {
-                                    val.push(c)
+                            for _i in 0..4 {
+                                if let Some(c) = r.next_char()? {
+                                    if is_hex_char(c) {
+                                        val.push(c)
+                                    } else {
+                                        return ParseErrDetail::invalid_escape(r)
+                                    }
                                 } else {
                                     return ParseErrDetail::invalid_escape(r)
                                 }
@@ -1159,8 +1172,8 @@ impl Parser {
                             let num: u32 =
                                 u32::from_str_radix(&val, 16).map_err(|err| ParseErrDetail::InvalidIntegerLiteral {
                                     err,
-                                    from: t.from(),
-                                    to: t.to(),
+                                    from: p1,
+                                    to: r.position(),
                                 })?;
 
                             // http://unicode.org/glossary/#unicode_scalar_value
@@ -1176,15 +1189,16 @@ impl Parser {
                             }
                         },
                         Some('U') => {
+                            // TODO ws https://github.com/toml-lang/toml#string
                             unimplemented!()
                         },
                         Some(c) if c.is_whitespace() => {
                             // handle line ending backslash
-                            while let Some(c) = chars.peek() {
+                            while let Some(c) = r.peek_char(1)? {
                                 if c.is_whitespace() {
-                                    chars.next();
+                                    r.next_char()?;
                                 } else {
-                                    break;
+                                    break
                                 }
                             }
                         }
@@ -1195,6 +1209,13 @@ impl Parser {
                 }
             }
         }
+        self.buf.pop();
+        if multiline {
+            self.buf.pop();
+            self.buf.pop();
+        }
+
+        r.seek(t.to())?;
         Ok(())
     }
 

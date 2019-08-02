@@ -42,7 +42,7 @@ macro_rules! assert_err {
 }
 
 #[test]
-fn invalid_input() {
+fn invalid_char() {
     let input = "%\
                  key=\"value\"";
 
@@ -217,7 +217,7 @@ fn floats_special() {
 }
 
 #[test]
-fn scientific_notation_invalid_input() {
+fn scientific_notation_invalid_char() {
     let input = r#"
         num = 1.2e-s
     "#;
@@ -228,7 +228,7 @@ fn scientific_notation_invalid_input() {
 }
 
 #[test]
-fn scientific_notation_invalid_input_2() {
+fn scientific_notation_invalid_char_2() {
     let input = r#"
         num = 1ee23
     "#;
@@ -392,9 +392,23 @@ fn basic_string_escapes() {
     );
 }
 
-// TODO
+
 #[test]
-fn basic_string_custom_escapes() {
+fn basic_string_utf8() {
+    let input = r#"
+        str1 = "✅ ❄ ❤ 💖"
+    "#;
+
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(
+        "✅ ❄ ❤ 💖",
+        node.get_key("str1").as_string_ext()
+    );
+}
+
+#[test]
+fn custom_escapes() {
     let input = r#"
         escape1 = "\u0022"
     "#;
@@ -405,9 +419,20 @@ fn basic_string_custom_escapes() {
 }
 
 #[test]
-fn basic_string_bad_custom_escape() {
+fn bad_custom_escape() {
     let input = r#"
         escape1 = "\uD800"
+    "#;
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidEscape {..});
+}
+
+#[test]
+fn too_short_custom_escape() {
+    let input = r#"
+        escape1 = "\u002"
     "#;
 
     let err: ParseDiag = parse_node_err!(input);
@@ -532,16 +557,18 @@ fn quoted_keys() {
         "127.0.0.1" = "value1"
         "character encoding" = "value2"
         "ʎǝʞ" = "value3"
-        'key2' = "value4"
+        'key2ʞ' = "value4"
         'quoted "value"' = "value5"
+        "💖" = "heart"
     "#;
     let node: NodeRef = parse_node!(input);
 
     assert_eq!("value1", node.get_key("127.0.0.1").as_string_ext());
     assert_eq!("value2", node.get_key("character encoding").as_string_ext());
     assert_eq!("value3", node.get_key("ʎǝʞ").as_string_ext());
-    assert_eq!("value4", node.get_key("key2").as_string_ext());
+    assert_eq!("value4", node.get_key("key2ʞ").as_string_ext());
     assert_eq!("value5", node.get_key("quoted \"value\"").as_string_ext());
+    assert_eq!("heart", node.get_key("💖").as_string_ext());
 }
 
 #[test]
