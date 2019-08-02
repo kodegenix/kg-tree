@@ -220,12 +220,12 @@ fn booleans() {
 #[test]
 fn strings() { //TODO MC Add \b, \f to parser
     let input = r#"{
-        "str1": " literal string \n \t \r \t \" \\ '"
+        "str1": " literal string \n \t \r \t \" \\ \b \f'"
     }"#;
     let node: NodeRef = parse_node!(input);
 
     assert_eq!(
-        " literal string \n \t \r \t \" \\ '",
+        " literal string \n \t \r \t \" \\ \u{0008} \u{000c}'",
         node.get_key("str1").as_string_ext()
     );
 }

@@ -560,6 +560,8 @@ impl Parser {
                     Some('t') => self.buf.push('\t'),
                     Some('r') => self.buf.push('\r'),
                     Some('n') => self.buf.push('\n'),
+                    Some('b') => self.buf.push('\u{0008}'),
+                    Some('f') => self.buf.push('\u{000c}'),
                     _ => return ParseErr::invalid_escape(r),
                 }
             } else {
