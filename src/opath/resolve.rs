@@ -142,7 +142,7 @@ mod tests {
         .unwrap();
 
         let mut r = TreeResolver::new();
-        r.resolve(&n);
+        r.resolve(&n).unwrap();
 
         assert_eq!(n.to_json(), r#"{"child1":{"my_key":"child1","sub2":{"my_key":"child1"},"subchild":{"my_key":"child1"}}}"#);
     }
