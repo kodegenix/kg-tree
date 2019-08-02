@@ -108,11 +108,12 @@ impl ParseErrDetail {
 
     pub fn invalid_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
+        let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErrDetail::InvalidChar {
-                    input: c,
+                    input: current,
                     from: p1,
                     to: p2
                 }, r, {
@@ -154,11 +155,12 @@ impl ParseErrDetail {
 
     pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
         let p1 = r.position();
+        let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErrDetail::InvalidCharMany {
-                    input: c,
+                    input: current,
                     from: p1,
                     to: p2,
                     expected,
@@ -229,7 +231,7 @@ impl ParseErrDetail {
             Kind::Object => "table",
             // there is no such types in TOML
             Kind::Binary => unreachable!(), //should never happen
-            Kind::Null => unreachable!(), // should never happen
+            Kind::Null => unreachable!(),   // should never happen
         };
         Err(
             parse_diag!(ParseErrDetail::MixedArrayType { expected: expected.into() }, r, {
@@ -599,10 +601,24 @@ impl Parser {
                 let mut multiline = false;
                 if let Some('\"') = r.peek_char(1)? {
                     r.next_char()?;
-                    if let Some('\"') = r.next_char()? {
-                        multiline = true;
-                    } else {
-                        return ParseErrDetail::invalid_input_one(r, '\"');
+                    match r.next_char()? {
+                        Some('\"') => {
+                            multiline = true;
+                        }
+                        Some(c) if c.is_whitespace() => {
+                            let p2 = r.position();
+                            return Ok(Token::new(
+                                Terminal::String {
+                                    literal: false,
+                                    multiline: false,
+                                },
+                                p1,
+                                p2,
+                            ));
+                        }
+                        _ => {
+                            return ParseErrDetail::invalid_input_one(r, '\"');
+                        }
                     }
                 }
 
@@ -644,10 +660,25 @@ impl Parser {
                 let mut multiline = false;
                 if let Some('\'') = r.peek_char(1)? {
                     r.next_char()?;
-                    if let Some('\'') = r.next_char()? {
-                        multiline = true;
-                    } else {
-                        return ParseErrDetail::invalid_input_one(r, '\'');
+
+                    match r.next_char()? {
+                        Some('\'') => {
+                            multiline = true;
+                        }
+                        Some(c) if c.is_whitespace() => {
+                            let p2 = r.position();
+                            return Ok(Token::new(
+                                Terminal::String {
+                                    literal: true,
+                                    multiline: false,
+                                },
+                                p1,
+                                p2,
+                            ));
+                        }
+                        _ => {
+                            return ParseErrDetail::invalid_input_one(r, '\'');
+                        }
                     }
                 }
 
@@ -921,7 +952,11 @@ impl Parser {
         let val = self.parse_value(r, parent)?;
         node.add_child(None, Some(key.into()), val).unwrap();
         let next = self.next_token(r)?;
-        if next.term() == Terminal::Newline || next.term() == Terminal::End {
+
+        if next.term() == Terminal::Newline
+            || next.term() == Terminal::End
+            || next.term() == Terminal::Comment
+        {
             Ok(())
         } else {
             ParseErrDetail::unexpected_token_many(next, vec![Terminal::Newline, Terminal::End], r)
@@ -1143,7 +1178,7 @@ impl Parser {
             let val = r.slice_pos(r.position(), t.to())?;
             self.buf.push_str(&val);
         } else {
-            while r.position().offset < end_offset-1 {
+            while r.position().offset < end_offset - 1 {
                 let c = r.next_char()?.unwrap();
                 if c == '\\' {
                     let c = r.next_char()?;
@@ -1163,18 +1198,19 @@ impl Parser {
                                     if is_hex_char(c) {
                                         val.push(c)
                                     } else {
-                                        return ParseErrDetail::invalid_escape(r)
+                                        return ParseErrDetail::invalid_escape(r);
                                     }
                                 } else {
-                                    return ParseErrDetail::invalid_escape(r)
+                                    return ParseErrDetail::invalid_escape(r);
                                 }
                             }
-                            let num: u32 =
-                                u32::from_str_radix(&val, 16).map_err(|err| ParseErrDetail::InvalidIntegerLiteral {
+                            let num: u32 = u32::from_str_radix(&val, 16).map_err(|err| {
+                                ParseErrDetail::InvalidIntegerLiteral {
                                     err,
                                     from: p1,
                                     to: r.position(),
-                                })?;
+                                }
+                            })?;
 
                             // http://unicode.org/glossary/#unicode_scalar_value
                             if (num <= 0xD7FFu32) || (num >= 0xE000u32 && num <= 0x10FFFFu32) {
@@ -1185,20 +1221,20 @@ impl Parser {
                                     }
                                 }
                             } else {
-                                return ParseErrDetail::invalid_escape(r)
+                                return ParseErrDetail::invalid_escape(r);
                             }
-                        },
+                        }
                         Some('U') => {
                             // TODO ws https://github.com/toml-lang/toml#string
                             unimplemented!()
-                        },
+                        }
                         Some(c) if c.is_whitespace() => {
                             // handle line ending backslash
                             while let Some(c) = r.peek_char(1)? {
                                 if c.is_whitespace() {
                                     r.next_char()?;
                                 } else {
-                                    break
+                                    break;
                                 }
                             }
                         }
