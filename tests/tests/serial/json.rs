@@ -43,6 +43,14 @@ macro_rules! assert_err {
 }
 
 #[test]
+fn invalid_char() {
+    let input = r#"{=}"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+}
+
+#[test]
 fn null() {
     let input = r#"null"#;
     let node: NodeRef = parse_node!(input);
@@ -168,6 +176,36 @@ fn floats() {
 }
 
 #[test]
+fn scientific_notation_invalid_char() {
+    let input = r#"{
+        "num": 1.2e-s
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::InvalidCharMany {..});
+}
+
+#[test]
+fn scientific_notation_invalid_char_2() {
+    let input = r#"{
+        "num": 1.2ee23
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::InvalidCharMany {..});
+}
+
+#[test]
+fn parse_float_err() {
+    let input = r#"{
+        "num": -e1
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::InvalidFloatLiteral {..});
+}
+
+#[test]
 fn booleans() {
     let input = r#"{
         "bool1": true,
@@ -275,6 +313,16 @@ fn array_mixed_types() {
     assert!(node.get_key("arr5").as_array_ext()[1].is_empty_ext());
 }
 
+#[test]
+fn array_unexpected_token() {
+    let input = r#"{
+        "arr1": [ 1 { ]
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedToken {..});
+}
+
 //#########################################
 
 #[test]
@@ -295,6 +343,15 @@ fn square_bracket_right_after_comma() {
     assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
 }
 
+#[test]
+fn unexpected_eoi_one() {
+    let input = r#"{
+        "string": "cos
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedEoiOne {..});
+}
 //#########################################
 
 #[test]
@@ -315,6 +372,7 @@ fn no_whitespace_after_comma() {
 /* TODO MC Tests:
 let input = r#""#;
 let input = r#"{int: 1}"#;
+let input = r#"{"int": 1(}"#;
 let input = r#"{"int":1}"#;
 let input = r#"{"int": 1 , "int2": 2}"#;
 let input = r#"{int: 1 int2: 2}"#;
@@ -324,4 +382,5 @@ let input = r#"{int: 1 int2: 2}"#;
 Test with UTF-8 BOM
 Test with duplicated keys
 Test with whitespaces
+Test with InvalidCharOne
 */
