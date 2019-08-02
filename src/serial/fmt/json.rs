@@ -167,7 +167,6 @@ impl ParseErr {
         Err(err)
     }
 
-    #[inline]
     pub fn unexpected_eoi_str<T>(r: &mut dyn CharReader, expected: String) -> Result<T, Error> {
         let pos = r.position();
         Err(parse_diag!(ParseErr::UnexpectedEoiOneString {
@@ -178,14 +177,12 @@ impl ParseErr {
         }))
     }
 
-    #[inline]
     pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErr::UnexpectedToken { token }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
 
-    #[inline]
     pub fn unexpected_token_one<T>(
         token: Token,
         expected: Terminal,
@@ -198,7 +195,6 @@ impl ParseErr {
         )
     }
 
-    #[inline]
     pub fn unexpected_token_many<T>(
         token: Token,
         expected: Vec<Terminal>,
@@ -259,7 +255,6 @@ impl Parser {
     }
 
     fn lex(&mut self, r: &mut dyn CharReader) -> Result<Token, Error> {
-        #[inline]
         fn process_scientific_notation(
             r: &mut dyn CharReader,
             p1: Position,
