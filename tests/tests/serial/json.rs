@@ -231,6 +231,74 @@ fn strings() {
 }
 
 #[test]
+fn string_utf8() {
+    let input = r#"{
+        "str1": "✅ ❄ ❤ 💖"
+    }"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(
+        "✅ ❄ ❤ 💖",
+        node.get_key("str1").as_string_ext()
+    );
+}
+
+//FIXME MC UTF-8 as \u0000 should work in json parser
+//#[test]
+fn custom_escapes() {
+    let input = r#"{
+        "str1": "\u00f8C"
+    }"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(
+        "\\u00f8C",
+        node.get_key("str1").as_string_ext()
+    );
+}
+
+//FIXME MC UTF-8 as \u0000 should work in json parser
+//#[test]
+fn bad_custom_escape() {
+    let input = r#"{
+        "str1": "\uD800"
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
+}
+
+//FIXME MC UTF-8 as \u0000 should work in json parser
+//#[test]
+fn too_short_custom_escape() {
+    let input = r#"{
+        "str1": "\u002"
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
+}
+
+#[test]
+fn string_bad_escape() {
+    let input = r#"{
+        "str1": "\h"
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
+}
+
+#[test] //FIXME MC
+fn bug_in_parser_where_there_is_wrong_charakcter_selected() {
+
+    let input = "{key}";
+    let err: ParseDiag = parse_node_err!(input);
+    eprintln!(" = {}", err);
+//    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+}
+
+#[test]
 fn symbol_in_key() {
     let input = r#"{
         "⌨": "value1",
