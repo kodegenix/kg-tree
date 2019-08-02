@@ -435,7 +435,11 @@ fn check_eol(r: &mut dyn CharReader, multiline: bool) -> Result<(), Error> {
 pub struct Parser {
     token_queue: VecDeque<Token>,
     buf: String,
+    /// Statically defined arrays
     static_arrays: Vec<NodeRef>,
+    /// Nodes that cannot be defined again
+    /// but can be used in dotted keys
+    defined_nodes: Vec<NodeRef>,
 }
 
 impl Parser {
@@ -444,6 +448,7 @@ impl Parser {
             token_queue: VecDeque::new(),
             buf: String::new(),
             static_arrays: vec![],
+            defined_nodes: vec![],
         }
     }
 
@@ -822,7 +827,9 @@ impl Parser {
                     } else {
                         self.push_token(t);
                         self.push_token(next);
-                        current = self.parse_table(r, parent)?;
+                        let node = self.parse_table(r, parent)?;
+                        self.defined_nodes.push(node.clone());
+                        current = node;
                     }
                 }
                 Terminal::Newline => {}
@@ -924,22 +931,20 @@ impl Parser {
                     continue;
                 }
                 _ => {
-                    if let Some(child) = current.get_child_key(&key) {
-                        if child.is_array() {
-                            current = child;
-                        } else {
+                    match current.get_child_key(&key) {
+                        Some(ref child) if child.is_array() => current = child.clone(),
+                        Some(ref child) if child.is_object() && !self.is_defined(child) => {}
+                        Some(ref child) => {
                             return ParseErrDetail::key_redefined_node(
                                 r,
                                 token.span(),
-                                &child,
+                                child,
                                 &key,
-                            );
+                            )
                         }
+                        _ => {}
                     }
-
                     self.push_token(next);
-
-                    // TODO hashset
                     return Ok((current.clone(), key));
                 }
             }
@@ -950,6 +955,7 @@ impl Parser {
         let (node, key) = self.parse_key(r, parent)?;
         self.expect_token(r, Terminal::Equals)?;
         let val = self.parse_value(r, parent)?;
+        self.defined_nodes.push(val.clone());
         node.add_child(None, Some(key.into()), val).unwrap();
         let next = self.next_token(r)?;
 
@@ -1032,10 +1038,14 @@ impl Parser {
             return ParseErrDetail::key_redefined_node(r, Span::with_pos(from, to), &node, &key);
         }
 
-        let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
-        node.add_child(None, Some(key.into()), table.clone())
-            .unwrap();
-        Ok(table)
+        if let Some(existing) = node.get_child_key(&key) {
+            return Ok(existing);
+        } else {
+            let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
+            node.add_child(None, Some(key.into()), table.clone())
+                .unwrap();
+            Ok(table)
+        }
     }
 
     fn parse_inline_table(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
@@ -1258,6 +1268,11 @@ impl Parser {
     fn is_static_array(&self, node: &NodeRef) -> bool {
         let static_array = self.static_arrays.iter().find(|n| n.is_ref_eq(&node));
         static_array.is_some()
+    }
+
+    fn is_defined(&self, node: &NodeRef) -> bool {
+        let defined = self.defined_nodes.iter().find(|n| n.is_ref_eq(&node));
+        defined.is_some()
     }
 }
 

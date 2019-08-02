@@ -962,6 +962,37 @@ fn table_dotted_key() {
 }
 
 #[test]
+fn define_super_table_afterwards() {
+    let input = r#"
+        [x.y.z.w]
+
+        [x]
+        key = "val"
+
+        [x.y]
+        key2 = "val2"
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("val", node.get_key("x").get_key("key").as_string_ext());
+
+    assert_eq!(
+        "val2",
+        node.get_key("x")
+            .get_key("y")
+            .get_key("key2")
+            .as_string_ext()
+    );
+
+    assert!(node
+        .get_key("x")
+        .get_key("y")
+        .get_key("z")
+        .get_key("w")
+        .is_empty_ext());
+}
+
+#[test]
 fn redefined_table() {
     let input = r#"
         [a]
@@ -1085,7 +1116,6 @@ key2="value2}
 
     assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
 }
-
 
 #[test]
 fn inline_table_unexpected_token() {
