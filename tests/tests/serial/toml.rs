@@ -43,8 +43,7 @@ macro_rules! assert_err {
 
 #[test]
 fn invalid_char() {
-    let input = "%\
-                 key=\"value\"";
+    let input = "key=\"value\"\n&key2=\"value2\"";
 
     let err: ParseDiag = parse_node_err!(input);
 
@@ -140,7 +139,6 @@ fn integers_invalid_integer() {
 
     assert_err!(err, TomlParseErrDetail::InvalidIntegerLiteral {..});
 }
-
 
 #[test]
 fn floats() {
@@ -248,6 +246,29 @@ fn comment_invalid_eol() {
 }
 
 #[test]
+fn comments() {
+    let input = r#"
+        # This is a full-line comment
+        key = "value"  # This is a comment at the end of a line
+        another = '# This is not a comment'
+        [table] # comment
+        #comment 2
+        [[array]]# comment3
+        # comment 4
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("value", node.get_key("key").as_string_ext());
+    assert_eq!(
+        "# This is not a comment",
+        node.get_key("another").as_string_ext()
+    );
+
+    assert!(node.get_key("table").is_empty_ext());
+    assert!(node.get_key("array").as_array_ext()[0].is_empty_ext());
+}
+
+#[test]
 fn parse_float_err() {
     let input = r#"
         num = -e1
@@ -271,7 +292,32 @@ fn booleans() {
 }
 
 #[test]
-fn literal_string() {
+fn literal_strings() {
+    let input = r#"
+        winpath  = 'C:\Users\nodejs\templates'
+        winpath2 = '\\ServerX\admin$\system32\'
+        quoted   = 'Tom "Dubs" Preston-Werner'
+        regex    = '<\i\c*\s*>'
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(
+        "C:\\Users\\nodejs\\templates",
+        node.get_key("winpath").as_string_ext()
+    );
+    assert_eq!(
+        "\\\\ServerX\\admin$\\system32\\",
+        node.get_key("winpath2").as_string_ext()
+    );
+    assert_eq!(
+        "Tom \"Dubs\" Preston-Werner",
+        node.get_key("quoted").as_string_ext()
+    );
+    assert_eq!("<\\i\\c*\\s*>", node.get_key("regex").as_string_ext());
+}
+
+#[test]
+fn literal_string2() {
     let input = r#"
         str1 = ' literal string \n \t \u1234'
     "#;
@@ -379,6 +425,17 @@ fn basic_multiline_string_first_crlf() {
 }
 
 #[test]
+fn basic_string_utf8() {
+    let input = r#"
+        str1 = "✅ ❄ ❤ 💖"
+    "#;
+
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("✅ ❄ ❤ 💖", node.get_key("str1").as_string_ext());
+}
+
+#[test]
 fn basic_string_escapes() {
     let input = r#"
         str1 = "\b \t \n \f \r \" \\"
@@ -388,21 +445,6 @@ fn basic_string_escapes() {
 
     assert_eq!(
         "\u{0008} \t \n \u{000c} \r \" \\",
-        node.get_key("str1").as_string_ext()
-    );
-}
-
-
-#[test]
-fn basic_string_utf8() {
-    let input = r#"
-        str1 = "✅ ❄ ❤ 💖"
-    "#;
-
-    let node: NodeRef = parse_node!(input);
-
-    assert_eq!(
-        "✅ ❄ ❤ 💖",
         node.get_key("str1").as_string_ext()
     );
 }
@@ -441,7 +483,7 @@ fn too_short_custom_escape() {
 }
 
 #[test]
-fn basic_string_bad_escape() {
+fn bad_escape() {
     let input = r#"
         str1 = "\h"
     "#;
@@ -501,13 +543,32 @@ fn bare_keys() {
 }
 
 #[test]
-fn no_key_value() {
+fn empty_bare_key() {
     let input = r#"
         = "no key name"
             "#;
     let err: ParseDiag = parse_node_err!(input);
 
     assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
+}
+#[test]
+fn empty_quoted_key() {
+    let input = r#"
+        '' = "no key name"
+            "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("no key name", node.get_key("").as_string_ext());
+}
+
+#[test]
+fn empty_d_quoted_key() {
+    let input = r#"
+        "" = "no key name"
+            "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("no key name", node.get_key("").as_string_ext());
 }
 
 #[test]
@@ -789,12 +850,12 @@ macro_rules! test_mixed(
         }
     )
 );
-
-test_mixed!{mixed_array_types_int, "arr1 = [ 1, 2.0 ]"}
-test_mixed!{mixed_array_types_string, "arr1 = [ \"1\", 2.0 ]"}
-test_mixed!{mixed_array_types_float, "arr1 = [ 1.0, 2 ]"}
-test_mixed!{mixed_array_types_array, "arr1 = [ [1], 2 ]"}
-test_mixed!{mixed_array_types_table, "arr1 = [ {k=\"v\"}, 2 ]"}
+test_mixed! {mixed_array_types_bool, "arr1 = [ true, 2.0 ]"}
+test_mixed! {mixed_array_types_int, "arr1 = [ 1, 2.0 ]"}
+test_mixed! {mixed_array_types_string, "arr1 = [ \"1\", 2.0 ]"}
+test_mixed! {mixed_array_types_float, "arr1 = [ 1.0, 2 ]"}
+test_mixed! {mixed_array_types_array, "arr1 = [ [1], 2 ]"}
+test_mixed! {mixed_array_types_table, "arr1 = [ {k=\"v\"}, 2 ]"}
 
 #[test]
 fn array_unexpected_token() {
@@ -1013,6 +1074,18 @@ fn array_of_inline_tables() {
             .as_int_ext()
     );
 }
+
+#[test]
+fn inline_table_newline() {
+    let input = r#"
+table = { key = "value",
+key2="value2}
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
+}
+
 
 #[test]
 fn inline_table_unexpected_token() {
