@@ -518,10 +518,11 @@ impl Parser {
         let p1 = self.expect_token(r, Terminal::BracketLeft)?.from();
         let mut elems = Elements::new();
         let mut comma = false;
+        let mut bracket_right = true;
         loop {
             let t = self.next_token(r)?;
             match t.term() {
-                Terminal::BracketRight => {
+                Terminal::BracketRight if bracket_right => {
                     let span = Span {
                         from: p1,
                         to: t.to(),
@@ -530,12 +531,14 @@ impl Parser {
                 }
                 Terminal::Comma if comma => {
                     comma = false;
+                    bracket_right = false;
                 }
                 _ if !comma => {
                     self.push_token(t);
                     let value = self.parse_value(r)?;
                     elems.push(value);
                     comma = true;
+                    bracket_right = true;
                 }
                 _ => return ParseErr::unexpected_token(t, r),
             }
