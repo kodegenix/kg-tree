@@ -99,11 +99,12 @@ impl ParseErr {
 
     pub fn invalid_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
+        let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErr::InvalidChar {
-                    input: c,
+                    input: current,
                     from: p1,
                     to: p2
                 }, r, {
@@ -122,7 +123,7 @@ impl ParseErr {
     pub fn invalid_input_one<T>(r: &mut dyn CharReader, expected: char) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
-            Some(c) => {
+            Some(c) => { //TODO MC Unreachable! To remove.
                 let p2 = r.position();
                 parse_diag!(ParseErr::InvalidCharOne {
                     input: c,
@@ -145,11 +146,12 @@ impl ParseErr {
 
     pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
         let p1 = r.position();
+        let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErr::InvalidCharMany {
-                    input: c,
+                    input: current,
                     from: p1,
                     to: p2,
                     expected,

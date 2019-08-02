@@ -289,13 +289,12 @@ fn string_bad_escape() {
     assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
 }
 
-#[test] //FIXME MC
-fn bug_in_parser_where_there_is_wrong_charakcter_selected() {
-
-    let input = "{key}";
+#[test] //FIXME MC Fix parser, error is expected.
+fn control_char_in_string() {
+    let input = "{\"key\": \"val\nue\"}";
     let err: ParseDiag = parse_node_err!(input);
-    eprintln!(" = {}", err);
-//    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+
+    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
 }
 
 #[test]
