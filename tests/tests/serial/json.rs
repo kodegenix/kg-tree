@@ -218,7 +218,7 @@ fn booleans() {
 }
 
 #[test]
-fn strings() { //TODO MC Add \b, \f to parser
+fn strings() {
     let input = r#"{
         "str1": " literal string \n \t \r \t \" \\ \b \f'"
     }"#;
