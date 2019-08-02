@@ -286,7 +286,7 @@ fn brace_right_after_comma() {
     assert_err!(err, JsonParseErrDetail::UnexpectedTokenOne {..});
 }
 
-#[test] //FIXME MC Parser should be fixed.
+#[test]
 fn square_bracket_right_after_comma() {
     let input = r#"{"arr1": [1,]}"#;
 
