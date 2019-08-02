@@ -279,7 +279,7 @@ fn array_mixed_types() {
 
 #[test]
 fn brace_right_after_comma() {
-    let input = r#"{"smt": 1,}"#;
+    let input = r#"{"key": 1,}"#;
 
     let err: ParseDiag = parse_node_err!(input);
 
@@ -289,7 +289,10 @@ fn brace_right_after_comma() {
 #[test] //FIXME MC Error should be expected and parser should be fixed.
 fn square_bracket_right_after_comma() {
     let input = r#"{"arr1": [1,]}"#;
-    let node: NodeRef = parse_node!(input);
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
 }
 
 //#########################################
@@ -311,7 +314,6 @@ fn no_whitespace_after_comma() {
 
 /* TODO MC Tests:
 let input = r#""#;
-let input = r#"{}"#;
 let input = r#"{int: 1}"#;
 let input = r#"{"int":1}"#;
 let input = r#"{"int": 1 , "int2": 2}"#;
