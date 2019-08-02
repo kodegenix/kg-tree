@@ -1,7 +1,7 @@
 use crate::serial::JsonParseErrDetail;
 use crate::serial::JsonParser as Parser;
 use crate::tests::serial::NodeRefExt;
-use kg_diag::MemCharReader;
+use kg_diag::{Diag};
 use kg_tree::NodeRef;
 use kg_diag::ParseDiag;
 
@@ -277,10 +277,13 @@ fn array_mixed_types() {
 
 //#########################################
 
-#[test] //FIXME MC Error should be expected.
+#[test]
 fn brace_right_after_comma() {
     let input = r#"{"smt": 1,}"#;
-    let node: NodeRef = parse_node!(input);
+
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedTokenOne {..});
 }
 
 #[test] //FIXME MC Error should be expected and parser should be fixed.
