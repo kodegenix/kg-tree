@@ -358,7 +358,7 @@ fn is_bare(ch: char) -> bool {
 fn is_non_bare(ch: Option<char>) -> bool {
     match ch {
         Some(c) => !is_bare(c),
-        None => true
+        None => true,
     }
 }
 
@@ -942,12 +942,7 @@ impl Parser {
                         Some(ref child) if child.is_array() => current = child.clone(),
                         Some(ref child) if child.is_object() && !self.is_defined(child) => {}
                         Some(ref child) => {
-                            return ParseErrDetail::key_redefined_node(
-                                r,
-                                token.span(),
-                                child,
-                                &key,
-                            )
+                            return ParseErrDetail::key_redefined_node(r, token.span(), child, &key)
                         }
                         _ => {}
                     }
