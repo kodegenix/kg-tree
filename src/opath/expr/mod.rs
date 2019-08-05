@@ -1930,6 +1930,5 @@ mod tests {
                 NodeSet::Many(vec![NodeRef::string("test"), NodeRef::integer(123)])
             );
         }
-
     }
 }

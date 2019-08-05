@@ -1,9 +1,9 @@
 use crate::serial::JsonParseErrDetail;
 use crate::serial::JsonParser as Parser;
 use crate::tests::serial::NodeRefExt;
-use kg_diag::{Diag};
-use kg_tree::NodeRef;
+use kg_diag::Diag;
 use kg_diag::ParseDiag;
+use kg_tree::NodeRef;
 
 macro_rules! parse_node {
     ($input: expr) => {{
@@ -20,10 +20,10 @@ macro_rules! parse_node_err {
     ($input: expr) => {{
         let mut r = kg_diag::MemCharReader::new($input.as_bytes());
         let mut parser = crate::serial::JsonParser::new();
-        let err = parser.parse(&mut r).map(|node|{
-            panic!("Error expected! got node: {}", node.to_json_pretty())
-        })
-        .unwrap_err();
+        let err = parser
+            .parse(&mut r)
+            .map(|node| panic!("Error expected! got node: {}", node.to_json_pretty()))
+            .unwrap_err();
         err
     }};
 }
@@ -237,10 +237,7 @@ fn string_utf8() {
     }"#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(
-        "✅ ❄ ❤ 💖",
-        node.get_key("str1").as_string_ext()
-    );
+    assert_eq!("✅ ❄ ❤ 💖", node.get_key("str1").as_string_ext());
 }
 
 //FIXME MC UTF-8 as \u0000 should work in json parser
@@ -251,10 +248,7 @@ fn custom_escapes() {
     }"#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(
-        "\\u00f8C",
-        node.get_key("str1").as_string_ext()
-    );
+    assert_eq!("\\u00f8C", node.get_key("str1").as_string_ext());
 }
 
 //FIXME MC UTF-8 as \u0000 should work in json parser
@@ -367,7 +361,8 @@ fn two_words_in_key() {
 }
 
 //#[test]
-fn test() { //FIXME MC Fix parser: add "duplicated keys" error, fix test: error should be expected
+fn test() {
+    //FIXME MC Fix parser: add "duplicated keys" error, fix test: error should be expected
     let input = r#"{
         "key1": "value1",
         "key1": "value2"
@@ -390,9 +385,18 @@ fn arrays() {
     assert_eq!(2, node.get_key("arr1").as_array_ext()[1].as_int_ext());
     assert_eq!(3, node.get_key("arr1").as_array_ext()[2].as_int_ext());
 
-    assert_eq!("red", node.get_key("arr2").as_array_ext()[0].as_string_ext());
-    assert_eq!("yellow", node.get_key("arr2").as_array_ext()[1].as_string_ext());
-    assert_eq!("green", node.get_key("arr2").as_array_ext()[2].as_string_ext());
+    assert_eq!(
+        "red",
+        node.get_key("arr2").as_array_ext()[0].as_string_ext()
+    );
+    assert_eq!(
+        "yellow",
+        node.get_key("arr2").as_array_ext()[1].as_string_ext()
+    );
+    assert_eq!(
+        "green",
+        node.get_key("arr2").as_array_ext()[2].as_string_ext()
+    );
 
     assert_eq!(true, node.get_key("arr3").as_array_ext()[0].as_bool_ext());
     assert_eq!(false, node.get_key("arr3").as_array_ext()[1].as_bool_ext());
@@ -405,11 +409,26 @@ fn array_of_arrays() {
     }"#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(1, node.get_key("arr1").as_array_ext()[0].as_array_ext()[0].as_int_ext());
-    assert_eq!(2, node.get_key("arr1").as_array_ext()[0].as_array_ext()[1].as_int_ext());
-    assert_eq!(3, node.get_key("arr1").as_array_ext()[1].as_array_ext()[0].as_int_ext());
-    assert_eq!(4, node.get_key("arr1").as_array_ext()[1].as_array_ext()[1].as_int_ext());
-    assert_eq!(5, node.get_key("arr1").as_array_ext()[1].as_array_ext()[2].as_int_ext());
+    assert_eq!(
+        1,
+        node.get_key("arr1").as_array_ext()[0].as_array_ext()[0].as_int_ext()
+    );
+    assert_eq!(
+        2,
+        node.get_key("arr1").as_array_ext()[0].as_array_ext()[1].as_int_ext()
+    );
+    assert_eq!(
+        3,
+        node.get_key("arr1").as_array_ext()[1].as_array_ext()[0].as_int_ext()
+    );
+    assert_eq!(
+        4,
+        node.get_key("arr1").as_array_ext()[1].as_array_ext()[1].as_int_ext()
+    );
+    assert_eq!(
+        5,
+        node.get_key("arr1").as_array_ext()[1].as_array_ext()[2].as_int_ext()
+    );
 }
 
 #[test]
@@ -423,17 +442,35 @@ fn array_mixed_types() {
     }"#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!(1, node.get_key("arr1").as_array_ext()[0].as_array_ext()[0].as_int_ext());
-    assert_eq!(2, node.get_key("arr1").as_array_ext()[0].as_array_ext()[1].as_int_ext());
-    assert_eq!("a", node.get_key("arr1").as_array_ext()[1].as_array_ext()[0].as_string_ext());
-    assert_eq!("b", node.get_key("arr1").as_array_ext()[1].as_array_ext()[1].as_string_ext());
-    assert_eq!("c", node.get_key("arr1").as_array_ext()[1].as_array_ext()[2].as_string_ext());
+    assert_eq!(
+        1,
+        node.get_key("arr1").as_array_ext()[0].as_array_ext()[0].as_int_ext()
+    );
+    assert_eq!(
+        2,
+        node.get_key("arr1").as_array_ext()[0].as_array_ext()[1].as_int_ext()
+    );
+    assert_eq!(
+        "a",
+        node.get_key("arr1").as_array_ext()[1].as_array_ext()[0].as_string_ext()
+    );
+    assert_eq!(
+        "b",
+        node.get_key("arr1").as_array_ext()[1].as_array_ext()[1].as_string_ext()
+    );
+    assert_eq!(
+        "c",
+        node.get_key("arr1").as_array_ext()[1].as_array_ext()[2].as_string_ext()
+    );
 
     assert_eq!(1, node.get_key("arr2").as_array_ext()[0].as_int_ext());
     assert_eq!(2.0, node.get_key("arr2").as_array_ext()[1].as_float_ext());
 
     assert_eq!(1, node.get_key("arr3").as_array_ext()[0].as_int_ext());
-    assert_eq!("string", node.get_key("arr3").as_array_ext()[1].as_string_ext());
+    assert_eq!(
+        "string",
+        node.get_key("arr3").as_array_ext()[1].as_string_ext()
+    );
 
     assert_eq!(1, node.get_key("arr4").as_array_ext()[0].as_int_ext());
     assert!(node.get_key("arr4").as_array_ext()[1].is_null());
@@ -482,12 +519,19 @@ fn values_in_object() {
     }"#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("string", node.get_key("ob1").get_key("key1").as_string_ext());
+    assert_eq!(
+        "string",
+        node.get_key("ob1").get_key("key1").as_string_ext()
+    );
     assert_eq!(74, node.get_key("ob1").get_key("key2").as_int_ext());
     assert_eq!(true, node.get_key("ob1").get_key("key3").as_bool_ext());
     assert!(node.get_key("ob1").get_key("key4").is_null());
     assert_eq!(3.37e12, node.get_key("ob1").get_key("key5").as_float_ext());
-    assert!(node.get_key("ob1").get_key("key6").as_array_ext().is_empty());
+    assert!(node
+        .get_key("ob1")
+        .get_key("key6")
+        .as_array_ext()
+        .is_empty());
     assert!(node.get_key("ob1").get_key("key7").is_empty_ext());
 }
 
@@ -505,10 +549,16 @@ fn multiple_objects() {
     }"#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("first string", node.get_key("ob1").get_key("key1").as_string_ext());
+    assert_eq!(
+        "first string",
+        node.get_key("ob1").get_key("key1").as_string_ext()
+    );
     assert_eq!(936, node.get_key("ob1").get_key("key2").as_int_ext());
 
-    assert_eq!("second string", node.get_key("ob2").get_key("key1").as_string_ext());
+    assert_eq!(
+        "second string",
+        node.get_key("ob2").get_key("key1").as_string_ext()
+    );
     assert_eq!(375, node.get_key("ob2").get_key("key2").as_int_ext());
 }
 
@@ -524,7 +574,13 @@ fn object_in_object() {
     }"#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("value", node.get_key("ob1").get_key("ob2").get_key("key").as_string_ext());
+    assert_eq!(
+        "value",
+        node.get_key("ob1")
+            .get_key("ob2")
+            .get_key("key")
+            .as_string_ext()
+    );
 }
 
 #[test]
@@ -541,8 +597,18 @@ fn objects_in_array() {
     }"#;
     let node: NodeRef = parse_node!(input);
 
-    assert_eq!("value1", node.get_key("arr").as_array_ext()[0].get_key("key").as_string_ext());
-    assert_eq!("value2", node.get_key("arr").as_array_ext()[1].get_key("key").as_string_ext());
+    assert_eq!(
+        "value1",
+        node.get_key("arr").as_array_ext()[0]
+            .get_key("key")
+            .as_string_ext()
+    );
+    assert_eq!(
+        "value2",
+        node.get_key("arr").as_array_ext()[1]
+            .get_key("key")
+            .as_string_ext()
+    );
 }
 
 #[test]

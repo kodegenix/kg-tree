@@ -1,8 +1,8 @@
 use crate::serial::TomlParseErrDetail;
 use crate::tests::serial::NodeRefExt;
 use kg_diag::Diag;
-use kg_tree::NodeRef;
 use kg_diag::ParseDiag;
+use kg_tree::NodeRef;
 
 macro_rules! parse_node {
     ($input: expr) => {{
@@ -1085,7 +1085,6 @@ key2="value2}
 
     assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
 }
-
 
 #[test]
 fn inline_table_unexpected_token() {

@@ -123,7 +123,8 @@ impl ParseErr {
     pub fn invalid_input_one<T>(r: &mut dyn CharReader, expected: char) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
-            Some(c) => { //TODO MC Unreachable! To remove.
+            Some(c) => {
+                //TODO MC Unreachable! To remove.
                 let p2 = r.position();
                 parse_diag!(ParseErr::InvalidCharOne {
                     input: c,
@@ -489,12 +490,8 @@ impl Parser {
                     comma = true;
                     literal = false;
                 }
-                _ if !literal && !comma=> {
-                    return ParseErr::unexpected_token_one(
-                        t,
-                        Terminal::Literal,
-                        r,
-                    )
+                _ if !literal && !comma => {
+                    return ParseErr::unexpected_token_one(t, Terminal::Literal, r)
                 }
                 _ => {
                     return ParseErr::unexpected_token_many(
@@ -578,5 +575,4 @@ impl Default for Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
-
 }
