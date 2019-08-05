@@ -8,8 +8,6 @@ mod de;
 mod error;
 mod fmt;
 mod ser;
-pub use crate::serial::toml::*;
-pub use crate::serial::json::*;
 
 pub mod json {
     use super::*;

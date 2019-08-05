@@ -146,7 +146,7 @@ impl NodeRef {
     }
 
     pub fn from_json(s: &str) -> Result<NodeRef, ParseDiag> {
-        let mut parser = serial::JsonParser::new();
+        let mut parser = serial::json::JsonParser::new();
         let mut r = MemCharReader::new(s.as_bytes());
         parser.parse(&mut r)
     }
@@ -160,7 +160,7 @@ impl NodeRef {
     }
 
     pub fn from_toml(s: &str) -> Result<NodeRef, ParseDiag> {
-        let mut parser = serial::TomlParser::new();
+        let mut parser = serial::toml::TomlParser::new();
         let mut r = MemCharReader::new(s.as_bytes());
         parser.parse(&mut r)
     }
