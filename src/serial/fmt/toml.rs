@@ -110,7 +110,7 @@ impl ParseErrDetail {
         let p1 = r.position();
         let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
-            Some(c) => {
+            Some(_c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErrDetail::InvalidChar {
                     input: current,
@@ -157,7 +157,7 @@ impl ParseErrDetail {
         let p1 = r.position();
         let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
-            Some(c) => {
+            Some(_c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErrDetail::InvalidCharMany {
                     input: current,
