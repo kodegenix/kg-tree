@@ -289,7 +289,7 @@ fn string_bad_escape() {
     assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
 }
 
-#[test] //FIXME MC Fix parser, error is expected.
+//#[test] //FIXME MC Fix parser, error is expected.
 fn control_char_in_string() {
     let input = "{\"key\": \"val\nue\"}";
     let err: ParseDiag = parse_node_err!(input);
@@ -298,7 +298,17 @@ fn control_char_in_string() {
 }
 
 #[test]
-fn symbol_in_key() {
+fn empty_key() {
+    let input = r#"{
+        "": "no key name"
+    }"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("no key name", node.get_key("").as_string_ext());
+}
+
+#[test]
+fn different_keys() {
     let input = r#"{
         "⌨": "value1",
         "127.0.0.1": "value2",
@@ -313,6 +323,58 @@ fn symbol_in_key() {
     assert_eq!("value3", node.get_key("character encoding").as_string_ext());
     assert_eq!("value4", node.get_key("ʎǝʞ").as_string_ext());
     assert_eq!("value5", node.get_key("'key'").as_string_ext());
+}
+
+#[test]
+fn no_colon() {
+    let input = r#"{
+        "key" "no colon"
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedTokenOne {..});
+}
+
+#[test]
+fn unexpected_token_after_key() {
+    let input = r#"{
+        "key": ,
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
+}
+
+//#[test] //FIXME MC Fix parser, error is expected.
+fn control_char_in_key() {
+    let input = r#"{
+        "ke
+        y": "value"
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
+}
+
+#[test]
+fn two_words_in_key() {
+    let input = r#"{
+        "two words": "value"
+    }"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("value", node.get_key("two words").as_string_ext());
+}
+
+//#[test]
+fn test() { //FIXME MC Fix parser: add "duplicated keys" error, fix test: error should be expected
+    let input = r#"{
+        "key1": "value1",
+        "key1": "value2"
+    }"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("value1", node.get_key("key1").as_string_ext());
 }
 
 #[test]
@@ -388,6 +450,109 @@ fn array_unexpected_token() {
     let err: ParseDiag = parse_node_err!(input);
 
     assert_err!(err, JsonParseErrDetail::UnexpectedToken {..});
+}
+
+#[test]
+fn array_newline() {
+    let input = r#"{
+        "arr1": [
+        1,
+        2,
+        3 ]
+    }"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(1, node.get_key("arr1").as_array_ext()[0].as_int_ext());
+    assert_eq!(2, node.get_key("arr1").as_array_ext()[1].as_int_ext());
+    assert_eq!(3, node.get_key("arr1").as_array_ext()[2].as_int_ext());
+}
+
+#[test]
+fn values_in_object() {
+    let input = r#"{
+        "ob1": {
+            "key1": "string",
+            "key2": 74,
+            "key3": true,
+            "key4": null,
+            "key5": 3.37e+12,
+            "key6": [],
+            "key7": {}
+        }
+    }"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("string", node.get_key("ob1").get_key("key1").as_string_ext());
+    assert_eq!(74, node.get_key("ob1").get_key("key2").as_int_ext());
+    assert_eq!(true, node.get_key("ob1").get_key("key3").as_bool_ext());
+    assert!(node.get_key("ob1").get_key("key4").is_null());
+    assert_eq!(3.37e12, node.get_key("ob1").get_key("key5").as_float_ext());
+    assert!(node.get_key("ob1").get_key("key6").as_array_ext().is_empty());
+    assert!(node.get_key("ob1").get_key("key7").is_empty_ext());
+}
+
+#[test]
+fn multiple_objects() {
+    let input = r#"{
+        "ob1": {
+            "key1": "first string",
+            "key2": 936
+        },
+        "ob2": {
+            "key1": "second string",
+            "key2": 375
+        }
+    }"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("first string", node.get_key("ob1").get_key("key1").as_string_ext());
+    assert_eq!(936, node.get_key("ob1").get_key("key2").as_int_ext());
+
+    assert_eq!("second string", node.get_key("ob2").get_key("key1").as_string_ext());
+    assert_eq!(375, node.get_key("ob2").get_key("key2").as_int_ext());
+}
+
+#[test]
+fn object_in_object() {
+    let input = r#"{
+        "ob1": {
+            "ob2": {
+                "key": "value"
+            }
+        }
+
+    }"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("value", node.get_key("ob1").get_key("ob2").get_key("key").as_string_ext());
+}
+
+#[test]
+fn objects_in_array() {
+    let input = r#"{
+        "arr": [
+            {
+                "key": "value1"
+            },
+            {
+                "key": "value2"
+            }
+        ]
+    }"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("value1", node.get_key("arr").as_array_ext()[0].get_key("key").as_string_ext());
+    assert_eq!("value2", node.get_key("arr").as_array_ext()[1].get_key("key").as_string_ext());
+}
+
+#[test]
+fn object_with_unexpected_token() {
+    let input = r#"{
+        "ob": {"key": "value":}
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
 }
 
 //#########################################

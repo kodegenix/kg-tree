@@ -489,7 +489,7 @@ impl Parser {
                     comma = true;
                     literal = false;
                 }
-                _ if !literal => {
+                _ if !literal && !comma=> {
                     return ParseErr::unexpected_token_one(
                         t,
                         Terminal::Literal,
