@@ -110,7 +110,7 @@ impl ParseErrDetail {
         let p1 = r.position();
         let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
-            Some(c) => {
+            Some(_c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErrDetail::InvalidChar {
                     input: current,
@@ -157,7 +157,7 @@ impl ParseErrDetail {
         let p1 = r.position();
         let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
-            Some(c) => {
+            Some(_c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErrDetail::InvalidCharMany {
                     input: current,
@@ -355,6 +355,13 @@ fn is_bare(ch: char) -> bool {
         || ch == '_'
 }
 
+fn is_non_bare(ch: Option<char>) -> bool {
+    match ch {
+        Some(c) => !is_bare(c),
+        None => true,
+    }
+}
+
 fn is_hex_char(ch: char) -> bool {
     ('A' <= ch && ch <= 'F') || ('a' <= ch && ch <= 'f') || ('0' <= ch && ch <= '9')
 }
@@ -435,7 +442,11 @@ fn check_eol(r: &mut dyn CharReader, multiline: bool) -> Result<(), Error> {
 pub struct Parser {
     token_queue: VecDeque<Token>,
     buf: String,
+    /// Statically defined arrays
     static_arrays: Vec<NodeRef>,
+    /// Nodes that cannot be defined again
+    /// but can be used in dotted keys
+    defined_nodes: Vec<NodeRef>,
 }
 
 impl Parser {
@@ -444,6 +455,7 @@ impl Parser {
             token_queue: VecDeque::new(),
             buf: String::new(),
             static_arrays: vec![],
+            defined_nodes: vec![],
         }
     }
 
@@ -567,28 +579,28 @@ impl Parser {
                 }
             }
             Some('i') => {
-                if r.match_str_term("inf", &is_non_alphanumeric)? {
+                if r.match_str_term("inf", &is_non_bare)? {
                     consume(r, 3, Terminal::Float)
                 } else {
                     consume_bare_key(r)
                 }
             }
             Some('n') => {
-                if r.match_str_term("nan", &is_non_alphanumeric)? {
+                if r.match_str_term("nan", &is_non_bare)? {
                     consume(r, 3, Terminal::Float)
                 } else {
                     consume_bare_key(r)
                 }
             }
             Some('t') => {
-                if r.match_str_term("true", &is_non_alphanumeric)? {
+                if r.match_str_term("true", &is_non_bare)? {
                     consume(r, 4, Terminal::True)
                 } else {
                     consume_bare_key(r)
                 }
             }
             Some('f') => {
-                if r.match_str_term("false", &is_non_alphanumeric)? {
+                if r.match_str_term("false", &is_non_bare)? {
                     consume(r, 5, Terminal::False)
                 } else {
                     consume_bare_key(r)
@@ -822,7 +834,9 @@ impl Parser {
                     } else {
                         self.push_token(t);
                         self.push_token(next);
-                        current = self.parse_table(r, parent)?;
+                        let node = self.parse_table(r, parent)?;
+                        self.defined_nodes.push(node.clone());
+                        current = node;
                     }
                 }
                 Terminal::Newline => {}
@@ -924,22 +938,15 @@ impl Parser {
                     continue;
                 }
                 _ => {
-                    if let Some(child) = current.get_child_key(&key) {
-                        if child.is_array() {
-                            current = child;
-                        } else {
-                            return ParseErrDetail::key_redefined_node(
-                                r,
-                                token.span(),
-                                &child,
-                                &key,
-                            );
+                    match current.get_child_key(&key) {
+                        Some(ref child) if child.is_array() => current = child.clone(),
+                        Some(ref child) if child.is_object() && !self.is_defined(child) => {}
+                        Some(ref child) => {
+                            return ParseErrDetail::key_redefined_node(r, token.span(), child, &key)
                         }
+                        _ => {}
                     }
-
                     self.push_token(next);
-
-                    // TODO hashset
                     return Ok((current.clone(), key));
                 }
             }
@@ -950,6 +957,7 @@ impl Parser {
         let (node, key) = self.parse_key(r, parent)?;
         self.expect_token(r, Terminal::Equals)?;
         let val = self.parse_value(r, parent)?;
+        self.defined_nodes.push(val.clone());
         node.add_child(None, Some(key.into()), val).unwrap();
         let next = self.next_token(r)?;
 
@@ -1032,10 +1040,14 @@ impl Parser {
             return ParseErrDetail::key_redefined_node(r, Span::with_pos(from, to), &node, &key);
         }
 
-        let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
-        node.add_child(None, Some(key.into()), table.clone())
-            .unwrap();
-        Ok(table)
+        if let Some(existing) = node.get_child_key(&key) {
+            return Ok(existing);
+        } else {
+            let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
+            node.add_child(None, Some(key.into()), table.clone())
+                .unwrap();
+            Ok(table)
+        }
     }
 
     fn parse_inline_table(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
@@ -1245,6 +1257,7 @@ impl Parser {
                 }
             }
         }
+        // trim quotes
         self.buf.pop();
         if multiline {
             self.buf.pop();
@@ -1258,6 +1271,11 @@ impl Parser {
     fn is_static_array(&self, node: &NodeRef) -> bool {
         let static_array = self.static_arrays.iter().find(|n| n.is_ref_eq(&node));
         static_array.is_some()
+    }
+
+    fn is_defined(&self, node: &NodeRef) -> bool {
+        let defined = self.defined_nodes.iter().find(|n| n.is_ref_eq(&node));
+        defined.is_some()
     }
 }
 
@@ -1408,6 +1426,15 @@ mod tests {
             let input: &str = r#"true"#;
 
             let terms = vec![Terminal::True, Terminal::End];
+
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn false_token() {
+            let input: &str = r#"false"#;
+
+            let terms = vec![Terminal::False, Terminal::End];
 
             assert_terms!(input, terms);
         }

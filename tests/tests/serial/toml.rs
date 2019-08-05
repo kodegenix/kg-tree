@@ -551,6 +551,7 @@ fn empty_bare_key() {
 
     assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
 }
+
 #[test]
 fn empty_quoted_key() {
     let input = r#"
@@ -569,6 +570,50 @@ fn empty_d_quoted_key() {
     let node: NodeRef = parse_node!(input);
 
     assert_eq!("no key name", node.get_key("").as_string_ext());
+}
+
+#[test]
+fn key_starts_with_boolean() {
+    let input = r#"
+        true1a = "starts with bool"
+        true_1a = "starts with bool"
+        true-1a = "starts with bool"
+
+        false1a = "starts with bool"
+        false_1a = "starts with bool"
+        false-1a = "starts with bool"
+            "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("starts with bool", node.get_key("true1a").as_string_ext());
+    assert_eq!("starts with bool", node.get_key("true_1a").as_string_ext());
+    assert_eq!("starts with bool", node.get_key("true-1a").as_string_ext());
+
+    assert_eq!("starts with bool", node.get_key("false1a").as_string_ext());
+    assert_eq!("starts with bool", node.get_key("false_1a").as_string_ext());
+    assert_eq!("starts with bool", node.get_key("false-1a").as_string_ext());
+}
+
+#[test]
+fn key_starts_with_special_float() {
+    let input = r#"
+        nan1a = "starts with nan"
+        nan_1a = "starts with nan"
+        nan-1a = "starts with nan"
+
+        inf1a = "starts with inf"
+        inf_1a = "starts with inf"
+        inf-1a = "starts with inf"
+            "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("starts with nan", node.get_key("nan1a").as_string_ext());
+    assert_eq!("starts with nan", node.get_key("nan_1a").as_string_ext());
+    assert_eq!("starts with nan", node.get_key("nan-1a").as_string_ext());
+
+    assert_eq!("starts with inf", node.get_key("inf1a").as_string_ext());
+    assert_eq!("starts with inf", node.get_key("inf_1a").as_string_ext());
+    assert_eq!("starts with inf", node.get_key("inf-1a").as_string_ext());
 }
 
 #[test]
@@ -959,6 +1004,37 @@ fn table_dotted_key() {
             .get_key("name")
             .as_string_ext()
     );
+}
+
+#[test]
+fn define_super_table_afterwards() {
+    let input = r#"
+        [x.y.z.w]
+
+        [x]
+        key = "val"
+
+        [x.y]
+        key2 = "val2"
+    "#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("val", node.get_key("x").get_key("key").as_string_ext());
+
+    assert_eq!(
+        "val2",
+        node.get_key("x")
+            .get_key("y")
+            .get_key("key2")
+            .as_string_ext()
+    );
+
+    assert!(node
+        .get_key("x")
+        .get_key("y")
+        .get_key("z")
+        .get_key("w")
+        .is_empty_ext());
 }
 
 #[test]
