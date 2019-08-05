@@ -1,6 +1,6 @@
 [package]
 name = "kg-tree"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Jakub Chłapiński <jakub.chlapinski@kodegenix.pl>"]
 description = """
 Generic object tree with Opath query language, similar to XPath.
