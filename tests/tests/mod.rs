@@ -9,3 +9,4 @@ mod convert;
 mod math_ops;
 mod number_ranges;
 mod prop_access;
+mod serial;

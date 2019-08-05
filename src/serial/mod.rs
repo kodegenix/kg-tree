@@ -4,10 +4,13 @@ pub use self::de::from_tree;
 pub use self::error::Error;
 pub use self::ser::to_tree;
 
-mod error;
-mod ser;
 mod de;
+mod error;
 mod fmt;
+mod ser;
+pub use fmt::json::Parser as JsonParser;
+pub use fmt::toml::ParseErrDetail as TomlParseErrDetail;
+pub use fmt::toml::Parser as TomlParser;
 
 #[cfg(test)]
 mod tests {

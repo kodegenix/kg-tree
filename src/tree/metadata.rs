@@ -230,7 +230,7 @@ impl Metadata {
         self.span = span.map(|s| Box::new(s));
     }
 
-    pub (super) fn detach(&mut self) {
+    pub(super) fn detach(&mut self) {
         self.parent = None;
         self.index = 0;
         self.key = Symbol::default();

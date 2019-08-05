@@ -218,7 +218,6 @@ impl NodeRef {
 
     //FIXME (jc) error handling
     pub fn from_file(file_path: &Path, format: Option<FileFormat>) -> TreeResult<NodeRef> {
-
         let file_path_ = if file_path.is_absolute() {
             fs::canonicalize(file_path)?
         } else {
@@ -235,11 +234,8 @@ impl NodeRef {
         let mut s = String::new();
         fs::read_to_string(&file_path, &mut s)?;
         let n = NodeRef::from_str(s.into(), format)?;
-        n.data_mut().set_file(Some(&FileInfo::new(
-            &file_path_,
-            FileType::File,
-            format,
-        )));
+        n.data_mut()
+            .set_file(Some(&FileInfo::new(&file_path_, FileType::File, format)));
         Ok(n)
     }
 
@@ -860,19 +856,19 @@ impl NodeRef {
         }
     }
 
-    pub (crate) fn with_span(self, span: Span) -> NodeRef {
+    pub fn with_span(self, span: Span) -> NodeRef {
         self.data_mut().metadata_mut().set_span(Some(span));
         self
     }
 
-    pub (crate) fn set_span_from(&self, from: Position) {
+    pub(crate) fn set_span_from(&self, from: Position) {
         let mut d = self.data_mut();
         let mut s = d.metadata_mut().span().unwrap_or_default();
         s.from = from;
         d.metadata_mut().set_span(Some(s));
     }
 
-    pub (crate) fn set_span_to(&self, to: Position) {
+    pub(crate) fn set_span_to(&self, to: Position) {
         let mut d = self.data_mut();
         let mut s = d.metadata_mut().span().unwrap_or_default();
         s.to = to;

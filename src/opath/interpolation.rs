@@ -335,7 +335,10 @@ mod tests {
         let interp = Interpolation::parse(s.into()).unwrap();
 
         assert!(interp.is_simple());
-        assert_eq!(interp.resolve(&n, &n).unwrap().unwrap().as_string(), "test <%> test");
+        assert_eq!(
+            interp.resolve(&n, &n).unwrap().unwrap().as_string(),
+            "test <%> test"
+        );
     }
 
     #[test]
@@ -360,7 +363,10 @@ mod tests {
         let interp = Interpolation::parse(s.into()).unwrap();
 
         assert!(interp.is_expr());
-        assert_eq!(interp.resolve(&n, &n).unwrap().unwrap().as_string(), "johnny");
+        assert_eq!(
+            interp.resolve(&n, &n).unwrap().unwrap().as_string(),
+            "johnny"
+        );
     }
 
     #[test]

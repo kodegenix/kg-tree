@@ -1,8 +1,8 @@
 use super::*;
 
-mod json;
-mod toml;
-mod yaml;
+pub mod json;
+pub mod toml;
+pub mod yaml;
 
 #[inline]
 fn is_non_alphanumeric(c: Option<char>) -> bool {

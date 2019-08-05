@@ -233,20 +233,24 @@ impl<'a> Args<'a> {
             }
         } else if min < max {
             if count < min || count > max {
-                return Err(basic_diag!(FuncCallErrorDetail::FuncCallInvalidArgCountRange {
-                    id: id.clone(),
-                    required_min: min,
-                    required_max: max,
-                    supplied: count
-                }));
+                return Err(basic_diag!(
+                    FuncCallErrorDetail::FuncCallInvalidArgCountRange {
+                        id: id.clone(),
+                        required_min: min,
+                        required_max: max,
+                        supplied: count
+                    }
+                ));
             }
         } else {
             if count < min {
-                return Err(basic_diag!(FuncCallErrorDetail::FuncCallInvalidArgCountMin {
-                    id: id.clone(),
-                    required_min: min,
-                    supplied: count
-                }));
+                return Err(basic_diag!(
+                    FuncCallErrorDetail::FuncCallInvalidArgCountMin {
+                        id: id.clone(),
+                        required_min: min,
+                        supplied: count
+                    }
+                ));
             }
         }
         Ok(())
@@ -262,31 +266,37 @@ impl<'a> Args<'a> {
         let count = self.count() as u32;
         if min == max {
             if count != min {
-                return Err(basic_diag!(FuncCallErrorDetail::MethodCallInvalidArgCount {
-                    id: id.clone(),
-                    kind,
-                    required: min,
-                    supplied: count
-                }));
+                return Err(basic_diag!(
+                    FuncCallErrorDetail::MethodCallInvalidArgCount {
+                        id: id.clone(),
+                        kind,
+                        required: min,
+                        supplied: count
+                    }
+                ));
             }
         } else if min < max {
             if count < min || count > max {
-                return Err(basic_diag!(FuncCallErrorDetail::MethodCallInvalidArgCountRange {
-                    id: id.clone(),
-                    kind,
-                    required_min: min,
-                    required_max: max,
-                    supplied: count
-                }));
+                return Err(basic_diag!(
+                    FuncCallErrorDetail::MethodCallInvalidArgCountRange {
+                        id: id.clone(),
+                        kind,
+                        required_min: min,
+                        required_max: max,
+                        supplied: count
+                    }
+                ));
             }
         } else {
             if count < min {
-                return Err(basic_diag!(FuncCallErrorDetail::MethodCallInvalidArgCountMin {
-                    id: id.clone(),
-                    kind,
-                    required_min: min,
-                    supplied: count
-                }));
+                return Err(basic_diag!(
+                    FuncCallErrorDetail::MethodCallInvalidArgCountMin {
+                        id: id.clone(),
+                        kind,
+                        required_min: min,
+                        supplied: count
+                    }
+                ));
             }
         }
         Ok(())
@@ -1334,62 +1344,6 @@ mod tests {
             }
         }
     "#;
-
-    mod diags_example {
-        use super::*;
-
-        #[derive(Debug, Display, Detail)]
-        #[diag(code_offset = 800)]
-        pub enum TestErr {
-            #[display(fmt = "unknown function '{name}'")]
-            PlainErr { name: String },
-            #[display(fmt = "TestErr2 occured: {det}", det = "err.detail()")]
-            TestErr2 { err: Box<dyn Diag> },
-        }
-
-        #[derive(Debug, Display, Detail)]
-        #[diag(code_offset = 900)]
-        pub enum TestErr2 {
-            #[display(fmt = "Another plain error '{name}'")]
-            AnotherPlainErr { name: String },
-            #[display(fmt = "TestERR: {detail}", detail = "err.detail()")]
-            TestErr { err: Box<dyn Diag> },
-        }
-
-        fn test_err() -> Result<(), BasicDiag> {
-            match test_err2() {
-                Ok(_) => panic!(),
-                Err(err) => {
-                    let detail = TestErr::TestErr2 { err: Box::new(err) };
-                    Err(BasicDiag::from(detail))
-                }
-            }
-        }
-
-        fn test_err2() -> Result<(), BasicDiag> {
-            let detail = TestErr2::AnotherPlainErr {
-                name: "inner".to_string(),
-            };
-            Err(BasicDiag::from(detail))
-        }
-
-        #[test]
-        fn test_diag() {
-            let res = test_err();
-            println!("{}", res.unwrap_err());
-        }
-
-        #[test]
-        fn errors_test() {
-            let n = NodeRef::from_json(r#"{}"#).unwrap();
-
-            let expr = Opath::parse("parse('{\"aaaa\":-}', 'json')").unwrap();
-            let mut res = expr.apply(&n, &n).unwrap();
-            eprintln!("res = {:?}", res);
-        }
-
-    }
-
     fn test_node<'a>() -> NodeRef {
         NodeRef::from_json(TEST_JSON).unwrap()
     }
@@ -1482,7 +1436,9 @@ mod tests {
             let a = vec![expr("$.**"), expr("'str'"), expr("1..10")];
             let args = Args::new(&a);
 
-            let values = args.resolve_rows_null(false, None, Env::new(&n, &n, None)).unwrap();
+            let values = args
+                .resolve_rows_null(false, None, Env::new(&n, &n, None))
+                .unwrap();
             assert_eq!(values.len(), 10);
             assert_eq!(values[0].len(), 3);
             assert_eq!(values[1].len(), 3);
@@ -1510,7 +1466,9 @@ mod tests {
             let a = vec![expr("$.**"), expr("'str'"), expr("1..10")];
             let args = Args::new(&a);
 
-            let values = args.resolve_rows_null(true, None, Env::new(&n, &n, None)).unwrap();
+            let values = args
+                .resolve_rows_null(true, None, Env::new(&n, &n, None))
+                .unwrap();
 
             assert_eq!(values.len(), 10);
             assert_eq!(values[0].len(), 3);
