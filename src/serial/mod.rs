@@ -13,6 +13,11 @@ pub use fmt::json::Parser as JsonParser;
 pub use fmt::toml::ParseErrDetail as TomlParseErrDetail;
 pub use fmt::toml::Parser as TomlParser;
 
+pub mod json {
+    use super::*;
+    pub use fmt::json::Terminal;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

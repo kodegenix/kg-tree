@@ -4,6 +4,7 @@ use crate::tests::serial::NodeRefExt;
 use kg_diag::Diag;
 use kg_diag::ParseDiag;
 use kg_tree::NodeRef;
+use kg_tree::serial::json::*;
 
 macro_rules! parse_node {
     ($input: expr) => {{
@@ -619,6 +620,19 @@ fn object_with_unexpected_token() {
     let err: ParseDiag = parse_node_err!(input);
 
     assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
+
+    let detail = err
+        .detail()
+        .downcast_ref::<JsonParseErrDetail>()
+        .expect("cannot downcast to JsonParseErrDetail");
+
+    match detail {
+        JsonParseErrDetail::UnexpectedTokenMany { expected, ..} => {
+            assert_eq!(Terminal::Comma, expected[0]);
+            assert_eq!(Terminal::BraceRight, expected[1]);
+        }
+        err => panic!("Unexpected error type {:?}", err),
+    }
 }
 
 //#########################################
