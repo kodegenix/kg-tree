@@ -819,7 +819,6 @@ impl Parser {
                     multiline,
                 } => {
                     if multiline {
-                        // FIXME better error
                         return ParseErrDetail::multiline_key(t, r);
                     }
                     self.push_token(t);

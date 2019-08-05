@@ -1,5 +1,4 @@
-use crate::serial::JsonParseErrDetail;
-use crate::serial::JsonParser as Parser;
+use crate::serial::json::JsonParseErrDetail;
 use crate::tests::serial::NodeRefExt;
 use kg_diag::Diag;
 use kg_diag::ParseDiag;
@@ -9,7 +8,7 @@ use kg_tree::serial::json::*;
 macro_rules! parse_node {
     ($input: expr) => {{
         let mut r = kg_diag::MemCharReader::new($input.as_bytes());
-        let mut parser = crate::serial::JsonParser::new();
+        let mut parser = crate::serial::json::JsonParser::new();
         parser.parse(&mut r).unwrap_or_else(|err| {
             eprintln!("{}", err);
             panic!("Error parsing node!")
@@ -20,7 +19,7 @@ macro_rules! parse_node {
 macro_rules! parse_node_err {
     ($input: expr) => {{
         let mut r = kg_diag::MemCharReader::new($input.as_bytes());
-        let mut parser = crate::serial::JsonParser::new();
+        let mut parser = crate::serial::json::JsonParser::new();
         let err = parser
             .parse(&mut r)
             .map(|node| panic!("Error expected! got node: {}", node.to_json_pretty()))
