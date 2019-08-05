@@ -42,6 +42,11 @@ pub enum TreeErrorDetail {
     )]
     NonUtf8Node { err: Utf8Error },
 
+    #[display(
+        fmt = "cannot deserialize node: {err}"
+    )]
+    DeserializationErr { err: ParseDiag },
+
     //FIXME ws to be removed
     #[display(fmt = "Error in line '{a0}'")]
     Undef(u32),
@@ -140,48 +145,37 @@ impl NodeRef {
         serial::to_tree(&value)
     }
 
-    pub fn from_json(s: &str) -> Result<NodeRef, serde_json::Error> {
-        serde_json::from_str(s)
+    pub fn from_json(s: &str) -> Result<NodeRef, ParseDiag> {
+        let mut parser = serial::JsonParser::new();
+        let mut r = MemCharReader::new(s.as_bytes());
+        parser.parse(&mut r)
     }
 
-    pub fn from_yaml(s: &str) -> Result<NodeRef, serde_yaml::Error> {
-        serde_yaml::from_str(s)
+    pub fn from_yaml(s: &str) -> Result<NodeRef, ParseDiag> {
+        // TODO use custom implementation from kg_tree
+        serde_yaml::from_str(s).map_err(|err| {
+            println!("{}", err);
+            panic!("Error deserializing Node from yaml")
+        })
     }
 
-    pub fn from_toml(s: &str) -> Result<NodeRef, toml::de::Error> {
-        toml::from_str(s)
+    pub fn from_toml(s: &str) -> Result<NodeRef, ParseDiag> {
+        let mut parser = serial::TomlParser::new();
+        let mut r = MemCharReader::new(s.as_bytes());
+        parser.parse(&mut r)
     }
 
-    //FIXME (jc) error handling
     pub fn from_str(s: Cow<'_, str>, format: FileFormat) -> TreeResult<NodeRef> {
-        match format {
-            FileFormat::Json => match NodeRef::from_json(&s) {
-                Ok(n) => Ok(n),
-                Err(err) => {
-                    println!("{}", err);
-                    Err(TreeErrorDetail::Undef(line!()).into())
-                }
-            },
-            FileFormat::Yaml => match NodeRef::from_yaml(&s) {
-                Ok(n) => Ok(n),
-                Err(err) => {
-                    println!("{}", err);
-                    Err(TreeErrorDetail::Undef(line!()).into())
-                }
-            },
-            FileFormat::Toml => match NodeRef::from_toml(&s) {
-                Ok(n) => Ok(n),
-                Err(err) => {
-                    println!("{}", err);
-                    Err(TreeErrorDetail::Undef(line!()).into())
-                }
-            },
+        let res = match format {
+            FileFormat::Json => NodeRef::from_json(&s),
+            FileFormat::Yaml => NodeRef::from_yaml(&s),
+            FileFormat::Toml => NodeRef::from_toml(&s),
             FileFormat::Text => Ok(NodeRef::string(s)),
             FileFormat::Binary => Ok(NodeRef::binary(s.as_bytes())),
-        }
+        };
+        res.map_err(|err| TreeErrorDetail::DeserializationErr {err}.into())
     }
 
-    //FIXME (jc) error handling
     pub fn from_bytes(s: &[u8], format: FileFormat) -> TreeResult<NodeRef> {
         fn to_str(s: &[u8]) -> TreeResult<&str> {
             match std::str::from_utf8(s) {
@@ -189,34 +183,16 @@ impl NodeRef {
                 Err(err) => Err(TreeErrorDetail::NonUtf8Node { err }.into()),
             }
         }
-        match format {
-            FileFormat::Json => match NodeRef::from_json(to_str(s)?) {
-                Ok(n) => Ok(n),
-                Err(err) => {
-                    println!("{}", err);
-                    Err(TreeErrorDetail::Undef(line!()).into())
-                }
-            },
-            FileFormat::Yaml => match NodeRef::from_yaml(to_str(s)?) {
-                Ok(n) => Ok(n),
-                Err(err) => {
-                    println!("{}", err);
-                    Err(TreeErrorDetail::Undef(line!()).into())
-                }
-            },
-            FileFormat::Toml => match NodeRef::from_toml(to_str(s)?) {
-                Ok(n) => Ok(n),
-                Err(err) => {
-                    println!("{}", err);
-                    Err(TreeErrorDetail::Undef(line!()).into())
-                }
-            },
+        let res = match format {
+            FileFormat::Json => NodeRef::from_json(to_str(s)?),
+            FileFormat::Yaml => NodeRef::from_yaml(to_str(s)?),
+            FileFormat::Toml => NodeRef::from_toml(to_str(s)?),
             FileFormat::Text => Ok(NodeRef::string(to_str(s)?)),
             FileFormat::Binary => Ok(NodeRef::binary(s)),
-        }
+        };
+        res.map_err(|err| TreeErrorDetail::DeserializationErr {err}.into())
     }
 
-    //FIXME (jc) error handling
     pub fn from_file(file_path: &Path, format: Option<FileFormat>) -> TreeResult<NodeRef> {
         let file_path_ = if file_path.is_absolute() {
             fs::canonicalize(file_path)?

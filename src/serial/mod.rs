@@ -8,9 +8,35 @@ mod de;
 mod error;
 mod fmt;
 mod ser;
-pub use fmt::json::Parser as JsonParser;
-pub use fmt::toml::ParseErrDetail as TomlParseErrDetail;
-pub use fmt::toml::Parser as TomlParser;
+pub use crate::serial::toml::*;
+pub use crate::serial::json::*;
+
+pub mod json {
+    use super::*;
+    pub use fmt::json::Parser as JsonParser;
+}
+
+pub mod toml {
+    use super::*;
+    use serde::de;
+    use kg_diag::ParseDiag;
+
+    pub use fmt::toml::ParseErrDetail as TomlParseErrDetail;
+    pub use fmt::toml::Parser as TomlParser;
+
+    pub fn from_str<'de, T>(toml: &'de str) -> Result<T, ParseDiag>
+        where
+            T: de::Deserialize<'de>,
+    {
+        let n = NodeRef::from_toml(toml)?;
+
+        // FIXME ws error handling
+        super::de::from_tree(&n).map_err(|err| {
+            eprintln!("Cannot deserialize type = {:?}", err);
+            panic!("Deserialization error")
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {
