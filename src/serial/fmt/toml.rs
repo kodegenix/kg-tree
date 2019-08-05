@@ -355,6 +355,13 @@ fn is_bare(ch: char) -> bool {
         || ch == '_'
 }
 
+fn is_non_bare(ch: Option<char>) -> bool {
+    match ch {
+        Some(c) => !is_bare(c),
+        None => true
+    }
+}
+
 fn is_hex_char(ch: char) -> bool {
     ('A' <= ch && ch <= 'F') || ('a' <= ch && ch <= 'f') || ('0' <= ch && ch <= '9')
 }
@@ -572,28 +579,28 @@ impl Parser {
                 }
             }
             Some('i') => {
-                if r.match_str_term("inf", &is_non_alphanumeric)? {
+                if r.match_str_term("inf", &is_non_bare)? {
                     consume(r, 3, Terminal::Float)
                 } else {
                     consume_bare_key(r)
                 }
             }
             Some('n') => {
-                if r.match_str_term("nan", &is_non_alphanumeric)? {
+                if r.match_str_term("nan", &is_non_bare)? {
                     consume(r, 3, Terminal::Float)
                 } else {
                     consume_bare_key(r)
                 }
             }
             Some('t') => {
-                if r.match_str_term("true", &is_non_alphanumeric)? {
+                if r.match_str_term("true", &is_non_bare)? {
                     consume(r, 4, Terminal::True)
                 } else {
                     consume_bare_key(r)
                 }
             }
             Some('f') => {
-                if r.match_str_term("false", &is_non_alphanumeric)? {
+                if r.match_str_term("false", &is_non_bare)? {
                     consume(r, 5, Terminal::False)
                 } else {
                     consume_bare_key(r)
@@ -1255,6 +1262,7 @@ impl Parser {
                 }
             }
         }
+        // trim quotes
         self.buf.pop();
         if multiline {
             self.buf.pop();
@@ -1423,6 +1431,15 @@ mod tests {
             let input: &str = r#"true"#;
 
             let terms = vec![Terminal::True, Terminal::End];
+
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn false_token() {
+            let input: &str = r#"false"#;
+
+            let terms = vec![Terminal::False, Terminal::End];
 
             assert_terms!(input, terms);
         }
