@@ -88,11 +88,7 @@ impl ParseErr {
                     p1, p2 => "invalid escape",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoi {
-                pos: p1,
-            }, r, {
-                p1, p1 => "unexpected end of input",
-            }),
+            None => unreachable!(), //Error UnexpectedEoi should be catch earlier in invalid_input_one
         };
         Err(err)
     }

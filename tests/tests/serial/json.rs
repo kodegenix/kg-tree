@@ -43,6 +43,16 @@ macro_rules! assert_err {
 }
 
 #[test]
+fn unexpected_end_of_input() {
+    let input = r#"{
+        "key": "\"#;
+    let err: ParseDiag = parse_node_err!(input);
+    eprintln!("err = {}", err);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedEoi {..});
+}
+
+#[test]
 fn invalid_char() {
     let input = r#"{=}"#;
     let err: ParseDiag = parse_node_err!(input);
