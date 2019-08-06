@@ -155,7 +155,6 @@ impl ParseErrDetail {
 
     pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
         let p1 = r.position();
-        let current = r.peek_char(0)?;
         let err = match (r.peek_char(0)?, r.next_char()?) {
             (Some(current), Some(_c)) => {
                 let p2 = r.position();
@@ -617,7 +616,7 @@ impl Parser {
                         Some('\"') => {
                             multiline = true;
                         }
-                        Some(c) => {
+                        Some(_c) => {
                             let p2 = r.position();
                             return Ok(Token::new(
                                 Terminal::String {
@@ -677,7 +676,7 @@ impl Parser {
                         Some('\'') => {
                             multiline = true;
                         }
-                        Some(c) => {
+                        Some(_c) => {
                             let p2 = r.position();
                             return Ok(Token::new(
                                 Terminal::String {

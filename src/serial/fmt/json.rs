@@ -97,7 +97,7 @@ impl ParseErr {
         let p1 = r.position();
         let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
-            Some(c) => {
+            Some(_c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErr::InvalidChar {
                     input: current,
@@ -119,7 +119,7 @@ impl ParseErr {
     pub fn invalid_input_one<T>(r: &mut dyn CharReader, expected: char) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
-            Some(c) => unreachable!(), //There is only one possibility in method lex: unexpected end of input
+            Some(_c) => unreachable!(), //There is only one possibility in method lex: unexpected end of input
             None => parse_diag!(ParseErr::UnexpectedEoiOne {
                 pos: p1,
                 expected,
@@ -132,9 +132,8 @@ impl ParseErr {
 
     pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
         let p1 = r.position();
-        let current = r.peek_char(0)?;
         let err = match (r.peek_char(0)?, r.next_char()?) {
-            (Some(current), Some(c)) => {
+            (Some(current), Some(_c)) => {
                 let p2 = r.position();
                 parse_diag!(ParseErr::InvalidCharMany {
                     input: current,
