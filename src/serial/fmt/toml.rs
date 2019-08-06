@@ -617,7 +617,7 @@ impl Parser {
                         Some('\"') => {
                             multiline = true;
                         }
-                        Some(c) if c.is_whitespace() => {
+                        Some(c) => {
                             let p2 = r.position();
                             return Ok(Token::new(
                                 Terminal::String {
@@ -677,7 +677,7 @@ impl Parser {
                         Some('\'') => {
                             multiline = true;
                         }
-                        Some(c) if c.is_whitespace() => {
+                        Some(c) => {
                             let p2 = r.position();
                             return Ok(Token::new(
                                 Terminal::String {

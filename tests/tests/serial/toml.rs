@@ -378,7 +378,7 @@ fn basic_multiline_invalid_open() {
 
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, TomlParseErrDetail::InvalidCharOne {..});
+    assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
 }
 
 #[test]
@@ -400,7 +400,7 @@ fn literal_multiline_invalid_open() {
 
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, TomlParseErrDetail::InvalidCharOne {..});
+    assert_err!(err, TomlParseErrDetail::UnexpectedTokenMany {..});
 }
 
 #[test]
@@ -835,6 +835,7 @@ fn arrays() {
     );
 }
 
+
 #[test]
 fn arrays_of_arrays() {
     let input = r#"
@@ -936,6 +937,17 @@ fn array_newline() {
     assert_eq!(1, node.get_key("arr1").as_array_ext()[0].as_int_ext());
     assert_eq!(2, node.get_key("arr1").as_array_ext()[1].as_int_ext());
     assert_eq!(3, node.get_key("arr1").as_array_ext()[2].as_int_ext());
+}
+
+#[test]
+fn array_empty_string() {
+    let input = r#"
+        arr1 = [""]
+        arr2 = ['']
+    "#;
+    let node: NodeRef = parse_node!(input);
+    assert_eq!("", node.get_key("arr1").as_array_ext()[0].as_string_ext());
+    assert_eq!("", node.get_key("arr2").as_array_ext()[0].as_string_ext());
 }
 
 #[test]
