@@ -155,9 +155,9 @@ impl ParseErrDetail {
 
     pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
         let p1 = r.position();
-        let current = r.peek_char(0)?.unwrap();
-        let err = match r.next_char()? {
-            Some(_c) => {
+        let current = r.peek_char(0)?;
+        let err = match (r.peek_char(0)?, r.next_char()?) {
+            (Some(current), Some(_c)) => {
                 let p2 = r.position();
                 parse_diag!(ParseErrDetail::InvalidCharMany {
                     input: current,
@@ -168,7 +168,7 @@ impl ParseErrDetail {
                     p1, p2 => "invalid character",
                 })
             }
-            None => parse_diag!(ParseErrDetail::UnexpectedEoiMany {
+            _ => parse_diag!(ParseErrDetail::UnexpectedEoiMany {
                 pos: p1,
                 expected,
             }, r, {
@@ -617,7 +617,7 @@ impl Parser {
                         Some('\"') => {
                             multiline = true;
                         }
-                        Some(c) if c.is_whitespace() => {
+                        Some(c) => {
                             let p2 = r.position();
                             return Ok(Token::new(
                                 Terminal::String {
@@ -677,7 +677,7 @@ impl Parser {
                         Some('\'') => {
                             multiline = true;
                         }
-                        Some(c) if c.is_whitespace() => {
+                        Some(c) => {
                             let p2 = r.position();
                             return Ok(Token::new(
                                 Terminal::String {

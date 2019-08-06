@@ -43,7 +43,7 @@ pub enum TreeErrorDetail {
     NonUtf8Node { err: Utf8Error },
 
     #[display(
-        fmt = "cannot deserialize node: {err}"
+        fmt = "deserialization error: {err}"
     )]
     DeserializationErr { err: ParseDiag },
 
