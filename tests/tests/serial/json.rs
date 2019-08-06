@@ -60,6 +60,14 @@ fn invalid_char() {
 }
 
 #[test]
+fn test() {
+    let input = r#"{]"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
+}
+
+#[test]
 fn null() {
     let input = r#"null"#;
     let node: NodeRef = parse_node!(input);
@@ -144,6 +152,16 @@ fn integers() {
     assert_eq!(421, node.get_key("int1").as_int_ext());
     assert_eq!(-452, node.get_key("int2").as_int_ext());
     assert_eq!(0, node.get_key("int3").as_int_ext());
+}
+
+#[test]
+fn integers_invalid_integer() {
+    let input = r#"{
+        "int": 99999999999999999999
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::InvalidIntegerLiteral {..});
 }
 
 #[test]
@@ -238,12 +256,12 @@ fn booleans() {
 #[test]
 fn strings() {
     let input = r#"{
-        "str1": " literal string \n \t \r \t \" \\ \b \f'"
+        "str1": " literal string \n \t \r \t \" \\ \' \b \f'"
     }"#;
     let node: NodeRef = parse_node!(input);
 
     assert_eq!(
-        " literal string \n \t \r \t \" \\ \u{0008} \u{000c}'",
+        " literal string \n \t \r \t \" \\ \' \u{0008} \u{000c}'",
         node.get_key("str1").as_string_ext()
     );
 }
@@ -407,7 +425,7 @@ fn two_words_in_key() {
 }
 
 //#[test]
-fn test() {
+fn duplicated_keys() {
     //FIXME MC Fix parser: add "duplicated keys" error, fix test: error should be expected
     let input = r#"{
         "key1": "value1",

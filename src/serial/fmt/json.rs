@@ -327,10 +327,6 @@ impl Parser {
                 r.skip_while(&|c| c.is_digit(10))?;
                 match r.peek_char(0)? {
                     Some('.') => {
-                        if Some('.') == r.peek_char(1)? {
-                            let p2 = r.position();
-                            return Ok(Token::new(Terminal::Integer, p1, p2));
-                        }
                         r.next_char()?;
                         r.skip_while(&|c| c.is_digit(10))?;
                         match r.peek_char(0)? {
@@ -548,12 +544,6 @@ impl Parser {
             }
         }
         Ok(())
-    }
-}
-
-impl Default for Parser {
-    fn default() -> Self {
-        Parser::new()
     }
 }
 
