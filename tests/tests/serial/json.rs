@@ -215,6 +215,15 @@ fn parse_float_err() {
 }
 
 #[test]
+fn scientific_notation_unexpected_end_of_input() {
+    let input = r#"{
+        "num": 1.2e+"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedEoiMany {..});
+}
+
+#[test]
 fn booleans() {
     let input = r#"{
         "bool1": true,
@@ -298,6 +307,15 @@ fn control_char_in_string() {
     let err: ParseDiag = parse_node_err!(input);
 
     assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+}
+
+#[test]
+fn invalid_input_unexpected_end_of_input() {
+    let input = r#"{
+        "key": n"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedEoi {..});
 }
 
 #[test]

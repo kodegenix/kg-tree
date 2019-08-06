@@ -119,18 +119,7 @@ impl ParseErr {
     pub fn invalid_input_one<T>(r: &mut dyn CharReader, expected: char) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
-            Some(c) => {
-                //TODO MC Unreachable! To remove.
-                let p2 = r.position();
-                parse_diag!(ParseErr::InvalidCharOne {
-                    input: c,
-                    from: p1,
-                    to: p2,
-                    expected,
-                }, r, {
-                    p1, p2 => "invalid character",
-                })
-            }
+            Some(c) => unreachable!(), //There is only one possibility in method lex: unexpected end of input
             None => parse_diag!(ParseErr::UnexpectedEoiOne {
                 pos: p1,
                 expected,
@@ -143,9 +132,9 @@ impl ParseErr {
 
     pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
         let p1 = r.position();
-        let current = r.peek_char(0)?.unwrap();
-        let err = match r.next_char()? {
-            Some(c) => {
+        let current = r.peek_char(0)?;
+        let err = match (r.peek_char(0)?, r.next_char()?) {
+            (Some(current), Some(c)) => {
                 let p2 = r.position();
                 parse_diag!(ParseErr::InvalidCharMany {
                     input: current,
@@ -156,7 +145,7 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoiMany {
+            _ => parse_diag!(ParseErr::UnexpectedEoiMany {
                 pos: p1,
                 expected,
             }, r, {
