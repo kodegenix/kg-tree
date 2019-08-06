@@ -47,9 +47,8 @@ fn unexpected_end_of_input() {
     let input = r#"{
         "key": "\"#;
     let err: ParseDiag = parse_node_err!(input);
-    eprintln!("err = {}", err);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedEoi {..});
+    assert_err!(err, JsonParseErrDetail::UnexpectedEoiOne {..});
 }
 
 #[test]
