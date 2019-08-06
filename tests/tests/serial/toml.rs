@@ -960,17 +960,6 @@ fn array_empty_string() {
 }
 
 #[test]
-fn array_empty_string() {
-    let input = r#"
-        arr1 = [""]
-        arr2 = ['']
-    "#;
-    let node: NodeRef = parse_node!(input);
-    assert_eq!("", node.get_key("arr1").as_array_ext()[0].as_string_ext());
-    assert_eq!("", node.get_key("arr2").as_array_ext()[0].as_string_ext());
-}
-
-#[test]
 fn empty_table() {
     let input = r#"
         [table]

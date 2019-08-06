@@ -310,9 +310,28 @@ fn control_char_in_string() {
 }
 
 #[test]
-fn invalid_input_unexpected_end_of_input() {
+fn invalid_input_in_null_with_unexpected_end_of_input() {
     let input = r#"{
         "key": n"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedEoi {..});
+}
+
+#[test]
+fn invalid_input_in_true_with_invalid_char() {
+    let input = r#"{
+        "key": tfue
+    }"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+}
+
+#[test]
+fn invalid_input_in_false_with_unexpected_end_of_input() {
+    let input = r#"{
+        "key": f"#;
     let err: ParseDiag = parse_node_err!(input);
 
     assert_err!(err, JsonParseErrDetail::UnexpectedEoi {..});
