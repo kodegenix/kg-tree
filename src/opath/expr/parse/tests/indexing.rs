@@ -46,5 +46,3 @@ fn index() {
         Index(box Integer(5))
     ]));
 }
-
-// TODO ws more tests?

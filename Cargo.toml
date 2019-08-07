@@ -33,3 +33,4 @@ regex = "1.2.0"
 [dev-dependencies]
 assert_approx_eq = "1.1.0"
 tempfile = "3.1.0"
+pretty_assertions = "0.6.1"

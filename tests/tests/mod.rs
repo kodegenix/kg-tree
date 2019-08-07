@@ -1,12 +1,81 @@
 use super::*;
 
-use self::common::*;
+macro_rules! assert_detail {
+    ($res: expr, $detail:ident, $variant: pat) => {{
+        let err = match $res {
+            Ok(ref val) => panic!("Error expected, got {:?}", val),
+            Err(ref err) => err,
+        };
+        let det = err
+            .detail()
+            .downcast_ref::<$detail>()
+            .expect(&format!("Cannot downcast to '{}'", stringify!($detail)));
 
-mod attrs;
-mod bool_ops;
-mod common;
-mod convert;
-mod math_ops;
-mod number_ranges;
-mod prop_access;
+        match det {
+            $variant => (err, det),
+            err => panic!("Expected error {} got {:?}", stringify!($variant), err),
+        }
+    }};
+}
+
+/// Helper trait for testing
+pub trait NodeRefExt {
+    fn as_int_ext(&self) -> i64;
+    fn as_float_ext(&self) -> f64;
+    fn as_bool_ext(&self) -> bool;
+    fn as_string_ext(&self) -> String;
+    fn as_array_ext(&self) -> Vec<NodeRef>;
+    fn is_empty_ext(&self) -> bool;
+    fn get_key(&self, key: &str) -> NodeRef;
+    fn get_idx(&self, idx: usize) -> NodeRef;
+}
+
+impl NodeRefExt for NodeRef {
+    fn as_int_ext(&self) -> i64 {
+        assert!(self.is_integer());
+        self.as_integer().unwrap()
+    }
+
+    fn as_float_ext(&self) -> f64 {
+        assert!(self.is_float());
+        self.as_float()
+    }
+
+    fn as_bool_ext(&self) -> bool {
+        assert!(self.is_boolean());
+        self.as_boolean()
+    }
+
+    fn as_string_ext(&self) -> String {
+        assert!(self.is_string());
+        self.as_string()
+    }
+
+    fn as_array_ext(&self) -> Vec<NodeRef> {
+        assert!(self.is_array());
+        match self.data().value() {
+            Value::Array(elems) => elems.clone(),
+            _ => unreachable!(),
+        }
+    }
+
+    fn is_empty_ext(&self) -> bool {
+        self.data()
+            .children_count()
+            .expect("cannot get children count")
+            == 0
+    }
+
+    fn get_key(&self, key: &str) -> NodeRef {
+        self.get_child_key(key)
+            .expect(&format!("key not found: '{}'", key))
+    }
+
+    fn get_idx(&self, idx: usize) -> NodeRef {
+        self.get_child_index(idx)
+            .expect(&format!("index not found: '{}'", idx))
+    }
+}
+
+mod opath;
 mod serial;

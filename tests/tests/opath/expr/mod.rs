@@ -1,2 +1,2 @@
 use super::*;
-mod toml;
+mod func;
