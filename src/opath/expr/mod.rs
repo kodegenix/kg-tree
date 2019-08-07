@@ -30,14 +30,14 @@ pub enum ExprErrorDetail {
     #[display(fmt = "too many iterations while resolving interpolations: '{depth}'")]
     InterpolationDepthReached { depth: usize },
 
-    #[display(fmt = "error calling method '{id}': {detail}", detail = "err.detail()")]
-    MethodCallError { id: MethodId, err: Box<dyn Diag> },
-
-    #[display(
-        fmt = "error calling function '{id}': {detail}",
-        detail = "err.detail()"
-    )]
-    FuncCallError { id: FuncId, err: Box<dyn Diag> },
+//    #[display(fmt = "error calling method '{id}': {detail}", detail = "err.detail()")]
+//    MethodCallError { id: MethodId, err: Box<dyn Diag> },
+//
+//    #[display(
+//        fmt = "error calling function '{id}': {detail}",
+//        detail = "err.detail()"
+//    )]
+//    FuncCallError { id: FuncId, err: Box<dyn Diag> },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1434,28 +1434,10 @@ impl Expr {
                 }
             }
             Expr::MethodCall(ref call) => {
-                match func::apply_method_to(call.id(), call.args(), env, ctx, out) {
-                    Ok(()) => Ok(()),
-                    Err(e) => {
-                        let detail = ExprErrorDetail::MethodCallError {
-                            id: call.id().clone(),
-                            err: Box::new(e),
-                        };
-                        return Err(detail.into());
-                    }
-                }
+                func::apply_method_to(call.id(), call.args(), env, ctx, out)
             }
             Expr::FuncCall(ref call) => {
-                match func::apply_func_to(call.id(), call.args(), env, ctx, out) {
-                    Ok(()) => Ok(()),
-                    Err(e) => {
-                        let detail = ExprErrorDetail::FuncCallError {
-                            id: call.id().clone(),
-                            err: Box::new(e),
-                        };
-                        return Err(detail.into());
-                    }
-                }
+                func::apply_func_to(call.id(), call.args(), env, ctx, out)
             }
             Expr::Var(ref e) => {
                 if let Some(scope) = env.scope() {

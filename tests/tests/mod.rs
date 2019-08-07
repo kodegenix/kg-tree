@@ -1,7 +1,23 @@
 use super::*;
+use std::path::PathBuf;
+use std::ffi::OsStr;
+use tempfile::TempDir;
+
+
+// some of these helpers should probably be extracted to external crate.
+macro_rules! write_file {
+    ($path: expr, $content:expr) => {{
+        use std::io::Write;
+        let mut f = std::fs::File::create(&$path)
+            .expect(&format!("Cannot create file: '{}'", $path.display()));
+        f.write_all($content.as_bytes())
+            .expect(&format!("Cannot write file: '{}'", $path.display()))
+    }};
+}
 
 macro_rules! assert_detail {
     ($res: expr, $detail:ident, $variant: pat) => {{
+        use kg_diag::Diag;
         let err = match $res {
             Ok(ref val) => panic!("Error expected, got {:?}", val),
             Err(ref err) => err,
@@ -16,6 +32,53 @@ macro_rules! assert_detail {
             err => panic!("Expected error {} got {:?}", stringify!($variant), err),
         }
     }};
+    ($res: expr, $detail:ident, $variant: pat, $cond:expr) => {{
+        use kg_diag::Diag;
+        let err = match $res {
+            Ok(ref val) => panic!("Error expected, got {:?}", val),
+            Err(ref err) => err,
+        };
+        let det = err
+            .detail()
+            .downcast_ref::<$detail>()
+            .expect(&format!("Cannot downcast to '{}'", stringify!($detail)));
+
+        match det {
+            $variant => {
+                if $cond {
+                    (err, det)
+                } else {
+                    panic!("Condition not met: '{}'", stringify!($cond))
+                }
+            },
+            err => panic!("Expected error {} got {:?}", stringify!($variant), err),
+        }
+    }};
+}
+
+/// Get absolute path to the "target" directory ("build" dir)
+pub fn get_target_dir() -> PathBuf {
+    let bin = std::env::current_exe().expect("exe path");
+    let mut target_dir = PathBuf::from(bin.parent().expect("bin parent"));
+    while target_dir.file_name() != Some(OsStr::new("target")) {
+        target_dir.pop();
+    }
+    target_dir
+}
+
+/// Get temporary directory located in "target".
+pub fn get_tmp_dir() -> (TempDir, PathBuf) {
+    let target = get_target_dir();
+    let resources_dir = target.join("test_resources");
+
+    if let Err(err) = std::fs::create_dir(&resources_dir) {
+        if err.kind() != std::io::ErrorKind::AlreadyExists {
+            panic!("Cannot create test resources dir: {:?}", err)
+        }
+    }
+    let dir = tempfile::tempdir_in(resources_dir).expect("Cannot create temporary dir!");
+    let path = dir.path().to_path_buf();
+    (dir, path)
 }
 
 /// Helper trait for testing
