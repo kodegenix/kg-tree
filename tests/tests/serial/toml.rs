@@ -1,5 +1,5 @@
 use crate::serial::toml::TomlParseErrDetail;
-use crate::tests::serial::NodeRefExt;
+use crate::tests::NodeRefExt;
 use kg_diag::Diag;
 use kg_tree::NodeRef;
 
