@@ -2,8 +2,8 @@ use crate::serial::json::JsonParseErrDetail;
 use crate::tests::serial::NodeRefExt;
 use kg_diag::Diag;
 use kg_diag::ParseDiag;
-use kg_tree::NodeRef;
 use kg_tree::serial::json::*;
+use kg_tree::NodeRef;
 
 macro_rules! parse_node {
     ($input: expr) => {{
@@ -432,16 +432,15 @@ fn two_words_in_key() {
     assert_eq!("value", node.get_key("two words").as_string_ext());
 }
 
-//#[test]
+#[test]
 fn duplicated_keys() {
-    //FIXME MC Fix parser: add "duplicated keys" error, fix test: error should be expected
     let input = r#"{
         "key1": "value1",
         "key1": "value2"
     }"#;
-    let node: NodeRef = parse_node!(input);
+    let err: ParseDiag = parse_node_err!(input);
 
-    assert_eq!("value1", node.get_key("key1").as_string_ext());
+    assert_err!(err, JsonParseErrDetail::RedefinedKey {..});
 }
 
 #[test]
@@ -698,7 +697,7 @@ fn object_with_unexpected_token() {
         .expect("cannot downcast to JsonParseErrDetail");
 
     match detail {
-        JsonParseErrDetail::UnexpectedTokenMany { expected, ..} => {
+        JsonParseErrDetail::UnexpectedTokenMany { expected, .. } => {
             assert_eq!(Terminal::Comma, expected[0]);
             assert_eq!(Terminal::BraceRight, expected[1]);
         }

@@ -73,6 +73,8 @@ pub enum ParseErr {
     },
     #[display(fmt = "unclosed {a0}")]
     UnclosedGroup(Terminal),
+    #[display(fmt = "key '{key}' defined multiple times")]
+    RedefinedKey { key: String },
 }
 
 impl ParseErr {
@@ -192,6 +194,34 @@ impl ParseErr {
                 token.from(), token.to() => "unexpected token"
             }),
         )
+    }
+
+    pub fn key_redefined<T>(
+        r: &mut dyn CharReader,
+        redefined: Span,
+        prev: Span,
+        key: &str,
+    ) -> Result<T, Error> {
+        Err(
+            parse_diag!(ParseErr::RedefinedKey{key: key.to_string()}, r, {
+                redefined.from, redefined.to => "key redefined here",
+                prev.from, prev.to => "previously defined here",
+            }),
+        )
+    }
+    pub fn key_redefined_node<T>(
+        r: &mut dyn CharReader,
+        redefined: Span,
+        prev_defined: &NodeRef,
+        key: &str,
+    ) -> Result<T, Error> {
+        let prev = prev_defined
+            .data()
+            .metadata()
+            .span()
+            .expect("Node should always have span");
+
+        return ParseErr::key_redefined(r, redefined, prev, &key);
     }
 }
 
@@ -466,6 +496,9 @@ impl Parser {
                     let key = Symbol::from(&self.buf);
                     self.expect_token(r, Terminal::Colon)?;
                     let value = self.parse_value(r)?;
+                    if let Some(child) = props.get(&key) {
+                        return ParseErr::key_redefined_node(r, t.span(), &child, &key);
+                    }
                     props.insert(key, value);
                     comma = true;
                     literal = false;

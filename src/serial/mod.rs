@@ -11,22 +11,22 @@ mod ser;
 
 pub mod json {
     use super::*;
-    pub use fmt::json::Parser as JsonParser;
     pub use fmt::json::ParseErr as JsonParseErrDetail;
+    pub use fmt::json::Parser as JsonParser;
     pub use fmt::json::Terminal;
 }
 
 pub mod toml {
     use super::*;
-    use serde::de;
     use kg_diag::ParseDiag;
+    use serde::de;
 
     pub use fmt::toml::ParseErrDetail as TomlParseErrDetail;
     pub use fmt::toml::Parser as TomlParser;
 
     pub fn from_str<'de, T>(toml: &'de str) -> Result<T, ParseDiag>
-        where
-            T: de::Deserialize<'de>,
+    where
+        T: de::Deserialize<'de>,
     {
         let n = NodeRef::from_toml(toml)?;
 

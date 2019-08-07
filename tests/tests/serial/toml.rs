@@ -844,7 +844,6 @@ fn arrays() {
     );
 }
 
-
 #[test]
 fn arrays_of_arrays() {
     let input = r#"

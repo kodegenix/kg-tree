@@ -42,9 +42,7 @@ pub enum TreeErrorDetail {
     )]
     NonUtf8Node { err: Utf8Error },
 
-    #[display(
-        fmt = "deserialization error: {err}"
-    )]
+    #[display(fmt = "deserialization error: {err}")]
     DeserializationErr { err: ParseDiag },
 
     //FIXME ws to be removed
@@ -173,7 +171,7 @@ impl NodeRef {
             FileFormat::Text => Ok(NodeRef::string(s)),
             FileFormat::Binary => Ok(NodeRef::binary(s.as_bytes())),
         };
-        res.map_err(|err| TreeErrorDetail::DeserializationErr {err}.into())
+        res.map_err(|err| TreeErrorDetail::DeserializationErr { err }.into())
     }
 
     pub fn from_bytes(s: &[u8], format: FileFormat) -> TreeResult<NodeRef> {
@@ -190,7 +188,7 @@ impl NodeRef {
             FileFormat::Text => Ok(NodeRef::string(to_str(s)?)),
             FileFormat::Binary => Ok(NodeRef::binary(s)),
         };
-        res.map_err(|err| TreeErrorDetail::DeserializationErr {err}.into())
+        res.map_err(|err| TreeErrorDetail::DeserializationErr { err }.into())
     }
 
     pub fn from_file(file_path: &Path, format: Option<FileFormat>) -> TreeResult<NodeRef> {
