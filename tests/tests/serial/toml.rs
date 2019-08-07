@@ -237,6 +237,15 @@ fn scientific_notation_invalid_char_2() {
 }
 
 #[test]
+fn scientific_notation_unexpected_end_of_input() {
+    let input = r#"
+        num = 1e+"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedEoiMany {..});
+}
+
+#[test]
 fn comment_invalid_eol() {
     let input = "num = 1 #comment\raf";
 
