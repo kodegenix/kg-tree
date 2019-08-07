@@ -558,21 +558,23 @@ impl Parser {
         self.buf.reserve(s.len());
         let mut chars = s[1..s.len() - 1].chars();
         while let Some(c) = chars.next() {
-            if c == '\\' {
-                let c = chars.next();
-                match c {
-                    Some('\\') => self.buf.push('\\'),
-                    Some('\'') => self.buf.push('\''),
-                    Some('\"') => self.buf.push('\"'),
-                    Some('t') => self.buf.push('\t'),
-                    Some('r') => self.buf.push('\r'),
-                    Some('n') => self.buf.push('\n'),
-                    Some('b') => self.buf.push('\u{0008}'),
-                    Some('f') => self.buf.push('\u{000c}'),
-                    _ => return ParseErr::invalid_escape(r),
+            match c {
+                '\\' => {
+                    let c = chars.next();
+                    match c {
+                        Some('\\') => self.buf.push('\\'),
+                        Some('\'') => self.buf.push('\''),
+                        Some('\"') => self.buf.push('\"'),
+                        Some('t') => self.buf.push('\t'),
+                        Some('r') => self.buf.push('\r'),
+                        Some('n') => self.buf.push('\n'),
+                        Some('b') => self.buf.push('\u{0008}'),
+                        Some('f') => self.buf.push('\u{000c}'),
+                        _ => return ParseErr::invalid_escape(r),
+                    }
                 }
-            } else {
-                self.buf.push(c);
+                c if c as u32 >= 0  && c as u32 <= 31 => return ParseErr::invalid_escape(r), // TODO MC To finish, change error.
+                _ => self.buf.push(c)
             }
         }
         Ok(())

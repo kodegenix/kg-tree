@@ -327,7 +327,7 @@ fn string_bad_escape() {
     assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
 }
 
-//#[test] //FIXME MC Fix parser, error is expected.
+#[test] //FIXME MC Fix parser, error is expected.
 fn control_char_in_string() {
     let input = "{\"key\": \"val\nue\"}";
     let err: ParseDiag = parse_node_err!(input);
@@ -411,7 +411,7 @@ fn unexpected_token_after_key() {
     assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
 }
 
-//#[test] //FIXME MC Fix parser, error is expected.
+#[test] //FIXME MC Fix parser, error is expected.
 fn control_char_in_key() {
     let input = r#"{
         "ke
