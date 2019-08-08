@@ -329,8 +329,22 @@ fn string_bad_escape() {
 
 #[test] //FIXME MC Fix parser, error is expected.
 fn control_char_in_string() {
-    let input = "{\"key\": \"val\nue\"}";
+    let input = r#"{
+        "key": "val
+        ue"}"#;
+    eprintln!("input = {:?}", input);
     let err: ParseDiag = parse_node_err!(input);
+    eprintln!("err = {}", err);
+
+    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+}
+
+#[test] //FIXME MC Fix parser, error is expected.
+fn control_char_in_string_2() {
+    let input = "{\"key\": \"val\nue\"}";
+    eprintln!("input = {:?}", input);
+    let err: ParseDiag = parse_node_err!(input);
+    eprintln!("err = {}", err);
 
     assert_err!(err, JsonParseErrDetail::InvalidChar {..});
 }
@@ -419,7 +433,7 @@ fn control_char_in_key() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
+    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
 }
 
 #[test]

@@ -573,7 +573,7 @@ impl Parser {
                         _ => return ParseErr::invalid_escape(r),
                     }
                 }
-                c if c as u32 >= 0  && c as u32 <= 31 => return ParseErr::invalid_escape(r), // TODO MC To finish, change error.
+                c if c as u32 >= 0  && c as u32 <= 31 => return ParseErr::invalid_input(r), // TODO MC To finish, change error.
                 _ => self.buf.push(c)
             }
         }
