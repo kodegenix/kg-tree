@@ -42,7 +42,7 @@ fn array_opath_err() {
 
     let res = eval_opath!(opath);
 
-    assert_detail!(res, FuncCallErrorDetail, FuncCallErrorDetail::UnknownFunc{name}, name == "nonExistingFunc");
+    assert_detail!(res, FuncCallErrorDetail, FuncCallErrorDetail::UnknownFunc{name}, assert_eq!("nonExistingFunc", name));
 }
 
 #[test]
