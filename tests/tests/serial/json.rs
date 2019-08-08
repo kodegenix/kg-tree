@@ -42,14 +42,6 @@ macro_rules! assert_err {
     };
 }
 
-//#[test] //FIXME MC Add handling of BOM
-fn bom() {
-    let input = "\u{EF}\u{BB}\u{BF}{true}";
-    let node: NodeRef = parse_node!(input);
-
-    assert_eq!(true, node.as_bool_ext());
-}
-
 #[test]
 fn unexpected_end_of_input() {
     let input = r#"{
