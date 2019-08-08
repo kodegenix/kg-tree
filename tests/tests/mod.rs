@@ -15,24 +15,12 @@ macro_rules! write_file {
     }};
 }
 
+#[macro_export]
 macro_rules! assert_detail {
-    ($res: expr, $detail:ident, $variant: pat) => {{
-        use kg_diag::Diag;
-        let err = match $res {
-            Ok(ref val) => panic!("Error expected, got {:?}", val),
-            Err(ref err) => err,
-        };
-        let det = err
-            .detail()
-            .downcast_ref::<$detail>()
-            .expect(&format!("Cannot downcast to '{}'", stringify!($detail)));
-
-        match det {
-            $variant => (err, det),
-            err => panic!("Expected error {} got {:?}", stringify!($variant), err),
-        }
-    }};
-    ($res: expr, $detail:ident, $variant: pat, $cond:expr) => {{
+    ($res: expr, $detail:ident, $variant: pat) => {
+        assert_detail!($res, $detail, $variant, {})
+    };
+    ($res: expr, $detail:ident, $variant: pat, $block:expr) => {{
         use kg_diag::Diag;
         let err = match $res {
             Ok(ref val) => panic!("Error expected, got {:?}", val),
@@ -45,12 +33,9 @@ macro_rules! assert_detail {
 
         match det {
             $variant => {
-                if $cond {
-                    (err, det)
-                } else {
-                    panic!("Condition not met: '{}'", stringify!($cond))
-                }
-            },
+                $block;
+                (err, det)
+            }
             err => panic!("Expected error {} got {:?}", stringify!($variant), err),
         }
     }};
