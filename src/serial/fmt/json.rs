@@ -36,6 +36,12 @@ pub enum ParseErr {
         to: Position,
         expected: Vec<char>,
     },
+    #[display(fmt = "invalid UTF-8 character '{input}'")]
+    InvalidControlUTF8Char {
+        input: char,
+        from: Position,
+        to: Position,
+    },
     #[display(fmt = "invalid number literal: {err}")]
     InvalidIntegerLiteral {
         err: std::num::ParseIntError,
@@ -152,6 +158,24 @@ impl ParseErr {
             }, r, {
                 p1, p1 => "unexpected end of input",
             }),
+        };
+        Err(err)
+    }
+
+    pub fn invalid_control_utf8_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
+        let p1 = r.position();
+        let err = match (r.peek_char(0)?, r.next_char()?) {
+            (Some(current), Some(_c)) => {
+                let p2 = r.position();
+                parse_diag!(ParseErr::InvalidControlUTF8Char {
+                    input: current,
+                    from: p1,
+                    to: p2
+                }, r, {
+                    p1, p2 => "invalid control UTF-8 character",
+                })
+            }
+            _ => unreachable!() //Error is caught in method lex and UnexpectedEoiOne in returned
         };
         Err(err)
     }
@@ -553,14 +577,17 @@ impl Parser {
     }
 
     fn parse_literal<'a>(&mut self, t: Token, r: &'a mut dyn CharReader) -> Result<(), Error> {
-        let s = r.slice_pos(t.from(), t.to())?;
+        r.seek(t.from())?;
+        let end_offset = t.to().offset;
+        r.skip_chars(1)?;
+        let start_offset = r.position().offset;
         self.buf.clear();
-        self.buf.reserve(s.len());
-        let mut chars = s[1..s.len() - 1].chars();
-        while let Some(c) = chars.next() {
+        self.buf.reserve(end_offset - start_offset);
+        while r.position().offset < end_offset - 1 {
+            let c = r.next_char()?.unwrap();
             match c {
                 '\\' => {
-                    let c = chars.next();
+                    let c = r.next_char()?;
                     match c {
                         Some('\\') => self.buf.push('\\'),
                         Some('\'') => self.buf.push('\''),
@@ -573,10 +600,12 @@ impl Parser {
                         _ => return ParseErr::invalid_escape(r),
                     }
                 }
-                c if c as u32 >= 0  && c as u32 <= 31 => return ParseErr::invalid_input(r), // TODO MC To finish, change error.
+                c if c as u32 <= 31 => return ParseErr::invalid_control_utf8_input(r),
                 _ => self.buf.push(c)
             }
         }
+        self.buf.pop();
+        r.seek(t.to())?;
         Ok(())
     }
 }

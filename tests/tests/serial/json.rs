@@ -327,26 +327,39 @@ fn string_bad_escape() {
     assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
 }
 
-#[test] //FIXME MC Fix parser, error is expected.
+#[test]
 fn control_char_in_string() {
     let input = r#"{
         "key": "val
-        ue"}"#;
-    eprintln!("input = {:?}", input);
+        ue"
+    }"#;
     let err: ParseDiag = parse_node_err!(input);
-    eprintln!("err = {}", err);
 
-    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+    assert_err!(err, JsonParseErrDetail::InvalidControlUTF8Char {..});
 }
 
-#[test] //FIXME MC Fix parser, error is expected.
+#[test]
 fn control_char_in_string_2() {
-    let input = "{\"key\": \"val\nue\"}";
-    eprintln!("input = {:?}", input);
+    let input = "{\"key\": \"val\u{0009}ue\"}";
     let err: ParseDiag = parse_node_err!(input);
-    eprintln!("err = {}", err);
 
-    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+    assert_err!(err, JsonParseErrDetail::InvalidControlUTF8Char {..});
+}
+
+#[test]
+fn control_char_in_string_3() {
+    let input = "{\"key\": \"val\u{0014}ue\"}";
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::InvalidControlUTF8Char {..});
+}
+
+#[test]
+fn control_char_in_string_with_unexpected_end_of_input() {
+    let input = "{\"key\": \"val\u{0014}";
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, JsonParseErrDetail::UnexpectedEoiOne {..});
 }
 
 #[test]
@@ -425,7 +438,7 @@ fn unexpected_token_after_key() {
     assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
 }
 
-#[test] //FIXME MC Fix parser, error is expected.
+#[test]
 fn control_char_in_key() {
     let input = r#"{
         "ke
@@ -433,7 +446,7 @@ fn control_char_in_key() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+    assert_err!(err, JsonParseErrDetail::InvalidControlUTF8Char {..});
 }
 
 #[test]
