@@ -1211,9 +1211,11 @@ impl Parser {
                                         return ParseErrDetail::invalid_escape(r);
                                     }
                                 } else {
-                                    return ParseErrDetail::invalid_escape(r);
+                                    unreachable!() // Error UnexpectedEoiOne is returned earlier in lex method
                                 }
                             }
+                            // Earlier checks in code protect from error in from_str_radix, so no code coverage.
+                            // map_err is present because IntErrorKind in ParseIntError is non-exhaustive
                             let num: u32 = u32::from_str_radix(&val, 16).map_err(|err| {
                                 ParseErrDetail::InvalidIntegerLiteral {
                                     err,

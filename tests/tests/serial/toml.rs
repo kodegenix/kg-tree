@@ -503,6 +503,25 @@ fn bad_escape() {
 }
 
 #[test]
+fn invalid_custom_escape_with_unexpected_end_of_input() {
+    let input = r#"
+        str1 = "\u00f"#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::UnexpectedEoiOne {..});
+}
+
+#[test]
+fn character_g_in_hexadecimal_custom_escape() {
+    let input = r#"
+        str1 = "\ufffg"
+    "#;
+    let err: ParseDiag = parse_node_err!(input);
+
+    assert_err!(err, TomlParseErrDetail::InvalidEscape {..});
+}
+
+#[test]
 fn basic_string_unexpected_eol() {
     let input = "key=\"val\nue\"";
 

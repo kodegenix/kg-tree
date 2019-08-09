@@ -281,6 +281,10 @@ pub enum Terminal {
 
 impl LexTerm for Terminal {}
 
+fn is_hex_char(ch: char) -> bool {
+    ('A' <= ch && ch <= 'F') || ('a' <= ch && ch <= 'f') || ('0' <= ch && ch <= '9')
+}
+
 #[derive(Debug)]
 pub struct Parser {
     token_queue: VecDeque<Token>,
@@ -597,6 +601,42 @@ impl Parser {
                         Some('n') => self.buf.push('\n'),
                         Some('b') => self.buf.push('\u{0008}'),
                         Some('f') => self.buf.push('\u{000c}'),
+                        Some('u') => {
+                            let p1 = r.position();
+                            let mut val = String::new();
+                            for _i in 0..4 {
+                                if let Some(c) = r.next_char()? {
+                                    if is_hex_char(c) {
+                                        val.push(c)
+                                    } else {
+                                        return ParseErr::invalid_escape(r);
+                                    }
+                                } else {
+                                    unreachable!() // Error UnexpectedEoiOne is returned earlier in lex method
+                                }
+                            }
+                            // Earlier checks in code protect from error in from_str_radix, so no code coverage.
+                            // map_err is present because IntErrorKind in ParseIntError is non-exhaustive
+                            let num: u32 = u32::from_str_radix(&val, 16).map_err(|err| {
+                                ParseErr::InvalidIntegerLiteral {
+                                    err,
+                                    from: p1,
+                                    to: r.position(),
+                                }
+                            })?;
+
+                            // http://unicode.org/glossary/#unicode_scalar_value
+                            if (num <= 0xD7FFu32) || (num >= 0xE000u32 && num <= 0x10FFFFu32) {
+                                let unicode_chars = num.to_be_bytes();
+                                for c in &unicode_chars {
+                                    if *c as char != 0 as char {
+                                        self.buf.push(*c as char)
+                                    }
+                                }
+                            } else {
+                                return ParseErr::invalid_escape(r);
+                            }
+                        }
                         _ => return ParseErr::invalid_escape(r),
                     }
                 }
