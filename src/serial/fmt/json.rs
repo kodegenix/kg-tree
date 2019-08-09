@@ -175,7 +175,7 @@ impl ParseErr {
                     p1, p2 => "invalid control UTF-8 character",
                 })
             }
-            _ => unreachable!() //Error is caught in method lex and UnexpectedEoiOne in returned
+            _ => unreachable!(), //Error is caught in method lex and UnexpectedEoiOne in returned
         };
         Err(err)
     }
@@ -641,7 +641,7 @@ impl Parser {
                     }
                 }
                 c if c as u32 <= 31 => return ParseErr::invalid_control_utf8_input(r),
-                _ => self.buf.push(c)
+                _ => self.buf.push(c),
             }
         }
         self.buf.pop();

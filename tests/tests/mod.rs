@@ -1,8 +1,7 @@
 use super::*;
-use std::path::PathBuf;
 use std::ffi::OsStr;
+use std::path::PathBuf;
 use tempfile::TempDir;
-
 
 // some of these helpers should probably be extracted to external crate.
 macro_rules! write_file {

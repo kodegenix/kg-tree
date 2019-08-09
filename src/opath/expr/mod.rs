@@ -29,15 +29,14 @@ pub enum ExprErrorDetail {
     // This variant should probably be placed in resolve.rs module
     #[display(fmt = "too many iterations while resolving interpolations: '{depth}'")]
     InterpolationDepthReached { depth: usize },
-
-//    #[display(fmt = "error calling method '{id}': {detail}", detail = "err.detail()")]
-//    MethodCallError { id: MethodId, err: Box<dyn Diag> },
-//
-//    #[display(
-//        fmt = "error calling function '{id}': {detail}",
-//        detail = "err.detail()"
-//    )]
-//    FuncCallError { id: FuncId, err: Box<dyn Diag> },
+    //    #[display(fmt = "error calling method '{id}': {detail}", detail = "err.detail()")]
+    //    MethodCallError { id: MethodId, err: Box<dyn Diag> },
+    //
+    //    #[display(
+    //        fmt = "error calling function '{id}': {detail}",
+    //        detail = "err.detail()"
+    //    )]
+    //    FuncCallError { id: FuncId, err: Box<dyn Diag> },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1436,9 +1435,7 @@ impl Expr {
             Expr::MethodCall(ref call) => {
                 func::apply_method_to(call.id(), call.args(), env, ctx, out)
             }
-            Expr::FuncCall(ref call) => {
-                func::apply_func_to(call.id(), call.args(), env, ctx, out)
-            }
+            Expr::FuncCall(ref call) => func::apply_func_to(call.id(), call.args(), env, ctx, out),
             Expr::Var(ref e) => {
                 if let Some(scope) = env.scope() {
                     let res = e.apply(env, Context::Expr)?;

@@ -1,7 +1,5 @@
 use super::*;
-use crate::opath::expr::func::FuncCallErrorDetail::{
-    NonBinaryNode, RegexParseError,
-};
+use crate::opath::expr::func::FuncCallErrorDetail::{NonBinaryNode, RegexParseError};
 pub type FuncCallError = BasicDiag;
 
 pub type FuncCallResult = Result<(), FuncCallError>;
@@ -89,19 +87,21 @@ impl FuncCallErrorDetail {
     pub fn custom_func(id: &FuncId, err: BasicDiag) -> FuncCallError {
         FuncCallErrorDetail::FuncCallCustomErr {
             id: id.clone(),
-            err: Box::new(err)
-        }.into()
+            err: Box::new(err),
+        }
+        .into()
     }
     pub fn custom_method(id: &MethodId, kind: Kind, err: BasicDiag) -> FuncCallError {
         FuncCallErrorDetail::MethodCallCustomErr {
             id: id.clone(),
             kind,
-            err: Box::new(err)
-        }.into()
+            err: Box::new(err),
+        }
+        .into()
     }
 
     pub fn parse_err(err: ParseDiag) -> FuncCallError {
-        FuncCallErrorDetail::ParseErr {err: Box::new (err)}.into()
+        FuncCallErrorDetail::ParseErr { err: Box::new(err) }.into()
     }
 }
 
@@ -556,8 +556,7 @@ pub(super) fn apply_func_to(
 ) -> FuncCallResult {
     match *id {
         FuncId::Array => {
-            let values = args
-                .resolve_flat(true, env)?;
+            let values = args.resolve_flat(true, env)?;
             out.add(NodeRef::array(values.into_iter().collect()));
             Ok(())
         }
@@ -565,8 +564,7 @@ pub(super) fn apply_func_to(
             if args.count() == 0 {
                 out.add(NodeRef::object(Properties::new()));
             } else if args.count() == 1 {
-                let values = args
-                    .resolve_column(false, 0, env)?;
+                let values = args.resolve_column(false, 0, env)?;
                 let mut map = LinkedHashMap::with_capacity(values.len());
                 for value in values.into_iter() {
                     if let Value::Object(ref props) = value.data().value() {
@@ -578,10 +576,8 @@ pub(super) fn apply_func_to(
                 out.add(NodeRef::object(map));
             } else {
                 args.check_count_func(id, 2, 2)?;
-                let keys = args
-                    .resolve_column(false, 0, env)?;
-                let values = args
-                    .resolve_column(true, 1, env)?;
+                let keys = args.resolve_column(false, 0, env)?;
+                let values = args.resolve_column(true, 1, env)?;
                 let mut map = LinkedHashMap::with_capacity(std::cmp::min(keys.len(), values.len()));
                 for (k, v) in keys.into_iter().zip(values.into_iter()) {
                     map.insert(k.as_string().to_string().into(), v);
@@ -594,18 +590,16 @@ pub(super) fn apply_func_to(
             args.check_count_func(id, 1, 2)?;
 
             if args.count() == 1 {
-                let paths = args
-                    .resolve_column(false, 0, env)?;
+                let paths = args.resolve_column(false, 0, env)?;
                 for p in paths.into_iter() {
-                    let n =  NodeRef::from_file(&resolve_path_str(p.data().as_string().as_ref()), None)
-                        .map_err(|err| FuncCallErrorDetail::custom_func(id, err))?;
+                    let n =
+                        NodeRef::from_file(&resolve_path_str(p.data().as_string().as_ref()), None)
+                            .map_err(|err| FuncCallErrorDetail::custom_func(id, err))?;
                     out.add(n);
                 }
             } else {
-                let paths = args
-                    .resolve_column(false, 0, env)?;
-                let formats =
-                    args.resolve_column(false, 1, env)?;
+                let paths = args.resolve_column(false, 0, env)?;
+                let formats = args.resolve_column(false, 1, env)?;
 
                 for (p, f) in paths.into_iter().zip(formats.into_iter()) {
                     let format: FileFormat = f.data().as_string().as_ref().into();
@@ -622,8 +616,7 @@ pub(super) fn apply_func_to(
         }
         FuncId::Json => {
             args.check_count_func(id, 1, 1)?;
-            let res = args
-                .resolve_flat(false, env)?;
+            let res = args.resolve_flat(false, env)?;
             for n in res.into_iter() {
                 let n = n.data();
                 let s = n.as_string();
@@ -636,8 +629,7 @@ pub(super) fn apply_func_to(
         }
         FuncId::Parse => {
             args.check_count_func(id, 2, 2)?;
-            let rows = args
-                .resolve_rows_null(false, None, env)?;
+            let rows = args.resolve_rows_null(false, None, env)?;
 
             for r in rows {
                 let ref content = r[0];
@@ -653,8 +645,7 @@ pub(super) fn apply_func_to(
             args.check_count_func(id, 1, 3)?;
             match args.count() {
                 1 => {
-                    let row = args
-                        .resolve_flat(false, env)?;
+                    let row = args.resolve_flat(false, env)?;
                     let format = FileFormat::Json;
                     for n in row {
                         out.add(NodeRef::string(n.to_format(format, false)));
@@ -698,8 +689,7 @@ pub(super) fn apply_func_to(
         FuncId::ParseInt => {
             args.check_count_func(id, 1, 2)?;
 
-            let strs = args
-                .resolve_column(false, 0, env)?;
+            let strs = args.resolve_column(false, 0, env)?;
 
             let mut radixes_1;
             let mut radixes_2;
@@ -737,8 +727,7 @@ pub(super) fn apply_func_to(
 
             args.check_count_func(id, 1, 1)?;
 
-            let strs = args
-                .resolve_column(false, 0, env)?;
+            let strs = args.resolve_column(false, 0, env)?;
 
             for s in strs.into_iter() {
                 let s = s.data();
@@ -755,10 +744,8 @@ pub(super) fn apply_func_to(
         FuncId::ParseBinary => {
             args.check_count_func(id, 2, 2)?;
 
-            let contents = args
-                .resolve_column(false, 0, env)?;
-            let formats = args
-                .resolve_column(false, 1, env)?;
+            let contents = args.resolve_column(false, 0, env)?;
+            let formats = args.resolve_column(false, 1, env)?;
 
             for (c, f) in contents.into_iter().zip(formats.into_iter()) {
                 let f: NodeRef = f;
@@ -785,8 +772,7 @@ pub(super) fn apply_func_to(
         FuncId::IsNaN => {
             args.check_count_func(id, 1, 1)?;
 
-            let nums = args
-                .resolve_column(false, 0, env)?;
+            let nums = args.resolve_column(false, 0, env)?;
 
             for n in nums.into_iter() {
                 let f = n.as_float();
@@ -796,8 +782,7 @@ pub(super) fn apply_func_to(
         }
         FuncId::Sqrt => {
             args.check_count_func(id, 1, 1)?;
-            let res = args
-                .resolve_flat(false, env)?;
+            let res = args.resolve_flat(false, env)?;
             for n in res.into_iter() {
                 out.add(NodeRef::float(n.as_float().sqrt()));
             }
@@ -861,8 +846,7 @@ pub(super) fn apply_method_to(
     ) -> FuncCallResult {
         if env.current().is_array() {
             args.check_count_method(id, kind, 1, 1)?;
-            let elems = args
-                .resolve_column(true, 0, env)?;
+            let elems = args.resolve_column(true, 0, env)?;
             for elem in elems.into_iter() {
                 env.current().add_child(index, None, elem).unwrap();
             }
@@ -944,8 +928,7 @@ pub(super) fn apply_method_to(
             if let Value::Array(ref elems) = *env.current().data().value() {
                 args.check_count_method(id, env.current().data().kind(), 1, 2)?;
                 let sep = {
-                    let nsep =
-                        args.resolve_column(false, 0, env)?;
+                    let nsep = args.resolve_column(false, 0, env)?;
                     match nsep.into_one() {
                         Some(sep) => sep.data().as_string().to_string(),
                         None => String::new(),
@@ -978,25 +961,19 @@ pub(super) fn apply_method_to(
         MethodId::Unshift => array_add(Some(0), id, kind, args, env, out),
         MethodId::Find => {
             args.check_count_method(id, kind, 1, 1)?;
-            let nres = args
-                .resolve_column(false, 0, env)?;
+            let nres = args.resolve_column(false, 0, env)?;
             for n in nres.into_iter() {
                 let d = n.data();
                 let s = d.as_string();
                 if s.is_empty() {
                     out.add(env.current().clone());
                 } else if s.starts_with("@.") {
-                    let opath = Opath::parse(&s)
-                        .map_err(|d| FuncCallErrorDetail::parse_err(d))?;
-                    opath
-                        .expr()
-                        .apply_to(env, Context::Expr, out)?;
+                    let opath = Opath::parse(&s).map_err(|d| FuncCallErrorDetail::parse_err(d))?;
+                    opath.expr().apply_to(env, Context::Expr, out)?;
                 } else {
                     let s = String::with_capacity(256) + "@." + &s;
-                    let opath = Opath::parse(&s).map_err(|d| FuncCallErrorDetail::parse_err( d))?;
-                    opath
-                        .expr()
-                        .apply_to(env, Context::Expr, out)?;
+                    let opath = Opath::parse(&s).map_err(|d| FuncCallErrorDetail::parse_err(d))?;
+                    opath.expr().apply_to(env, Context::Expr, out)?;
                 }
             }
             Ok(())
@@ -1006,8 +983,7 @@ pub(super) fn apply_method_to(
             if env.current().is_object() {
                 args.check_count_method(id, kind, 2, 2)?;
 
-                let keys = args
-                    .resolve_column(false, 0, env)?;
+                let keys = args.resolve_column(false, 0, env)?;
                 let keys: Vec<_> = keys
                     .into_iter()
                     .map(|k| {
@@ -1019,8 +995,7 @@ pub(super) fn apply_method_to(
                     })
                     .collect();
 
-                let values =
-                    args.resolve_column(true, 1, env)?;
+                let values = args.resolve_column(true, 1, env)?;
 
                 env.current()
                     .add_children(
@@ -1043,8 +1018,7 @@ pub(super) fn apply_method_to(
             if env.current().is_object() {
                 args.check_count_method(id, kind, 1, 1)?;
 
-                let keys = args
-                    .resolve_column(false, 0, env)?;
+                let keys = args.resolve_column(false, 0, env)?;
                 let keys: Vec<_> = keys
                     .into_iter()
                     .map(|k| {
@@ -1081,16 +1055,13 @@ pub(super) fn apply_method_to(
                 args.check_count_method(id, kind, 1, 2)?;
 
                 if args.count() == 1 {
-                    let values =
-                        args.resolve_column(true, 0, env)?;
+                    let values = args.resolve_column(true, 0, env)?;
                     env.current()
                         .extend_multiple(values.into_iter().map(|n| (n, None)))
                         .unwrap();
                 } else {
-                    let values =
-                        args.resolve_column(true, 0, env)?;
-                    let indices =
-                        args.resolve_column(false, 1, env)?;
+                    let values = args.resolve_column(true, 0, env)?;
+                    let indices = args.resolve_column(false, 1, env)?;
                     let len = env.current().data().children_count().unwrap();
                     env.current()
                         .extend_multiple(
@@ -1128,10 +1099,7 @@ pub(super) fn apply_method_to(
             if kind == Kind::String {
                 args.check_count_method(id, kind, 1, 2)?;
 
-                let re = args
-                    .resolve_column(true, 0, env)?
-                    .into_one()
-                    .unwrap();
+                let re = args.resolve_column(true, 0, env)?.into_one().unwrap();
                 let regex =
                     Regex::new(&re.data().as_string()).map_err(|err| RegexParseError { err })?;
                 let replacement = {
@@ -1164,10 +1132,7 @@ pub(super) fn apply_method_to(
 
             if kind == Kind::String {
                 args.check_count_method(id, kind, 1, 2)?;
-                let re = args
-                    .resolve_column(true, 0, env)?
-                    .into_one()
-                    .unwrap();
+                let re = args.resolve_column(true, 0, env)?.into_one().unwrap();
                 let regex = Regex::new(re.data().as_string().as_ref())
                     .map_err(|err| RegexParseError { err })?;
 

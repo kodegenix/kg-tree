@@ -1,13 +1,11 @@
 use super::*;
-use kg_tree::opath::NodeSet;
 use kg_tree::opath::FuncCallErrorDetail;
+use kg_tree::opath::NodeSet;
 macro_rules! eval_opath {
     ($opath:expr) => {{
         let opath = match kg_tree::opath::Opath::parse($opath) {
             Ok(op) => op,
-            Err(err) => {
-                panic!("Error parsing opath!: {}", err)
-            }
+            Err(err) => panic!("Error parsing opath!: {}", err),
         };
         let root = NodeRef::object(kg_utils::collections::LinkedHashMap::new());
 
@@ -19,11 +17,10 @@ macro_rules! assert_one {
     ($node_set:expr) => {{
         match $node_set {
             NodeSet::One(node) => node,
-            got => panic!("Expected single node, got: {:?}", got)
+            got => panic!("Expected single node, got: {:?}", got),
         }
     }};
 }
-
 
 #[test]
 fn array() {
@@ -42,7 +39,12 @@ fn array_opath_err() {
 
     let res = eval_opath!(opath);
 
-    assert_detail!(res, FuncCallErrorDetail, FuncCallErrorDetail::UnknownFunc{name}, assert_eq!("nonExistingFunc", name));
+    assert_detail!(
+        res,
+        FuncCallErrorDetail,
+        FuncCallErrorDetail::UnknownFunc { name },
+        assert_eq!("nonExistingFunc", name)
+    );
 }
 
 #[test]
@@ -60,10 +62,6 @@ fn read_file_json() {
     assert_eq!("value", node.get_key("key").as_string_ext())
 }
 
-pub fn as_err<E>(err: E) -> Result<!, E> {
-    Err(err)
-}
-
 #[test]
 fn read_file_malformed() {
     let (_tmp, dir) = get_tmp_dir();
@@ -75,10 +73,10 @@ fn read_file_malformed() {
 
     let res = eval_opath!(opath);
 
-    let (_err, _) = assert_detail!(res, FuncCallErrorDetail, FuncCallErrorDetail::FuncCallCustomErr{..});
+    let (_err, _) =
+        assert_detail!(res, FuncCallErrorDetail, FuncCallErrorDetail::FuncCallCustomErr{..});
 
     // FIXME is this error message ok?
 
-//    println!("{}", err);
-
+    //    println!("{}", err);
 }
