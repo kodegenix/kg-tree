@@ -155,7 +155,6 @@ impl ParseErrDetail {
 
     pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
         let p1 = r.position();
-        let current = r.peek_char(0)?;
         let err = match (r.peek_char(0)?, r.next_char()?) {
             (Some(current), Some(_c)) => {
                 let p2 = r.position();
@@ -617,7 +616,7 @@ impl Parser {
                         Some('\"') => {
                             multiline = true;
                         }
-                        Some(c) => {
+                        Some(_c) => {
                             let p2 = r.position();
                             return Ok(Token::new(
                                 Terminal::String {
@@ -677,7 +676,7 @@ impl Parser {
                         Some('\'') => {
                             multiline = true;
                         }
-                        Some(c) => {
+                        Some(_c) => {
                             let p2 = r.position();
                             return Ok(Token::new(
                                 Terminal::String {
@@ -1212,9 +1211,11 @@ impl Parser {
                                         return ParseErrDetail::invalid_escape(r);
                                     }
                                 } else {
-                                    return ParseErrDetail::invalid_escape(r);
+                                    unreachable!() // Error UnexpectedEoiOne is returned earlier in lex method
                                 }
                             }
+                            // Earlier checks in code protect from error in from_str_radix, so no code coverage.
+                            // map_err is present because IntErrorKind in ParseIntError is non-exhaustive
                             let num: u32 = u32::from_str_radix(&val, 16).map_err(|err| {
                                 ParseErrDetail::InvalidIntegerLiteral {
                                     err,

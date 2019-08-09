@@ -36,6 +36,12 @@ pub enum ParseErr {
         to: Position,
         expected: Vec<char>,
     },
+    #[display(fmt = "invalid UTF-8 character '{input}'")]
+    InvalidControlUTF8Char {
+        input: char,
+        from: Position,
+        to: Position,
+    },
     #[display(fmt = "invalid number literal: {err}")]
     InvalidIntegerLiteral {
         err: std::num::ParseIntError,
@@ -73,6 +79,8 @@ pub enum ParseErr {
     },
     #[display(fmt = "unclosed {a0}")]
     UnclosedGroup(Terminal),
+    #[display(fmt = "key '{key}' defined multiple times")]
+    RedefinedKey { key: String },
 }
 
 impl ParseErr {
@@ -88,22 +96,19 @@ impl ParseErr {
                     p1, p2 => "invalid escape",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoi {
-                pos: p1,
-            }, r, {
-                p1, p1 => "unexpected end of input",
-            }),
+            None => unreachable!(), //Error UnexpectedEoi should be catch earlier in invalid_input_one
         };
         Err(err)
     }
 
     pub fn invalid_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
+        let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
-            Some(c) => {
+            Some(_c) => {
                 let p2 = r.position();
                 parse_diag!(ParseErr::InvalidChar {
-                    input: c,
+                    input: current,
                     from: p1,
                     to: p2
                 }, r, {
@@ -122,17 +127,7 @@ impl ParseErr {
     pub fn invalid_input_one<T>(r: &mut dyn CharReader, expected: char) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
-            Some(c) => {
-                let p2 = r.position();
-                parse_diag!(ParseErr::InvalidCharOne {
-                    input: c,
-                    from: p1,
-                    to: p2,
-                    expected,
-                }, r, {
-                    p1, p2 => "invalid character",
-                })
-            }
+            Some(_c) => unreachable!(), //There is only one possibility in method lex: unexpected end of input
             None => parse_diag!(ParseErr::UnexpectedEoiOne {
                 pos: p1,
                 expected,
@@ -145,11 +140,11 @@ impl ParseErr {
 
     pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
         let p1 = r.position();
-        let err = match r.next_char()? {
-            Some(c) => {
+        let err = match (r.peek_char(0)?, r.next_char()?) {
+            (Some(current), Some(_c)) => {
                 let p2 = r.position();
                 parse_diag!(ParseErr::InvalidCharMany {
-                    input: c,
+                    input: current,
                     from: p1,
                     to: p2,
                     expected,
@@ -157,7 +152,7 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoiMany {
+            _ => parse_diag!(ParseErr::UnexpectedEoiMany {
                 pos: p1,
                 expected,
             }, r, {
@@ -167,7 +162,24 @@ impl ParseErr {
         Err(err)
     }
 
-    #[inline]
+    pub fn invalid_control_utf8_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
+        let p1 = r.position();
+        let err = match (r.peek_char(0)?, r.next_char()?) {
+            (Some(current), Some(_c)) => {
+                let p2 = r.position();
+                parse_diag!(ParseErr::InvalidControlUTF8Char {
+                    input: current,
+                    from: p1,
+                    to: p2
+                }, r, {
+                    p1, p2 => "invalid control UTF-8 character",
+                })
+            }
+            _ => unreachable!() //Error is caught in method lex and UnexpectedEoiOne in returned
+        };
+        Err(err)
+    }
+
     pub fn unexpected_eoi_str<T>(r: &mut dyn CharReader, expected: String) -> Result<T, Error> {
         let pos = r.position();
         Err(parse_diag!(ParseErr::UnexpectedEoiOneString {
@@ -178,14 +190,12 @@ impl ParseErr {
         }))
     }
 
-    #[inline]
     pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErr::UnexpectedToken { token }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
 
-    #[inline]
     pub fn unexpected_token_one<T>(
         token: Token,
         expected: Terminal,
@@ -198,7 +208,6 @@ impl ParseErr {
         )
     }
 
-    #[inline]
     pub fn unexpected_token_many<T>(
         token: Token,
         expected: Vec<Terminal>,
@@ -209,6 +218,34 @@ impl ParseErr {
                 token.from(), token.to() => "unexpected token"
             }),
         )
+    }
+
+    pub fn key_redefined<T>(
+        r: &mut dyn CharReader,
+        redefined: Span,
+        prev: Span,
+        key: &str,
+    ) -> Result<T, Error> {
+        Err(
+            parse_diag!(ParseErr::RedefinedKey{key: key.to_string()}, r, {
+                redefined.from, redefined.to => "key redefined here",
+                prev.from, prev.to => "previously defined here",
+            }),
+        )
+    }
+    pub fn key_redefined_node<T>(
+        r: &mut dyn CharReader,
+        redefined: Span,
+        prev_defined: &NodeRef,
+        key: &str,
+    ) -> Result<T, Error> {
+        let prev = prev_defined
+            .data()
+            .metadata()
+            .span()
+            .expect("Node should always have span");
+
+        return ParseErr::key_redefined(r, redefined, prev, &key);
     }
 }
 
@@ -244,6 +281,10 @@ pub enum Terminal {
 
 impl LexTerm for Terminal {}
 
+fn is_hex_char(ch: char) -> bool {
+    ('A' <= ch && ch <= 'F') || ('a' <= ch && ch <= 'f') || ('0' <= ch && ch <= '9')
+}
+
 #[derive(Debug)]
 pub struct Parser {
     token_queue: VecDeque<Token>,
@@ -259,7 +300,6 @@ impl Parser {
     }
 
     fn lex(&mut self, r: &mut dyn CharReader) -> Result<Token, Error> {
-        #[inline]
         fn process_scientific_notation(
             r: &mut dyn CharReader,
             p1: Position,
@@ -344,10 +384,6 @@ impl Parser {
                 r.skip_while(&|c| c.is_digit(10))?;
                 match r.peek_char(0)? {
                     Some('.') => {
-                        if Some('.') == r.peek_char(1)? {
-                            let p2 = r.position();
-                            return Ok(Token::new(Terminal::Integer, p1, p2));
-                        }
                         r.next_char()?;
                         r.skip_while(&|c| c.is_digit(10))?;
                         match r.peek_char(0)? {
@@ -469,10 +505,11 @@ impl Parser {
         let p1 = self.expect_token(r, Terminal::BraceLeft)?.from();
         let mut props = Properties::new();
         let mut comma = false;
+        let mut literal = true;
         loop {
             let t = self.next_token(r)?;
             match t.term() {
-                Terminal::BraceRight => {
+                Terminal::BraceRight if (comma || literal) => {
                     let span = Span {
                         from: p1,
                         to: t.to(),
@@ -487,8 +524,15 @@ impl Parser {
                     let key = Symbol::from(&self.buf);
                     self.expect_token(r, Terminal::Colon)?;
                     let value = self.parse_value(r)?;
+                    if let Some(child) = props.get(&key) {
+                        return ParseErr::key_redefined_node(r, t.span(), &child, &key);
+                    }
                     props.insert(key, value);
                     comma = true;
+                    literal = false;
+                }
+                _ if !literal && !comma => {
+                    return ParseErr::unexpected_token_one(t, Terminal::Literal, r)
                 }
                 _ => {
                     return ParseErr::unexpected_token_many(
@@ -509,10 +553,11 @@ impl Parser {
         let p1 = self.expect_token(r, Terminal::BracketLeft)?.from();
         let mut elems = Elements::new();
         let mut comma = false;
+        let mut bracket_right = true;
         loop {
             let t = self.next_token(r)?;
             match t.term() {
-                Terminal::BracketRight => {
+                Terminal::BracketRight if bracket_right => {
                     let span = Span {
                         from: p1,
                         to: t.to(),
@@ -521,12 +566,14 @@ impl Parser {
                 }
                 Terminal::Comma if comma => {
                     comma = false;
+                    bracket_right = false;
                 }
                 _ if !comma => {
                     self.push_token(t);
                     let value = self.parse_value(r)?;
                     elems.push(value);
                     comma = true;
+                    bracket_right = true;
                 }
                 _ => return ParseErr::unexpected_token(t, r),
             }
@@ -534,38 +581,76 @@ impl Parser {
     }
 
     fn parse_literal<'a>(&mut self, t: Token, r: &'a mut dyn CharReader) -> Result<(), Error> {
-        let s = r.slice_pos(t.from(), t.to())?;
+        r.seek(t.from())?;
+        let end_offset = t.to().offset;
+        r.skip_chars(1)?;
+        let start_offset = r.position().offset;
         self.buf.clear();
-        self.buf.reserve(s.len());
-        let mut chars = s[1..s.len() - 1].chars();
-        while let Some(c) = chars.next() {
-            if c == '\\' {
-                let c = chars.next();
-                match c {
-                    Some('\\') => self.buf.push('\\'),
-                    Some('\'') => self.buf.push('\''),
-                    Some('\"') => self.buf.push('\"'),
-                    Some('t') => self.buf.push('\t'),
-                    Some('r') => self.buf.push('\r'),
-                    Some('n') => self.buf.push('\n'),
-                    _ => return ParseErr::invalid_escape(r),
+        self.buf.reserve(end_offset - start_offset);
+        while r.position().offset < end_offset - 1 {
+            let c = r.next_char()?.unwrap();
+            match c {
+                '\\' => {
+                    let c = r.next_char()?;
+                    match c {
+                        Some('\\') => self.buf.push('\\'),
+                        Some('\'') => self.buf.push('\''),
+                        Some('\"') => self.buf.push('\"'),
+                        Some('t') => self.buf.push('\t'),
+                        Some('r') => self.buf.push('\r'),
+                        Some('n') => self.buf.push('\n'),
+                        Some('b') => self.buf.push('\u{0008}'),
+                        Some('f') => self.buf.push('\u{000c}'),
+                        Some('u') => {
+                            let p1 = r.position();
+                            let mut val = String::new();
+                            for _i in 0..4 {
+                                if let Some(c) = r.next_char()? {
+                                    if is_hex_char(c) {
+                                        val.push(c)
+                                    } else {
+                                        return ParseErr::invalid_escape(r);
+                                    }
+                                } else {
+                                    unreachable!() // Error UnexpectedEoiOne is returned earlier in lex method
+                                }
+                            }
+                            // Earlier checks in code protect from error in from_str_radix, so no code coverage.
+                            // map_err is present because IntErrorKind in ParseIntError is non-exhaustive
+                            let num: u32 = u32::from_str_radix(&val, 16).map_err(|err| {
+                                ParseErr::InvalidIntegerLiteral {
+                                    err,
+                                    from: p1,
+                                    to: r.position(),
+                                }
+                            })?;
+
+                            // http://unicode.org/glossary/#unicode_scalar_value
+                            if (num <= 0xD7FFu32) || (num >= 0xE000u32 && num <= 0x10FFFFu32) {
+                                let unicode_chars = num.to_be_bytes();
+                                for c in &unicode_chars {
+                                    if *c as char != 0 as char {
+                                        self.buf.push(*c as char)
+                                    }
+                                }
+                            } else {
+                                return ParseErr::invalid_escape(r);
+                            }
+                        }
+                        _ => return ParseErr::invalid_escape(r),
+                    }
                 }
-            } else {
-                self.buf.push(c);
+                c if c as u32 <= 31 => return ParseErr::invalid_control_utf8_input(r),
+                _ => self.buf.push(c)
             }
         }
+        self.buf.pop();
+        r.seek(t.to())?;
         Ok(())
-    }
-}
-
-impl Default for Parser {
-    fn default() -> Self {
-        Parser::new()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
 }
