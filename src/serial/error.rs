@@ -16,8 +16,8 @@ impl std::error::Error for Error {
 }
 
 impl std::fmt::Display for Error {
-    fn fmt(&self, _f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        unimplemented!()
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(&format!("{:?}", self))
     }
 }
 
