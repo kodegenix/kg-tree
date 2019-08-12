@@ -1,7 +1,10 @@
+use kg_diag::Severity;
 //FIXME (jc)
-#[derive(Debug)]
+#[derive(Debug, Display, Detail)]
 pub enum Error {
+    #[display(fmt = "SerializationError : {a0}")]
     SerializationError(u32),
+    #[display(fmt = "DeserializationError : {a0}")]
     DeserializationError(u32),
 }
 
@@ -12,12 +15,6 @@ impl std::error::Error for Error {
 
     fn cause(&self) -> Option<&dyn std::error::Error> {
         unimplemented!()
-    }
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str(&format!("{:?}", self))
     }
 }
 

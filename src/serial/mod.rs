@@ -32,8 +32,7 @@ pub mod toml {
 
         // FIXME ws error handling
         super::de::from_tree(&n).map_err(|err| {
-            eprintln!("Cannot deserialize type = {:?}", err);
-            panic!("Deserialization error")
+            err.into()
         })
     }
 }
