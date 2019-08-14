@@ -557,7 +557,7 @@ impl Parser {
             Ok(Token::new(Terminal::BareKey, p1, p2))
         }
 
-        r.skip_until(&|c: char| !(c.is_whitespace() && c != '\n' && c != '\r'))?;
+        r.skip_whitespace_nonl()?;
 
         match r.peek_char(0)? {
             None => Ok(Token::new(Terminal::End, r.position(), r.position())),
