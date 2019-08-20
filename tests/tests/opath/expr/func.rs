@@ -1,4 +1,5 @@
 use super::*;
+use kg_diag::Diag;
 use kg_tree::opath::FuncCallErrorDetail;
 use kg_tree::opath::NodeSet;
 macro_rules! eval_opath {
@@ -73,9 +74,10 @@ fn read_file_malformed() {
 
     let res = eval_opath!(opath);
 
-    let (_err, _) =
-        assert_detail!(res, FuncCallErrorDetail, FuncCallErrorDetail::FuncCallCustomErr{..});
+    let (err, _) =
+        assert_detail!(res, FuncCallErrorDetail, FuncCallErrorDetail::FuncCallCustom{..});
 
+    assert!(err.cause().is_some())
     // FIXME is this error message ok?
 
     //    println!("{}", err);
