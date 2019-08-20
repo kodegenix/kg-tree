@@ -70,38 +70,33 @@ pub enum FuncCallErrorDetail {
     #[display(fmt = "cannot parse regex: {err}")]
     RegexParseError { err: regex::Error },
 
-    #[display(fmt = "{err}")]
-    ParseErr { err: Box<dyn Diag> },
+    #[display(fmt = "cannot parse expression")]
+    ParseErr,
 
-    #[display(fmt = "error while calling method '{id}' for type '{kind}': {err}")]
-    MethodCallCustomErr {
+    #[display(fmt = "error while calling method '{id}' for type '{kind}'")]
+    MethodCallCustom {
         id: MethodId,
         kind: Kind,
-        err: Box<dyn Diag>,
     },
-    #[display(fmt = "error while calling function '{id}': {err}")]
-    FuncCallCustomErr { id: FuncId, err: Box<dyn Diag> },
+    #[display(fmt = "error while calling function '{id}'")]
+    FuncCallCustom { id: FuncId },
 }
 
 impl FuncCallErrorDetail {
     pub fn custom_func(id: &FuncId, err: BasicDiag) -> FuncCallError {
-        FuncCallErrorDetail::FuncCallCustomErr {
+        FuncCallErrorDetail::FuncCallCustom {
             id: id.clone(),
-            err: Box::new(err),
-        }
-        .into()
+        }.with_cause(err)
     }
     pub fn custom_method(id: &MethodId, kind: Kind, err: BasicDiag) -> FuncCallError {
-        FuncCallErrorDetail::MethodCallCustomErr {
+        FuncCallErrorDetail::MethodCallCustom {
             id: id.clone(),
             kind,
-            err: Box::new(err),
-        }
-        .into()
+        }.with_cause(err)
     }
 
     pub fn parse_err(err: ParseDiag) -> FuncCallError {
-        FuncCallErrorDetail::ParseErr { err: Box::new(err) }.into()
+        FuncCallErrorDetail::ParseErr.with_cause(err)
     }
 }
 
