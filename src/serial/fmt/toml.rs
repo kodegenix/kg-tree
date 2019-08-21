@@ -469,7 +469,7 @@ impl Parser {
                 Some('-') | Some('+') => {
                     r.skip_chars(1)?;
                     let mut has_digits = false;
-                    r.skip_while_mut(&mut |c| {
+                    r.skip_while(&mut |c| {
                         if c.is_digit(10) {
                             has_digits = true;
                             true
@@ -489,7 +489,7 @@ impl Parser {
                 }
                 Some(c) if c.is_digit(10) => {
                     r.skip_chars(1)?;
-                    r.skip_while(&|c| c.is_digit(10))?;
+                    r.skip_while(&mut |c| c.is_digit(10))?;
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Float, p1, p2))
                 }
@@ -540,7 +540,7 @@ impl Parser {
                 // underscore is not allowed between prefix and number
                 return ParseErrDetail::invalid_input(r);
             }
-            r.skip_while(&|c| f(c) || c == '_')?;
+            r.skip_while(&mut |c| f(c) || c == '_')?;
             let p2 = r.position();
             return Ok(Token::new(Terminal::Integer, p1, p2));
         }
@@ -557,7 +557,7 @@ impl Parser {
             Ok(Token::new(Terminal::BareKey, p1, p2))
         }
 
-        r.skip_until(&|c: char| !(c.is_whitespace() && c != '\n' && c != '\r'))?;
+        r.skip_until(&mut |c: char| !(c.is_whitespace() && c != '\n' && c != '\r'))?;
 
         match r.peek_char(0)? {
             None => Ok(Token::new(Terminal::End, r.position(), r.position())),
@@ -578,28 +578,28 @@ impl Parser {
                 }
             }
             Some('i') => {
-                if r.match_str_term("inf", &is_non_bare)? {
+                if r.match_str_term("inf", &mut is_non_bare)? {
                     consume(r, 3, Terminal::Float)
                 } else {
                     consume_bare_key(r)
                 }
             }
             Some('n') => {
-                if r.match_str_term("nan", &is_non_bare)? {
+                if r.match_str_term("nan", &mut is_non_bare)? {
                     consume(r, 3, Terminal::Float)
                 } else {
                     consume_bare_key(r)
                 }
             }
             Some('t') => {
-                if r.match_str_term("true", &is_non_bare)? {
+                if r.match_str_term("true", &mut is_non_bare)? {
                     consume(r, 4, Terminal::True)
                 } else {
                     consume_bare_key(r)
                 }
             }
             Some('f') => {
-                if r.match_str_term("false", &is_non_bare)? {
+                if r.match_str_term("false", &mut is_non_bare)? {
                     consume(r, 5, Terminal::False)
                 } else {
                     consume_bare_key(r)
@@ -735,12 +735,12 @@ impl Parser {
 
                     // Check special floats
                     (first, Some('i')) if is_sign(first) => {
-                        if r.match_str_term(&format!("{}inf", first), &is_non_alphanumeric)? {
+                        if r.match_str_term(&format!("{}inf", first), &mut is_non_alphanumeric)? {
                             return consume(r, 4, Terminal::Float);
                         }
                     }
                     (first, Some('n')) if is_sign(first) => {
-                        if r.match_str_term(&format!("{}nan", first), &is_non_alphanumeric)? {
+                        if r.match_str_term(&format!("{}nan", first), &mut is_non_alphanumeric)? {
                             return consume(r, 4, Terminal::Float);
                         }
                     }
@@ -748,11 +748,11 @@ impl Parser {
                 }
 
                 r.next_char()?;
-                r.skip_while(&|c| c.is_digit(10) || c == '_')?;
+                r.skip_while(&mut |c| c.is_digit(10) || c == '_')?;
                 match r.peek_char(0)? {
                     Some('.') => {
                         r.next_char()?;
-                        r.skip_while(&|c| c.is_digit(10) || c == '_')?;
+                        r.skip_while(&mut |c| c.is_digit(10) || c == '_')?;
                         match r.peek_char(0)? {
                             Some('e') | Some('E') => process_scientific_notation(r, p1),
                             _ => {

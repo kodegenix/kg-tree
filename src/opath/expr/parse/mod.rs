@@ -373,7 +373,7 @@ impl Parser {
                 Some('-') | Some('+') => {
                     r.skip_chars(1)?;
                     let mut has_digits = false;
-                    r.skip_while_mut(&mut |c| {
+                    r.skip_while(&mut |c| {
                         if c.is_digit(10) {
                             has_digits = true;
                             true
@@ -393,7 +393,7 @@ impl Parser {
                 }
                 Some(c) if c.is_digit(10) => {
                     r.skip_chars(1)?;
-                    r.skip_while(&|c| c.is_digit(10))?;
+                    r.skip_while(&mut |c| c.is_digit(10))?;
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Float, p1, p2))
                 }
@@ -548,7 +548,7 @@ impl Parser {
                 let p1 = r.position();
                 r.next_char()?;
                 let mut more = false;
-                r.skip_while_mut(&mut |c| {
+                r.skip_while(&mut |c| {
                     if is_ident_char(c) {
                         more = true;
                         true
@@ -577,7 +577,7 @@ impl Parser {
                     }
                     _ => {
                         let mut more = false;
-                        r.skip_while_mut(&mut |c| {
+                        r.skip_while(&mut |c| {
                             if is_ident_char(c) {
                                 more = true;
                                 true
@@ -603,18 +603,18 @@ impl Parser {
                 } else {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&is_ident_char)?;
+                    r.skip_while(&mut is_ident_char)?;
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Property, p1, p2))
                 }
             }
             Some('n') => {
-                if r.match_str_term("null", &is_non_ident_char)? {
+                if r.match_str_term("null", &mut is_non_ident_char)? {
                     let p1 = r.position();
                     r.skip_chars(4)?;
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Null, p1, p2))
-                } else if r.match_str_term("not", &is_non_ident_char)? {
+                } else if r.match_str_term("not", &mut is_non_ident_char)? {
                     let p1 = r.position();
                     r.skip_chars(3)?;
                     let p2 = r.position();
@@ -622,13 +622,13 @@ impl Parser {
                 } else {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&is_ident_char)?;
+                    r.skip_while(&mut is_ident_char)?;
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Property, p1, p2))
                 }
             }
             Some('t') => {
-                if r.match_str_term("true", &is_non_ident_char)? {
+                if r.match_str_term("true", &mut is_non_ident_char)? {
                     let p1 = r.position();
                     r.skip_chars(4)?;
                     let p2 = r.position();
@@ -636,13 +636,13 @@ impl Parser {
                 } else {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&is_ident_char)?;
+                    r.skip_while(&mut is_ident_char)?;
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Property, p1, p2))
                 }
             }
             Some('f') => {
-                if r.match_str_term("false", &is_non_ident_char)? {
+                if r.match_str_term("false", &mut is_non_ident_char)? {
                     let p1 = r.position();
                     r.skip_chars(5)?;
                     let p2 = r.position();
@@ -650,13 +650,13 @@ impl Parser {
                 } else {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&is_ident_char)?;
+                    r.skip_while(&mut is_ident_char)?;
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Property, p1, p2))
                 }
             }
             Some('a') => {
-                if r.match_str_term("and", &is_non_ident_char)? {
+                if r.match_str_term("and", &mut is_non_ident_char)? {
                     let p1 = r.position();
                     r.skip_chars(3)?;
                     let p2 = r.position();
@@ -664,13 +664,13 @@ impl Parser {
                 } else {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&is_ident_char)?;
+                    r.skip_while(&mut is_ident_char)?;
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Property, p1, p2))
                 }
             }
             Some('o') => {
-                if r.match_str_term("or", &is_non_ident_char)? {
+                if r.match_str_term("or", &mut is_non_ident_char)? {
                     let p1 = r.position();
                     r.skip_chars(2)?;
                     let p2 = r.position();
@@ -678,7 +678,7 @@ impl Parser {
                 } else {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&is_ident_char)?;
+                    r.skip_while(&mut is_ident_char)?;
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Property, p1, p2))
                 }
@@ -686,14 +686,14 @@ impl Parser {
             Some(c) if c.is_alphabetic() || c == '_' => {
                 let p1 = r.position();
                 r.next_char()?;
-                r.skip_while(&is_ident_char)?;
+                r.skip_while(&mut is_ident_char)?;
                 let p2 = r.position();
                 Ok(Token::new(Terminal::Property, p1, p2))
             }
             Some(c) if c.is_digit(10) => {
                 let p1 = r.position();
                 r.next_char()?;
-                r.skip_while(&|c| c.is_digit(10))?;
+                r.skip_while(&mut |c| c.is_digit(10))?;
                 match r.peek_char(0)? {
                     Some('.') => {
                         if Some('.') == r.peek_char(1)? {
@@ -701,7 +701,7 @@ impl Parser {
                             return Ok(Token::new(Terminal::Integer, p1, p2));
                         }
                         r.next_char()?;
-                        r.skip_while(&|c| c.is_digit(10))?;
+                        r.skip_while(&mut |c| c.is_digit(10))?;
                         match r.peek_char(0)? {
                             Some('e') | Some('E') => process_scientific_notation(r, p1),
                             _ => {

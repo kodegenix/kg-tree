@@ -309,7 +309,7 @@ impl Parser {
                 Some('-') | Some('+') => {
                     r.skip_chars(1)?;
                     let mut has_digits = false;
-                    r.skip_while_mut(&mut |c| {
+                    r.skip_while(&mut |c| {
                         if c.is_digit(10) {
                             has_digits = true;
                             true
@@ -329,7 +329,7 @@ impl Parser {
                 }
                 Some(c) if c.is_digit(10) => {
                     r.skip_chars(1)?;
-                    r.skip_while(&|c| c.is_digit(10))?;
+                    r.skip_while(&mut |c| c.is_digit(10))?;
                     let p2 = r.position();
                     Ok(Token::new(Terminal::Float, p1, p2))
                 }
@@ -358,21 +358,21 @@ impl Parser {
             Some('}') => consume(r, 1, Terminal::BraceRight),
             Some(':') => consume(r, 1, Terminal::Colon),
             Some('n') => {
-                if r.match_str_term("null", &is_non_alphanumeric)? {
+                if r.match_str_term("null", &mut is_non_alphanumeric)? {
                     consume(r, 4, Terminal::Null)
                 } else {
                     ParseErr::invalid_input(r)
                 }
             }
             Some('t') => {
-                if r.match_str_term("true", &is_non_alphanumeric)? {
+                if r.match_str_term("true", &mut is_non_alphanumeric)? {
                     consume(r, 4, Terminal::True)
                 } else {
                     ParseErr::invalid_input(r)
                 }
             }
             Some('f') => {
-                if r.match_str_term("false", &is_non_alphanumeric)? {
+                if r.match_str_term("false", &mut is_non_alphanumeric)? {
                     consume(r, 5, Terminal::False)
                 } else {
                     ParseErr::invalid_input(r)
@@ -381,11 +381,11 @@ impl Parser {
             Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
                 let p1 = r.position();
                 r.next_char()?;
-                r.skip_while(&|c| c.is_digit(10))?;
+                r.skip_while(&mut |c| c.is_digit(10))?;
                 match r.peek_char(0)? {
                     Some('.') => {
                         r.next_char()?;
-                        r.skip_while(&|c| c.is_digit(10))?;
+                        r.skip_while(&mut |c| c.is_digit(10))?;
                         match r.peek_char(0)? {
                             Some('e') | Some('E') => process_scientific_notation(r, p1),
                             _ => {
