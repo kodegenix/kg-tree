@@ -310,16 +310,6 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<ModelChange>, cache: &m
                     changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
                 }
             }
-            (&Value::Integer(na), &Value::Float(nb)) => {
-                if na as f64 != nb {
-                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
-                }
-            }
-            (&Value::Float(na), &Value::Integer(nb)) => {
-                if na != nb as f64 {
-                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
-                }
-            }
             (&Value::String(ref sa), &Value::String(ref sb)) => {
                 if sa != sb {
                     changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));

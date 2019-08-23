@@ -770,8 +770,11 @@ impl NodeRef {
                 (&Value::Boolean(a), &Value::Boolean(b)) => a == b,
                 (&Value::Boolean(a), _) => a == b.as_boolean(),
                 (_, &Value::Boolean(b)) => a.as_boolean() == b,
+                #[allow(clippy::float_cmp)]
                 (&Value::Float(a), &Value::Float(b)) => a == b,
+                #[allow(clippy::float_cmp)]
                 (&Value::Float(a), _) => a == b.as_float(),
+                #[allow(clippy::float_cmp)]
                 (_, &Value::Float(b)) => a.as_float() == b,
                 (&Value::Integer(a), &Value::Integer(b)) => a == b,
                 (_, _) => false,
@@ -791,7 +794,7 @@ impl NodeRef {
                 (&Value::Array(_), &Value::Array(_)) => self.is_ref_eq(other),
                 (&Value::String(ref a), &Value::String(ref b)) => a == b,
                 (&Value::Boolean(a), &Value::Boolean(b)) => a == b,
-                (&Value::Float(a), &Value::Float(b)) => a == b,
+                (&Value::Float(a), &Value::Float(b)) => a.to_bits() == b.to_bits(),
                 (&Value::Integer(a), &Value::Integer(b)) => a == b,
                 (_, _) => false,
             }
@@ -832,7 +835,7 @@ impl NodeRef {
                 }
                 (&Value::String(ref a), &Value::String(ref b)) => a == b,
                 (&Value::Boolean(a), &Value::Boolean(b)) => a == b,
-                (&Value::Float(a), &Value::Float(b)) => a == b,
+                (&Value::Float(a), &Value::Float(b)) => a.to_bits() == b.to_bits(),
                 (&Value::Integer(a), &Value::Integer(b)) => a == b,
                 (_, _) => false,
             }
