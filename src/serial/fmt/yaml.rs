@@ -167,10 +167,10 @@ impl Parser {
                     let indent = p2.offset - p1.offset;
                     if self.indent > indent {
                         self.indent = indent;
-                        return Ok(Token::new(Terminal::Indent, p1, p2))
+                        return Ok(Token::new(Terminal::Dedent, p1, p2))
                     } else if self.indent < indent {
                         self.indent = indent;
-                        return Ok(Token::new(Terminal::Dedent, p1, p2))
+                        return Ok(Token::new(Terminal::Indent, p1, p2))
                     }
                 }
             }
@@ -184,9 +184,13 @@ impl Parser {
             Some(']') => consume(r, 1, Terminal::BracketRight),
             Some('{') => consume(r, 1, Terminal::BraceLeft),
             Some('}') => consume(r, 1, Terminal::BraceRight),
-            Some('\n') => consume(r, 1, Terminal::Newline),
+            Some('\n') => {
+                self.line_start = true;
+                consume(r, 1, Terminal::Newline)
+            }
             Some('\r') => {
                 if let Some('\n') = r.peek_char(1)? {
+                    self.line_start = true;
                     consume(r, 2, Terminal::Newline)
                 } else {
                     ParseErrDetail::invalid_input(r)
