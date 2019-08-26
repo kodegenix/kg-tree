@@ -29,14 +29,6 @@ pub enum ExprErrorDetail {
     // This variant should probably be placed in resolve.rs module
     #[display(fmt = "too many iterations while resolving interpolations: '{depth}'")]
     InterpolationDepthReached { depth: usize },
-    //    #[display(fmt = "error calling method '{id}': {detail}", detail = "err.detail()")]
-    //    MethodCallError { id: MethodId, err: Box<dyn Diag> },
-    //
-    //    #[display(
-    //        fmt = "error calling function '{id}': {detail}",
-    //        detail = "err.detail()"
-    //    )]
-    //    FuncCallError { id: FuncId, err: Box<dyn Diag> },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1325,20 +1317,6 @@ impl Expr {
                     }
                 }
 
-                fn clip(value: f64, min: f64, max: f64) -> f64 {
-                    if value < min {
-                        min
-                    } else if value > max {
-                        max
-                    } else {
-                        value
-                    }
-                }
-
-                /*fn span(start: f64, stop: f64, step: f64) -> f64 {
-                    f64::abs((stop - start) / step)
-                }*/
-
                 let mut start;
                 let mut stop;
 
@@ -1352,10 +1330,10 @@ impl Expr {
                     start = get_opt_float(env, r.start())?.unwrap_or(0.);
                     stop = get_opt_float(env, r.stop())?.unwrap_or(last);
                     if start < 0. {
-                        start = len + start;
+                        start += len;
                     }
                     if stop < 0. {
-                        stop = len + stop;
+                        stop += len;
                     }
                     if stop < 0. && start == 0. {
                         return Ok(());
@@ -1363,20 +1341,18 @@ impl Expr {
                     if start > last && stop > last {
                         return Ok(());
                     }
-                    start = clip(start, 0., last);
-                    stop = clip(stop, 0., last);
+                    start = start.clamp(0., last);
+                    stop = stop.clamp(0., last);
                 } else {
                     start = get_opt_float(env, r.start())?.unwrap_or(0.);
                     stop = get_opt_float(env, r.stop())?.unwrap_or(0.);
                 }
 
-                if start == stop {
+                if (start - stop).abs() < std::f64::EPSILON {
                     apply_float(env.current(), ctx, start, out)
                 } else if start < stop {
                     let step = get_opt_float(env, r.step())?.unwrap_or(1f64);
-                    if step > 0f64
-                    /*&& span(start, stop, step) <= 1000f64*/
-                    {
+                    if step > 0f64 {
                         loop {
                             apply_float(env.current(), ctx, start, out)?;
                             start += step;
@@ -1388,9 +1364,7 @@ impl Expr {
                     Ok(())
                 } else {
                     let step = get_opt_float(env, r.step())?.unwrap_or(-1f64);
-                    if step < 0f64
-                    /*&& span(start, stop, step) <= 1000f64*/
-                    {
+                    if step < 0f64 {
                         loop {
                             apply_float(env.current(), ctx, start, out)?;
                             start += step;

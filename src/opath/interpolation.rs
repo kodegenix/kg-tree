@@ -186,7 +186,7 @@ struct Delims {
 
 #[derive(Debug)]
 pub struct Parser {
-    expr_parser: self::parse::Parser,
+    expr_parser: self::expr::parse::Parser,
     delims: Delims,
 }
 
@@ -214,7 +214,7 @@ impl Parser {
         };
 
         Parser {
-            expr_parser: self::parse::Parser::new().with_partial(true),
+            expr_parser: self::expr::parse::Parser::new().with_partial(true),
             delims,
         }
     }
@@ -258,7 +258,7 @@ impl Parser {
                             r.skip_chars(self.delims.close.len())?;
                             p0 = r.position();
                         } else {
-                            return self::parse::ParseErr::unexpected_eoi_str(
+                            return self::expr::parse::ParseErr::unexpected_eoi_str(
                                 r,
                                 self.delims.close.clone(),
                             );

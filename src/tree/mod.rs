@@ -42,8 +42,11 @@ pub enum TreeErrorDetail {
     )]
     NonUtf8Node { err: Utf8Error },
 
-    #[display(fmt = "deserialization error: {err}")]
-    DeserializationErr { err: ParseDiag },
+    #[display(fmt = "cannot deserialize node from '{format}': {err}")]
+    DeserializationErr {
+        format: FileFormat,
+        err: ParseDiag
+    },
 
     //FIXME ws to be removed
     #[display(fmt = "Error in line '{a0}'")]
@@ -171,7 +174,10 @@ impl NodeRef {
             FileFormat::Text => Ok(NodeRef::string(s)),
             FileFormat::Binary => Ok(NodeRef::binary(s.as_bytes())),
         };
-        res.map_err(|err| TreeErrorDetail::DeserializationErr { err }.into())
+        res.map_err(|err| TreeErrorDetail::DeserializationErr {
+            format,
+            err
+        }.into())
     }
 
     pub fn from_bytes(s: &[u8], format: FileFormat) -> TreeResult<NodeRef> {
@@ -188,7 +194,10 @@ impl NodeRef {
             FileFormat::Text => Ok(NodeRef::string(to_str(s)?)),
             FileFormat::Binary => Ok(NodeRef::binary(s)),
         };
-        res.map_err(|err| TreeErrorDetail::DeserializationErr { err }.into())
+        res.map_err(|err| TreeErrorDetail::DeserializationErr {
+            format,
+            err
+        }.into())
     }
 
     pub fn from_file(file_path: &Path, format: Option<FileFormat>) -> TreeResult<NodeRef> {
@@ -761,8 +770,11 @@ impl NodeRef {
                 (&Value::Boolean(a), &Value::Boolean(b)) => a == b,
                 (&Value::Boolean(a), _) => a == b.as_boolean(),
                 (_, &Value::Boolean(b)) => a.as_boolean() == b,
+                #[allow(clippy::float_cmp)]
                 (&Value::Float(a), &Value::Float(b)) => a == b,
+                #[allow(clippy::float_cmp)]
                 (&Value::Float(a), _) => a == b.as_float(),
+                #[allow(clippy::float_cmp)]
                 (_, &Value::Float(b)) => a.as_float() == b,
                 (&Value::Integer(a), &Value::Integer(b)) => a == b,
                 (_, _) => false,
@@ -782,7 +794,7 @@ impl NodeRef {
                 (&Value::Array(_), &Value::Array(_)) => self.is_ref_eq(other),
                 (&Value::String(ref a), &Value::String(ref b)) => a == b,
                 (&Value::Boolean(a), &Value::Boolean(b)) => a == b,
-                (&Value::Float(a), &Value::Float(b)) => a == b,
+                (&Value::Float(a), &Value::Float(b)) => a.to_bits() == b.to_bits(),
                 (&Value::Integer(a), &Value::Integer(b)) => a == b,
                 (_, _) => false,
             }
@@ -823,7 +835,7 @@ impl NodeRef {
                 }
                 (&Value::String(ref a), &Value::String(ref b)) => a == b,
                 (&Value::Boolean(a), &Value::Boolean(b)) => a == b,
-                (&Value::Float(a), &Value::Float(b)) => a == b,
+                (&Value::Float(a), &Value::Float(b)) => a.to_bits() == b.to_bits(),
                 (&Value::Integer(a), &Value::Integer(b)) => a == b,
                 (_, _) => false,
             }
