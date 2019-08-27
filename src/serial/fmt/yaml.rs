@@ -50,10 +50,14 @@ pub enum Terminal {
     End,
     #[display(fmt = "NEWLINE")]
     Newline,
+    #[display(fmt = "WHITESPACE")]
+    Whitespace,
     #[display(fmt = "'%'")]
     Percent,
     #[display(fmt = "'-'")]
     Dash,
+    #[display(fmt = "'.'")]
+    Dot,
     #[display(fmt = "':'")]
     Colon,
     #[display(fmt = "INDENT")]
@@ -119,6 +123,15 @@ fn is_blank(c: char) -> bool {
 fn is_break(c: char) -> bool {
     c == '\n' || c == '\r'
 }
+
+fn is_string(c: char) -> bool {
+    match c {
+        ':' => false,
+        '%' => false,
+        _ => true
+    }
+}
+
 #[derive(Debug)]
 pub struct Parser {
     token_queue: VecDeque<Token>,
@@ -169,8 +182,8 @@ impl Parser {
         }
 
         let p1 = r.position();
-        r.skip_whitespace_nonl()?;
         if self.line_start {
+            r.skip_whitespace_nonl()?;
             self.line_start = false;
             if let Some(c) = r.peek_char(0)? {
                 if c != '#' && c != '\n' && c != '\r' {
@@ -182,27 +195,6 @@ impl Parser {
                     } else if self.indent < indent {
                         self.indent = indent;
                         return Ok(Token::new(Terminal::Indent, p1, p2))
-                    }
-                }
-                if c == '%' && r.position().column == 0 {
-                    unimplemented!() //TODO MC Directives
-                }
-                if r.match_str("---")? && r.position().column == 0 {
-                    if let Some(c) = r.peek_char(3)? {
-                        if is_break(c) {
-                            return consume(r, 3, Terminal::DocumentStart);
-                        }
-                    } else {
-                        unimplemented!() //TODO MC Error
-                    }
-                }
-                if r.match_str("...")? && r.position().column == 0 {
-                    if let Some(c) = r.peek_char(3)? {
-                        if is_break(c) {
-                            return consume(r, 3, Terminal::DocumentEnd);
-                        }
-                    } else {
-                        unimplemented!() //TODO MC Error
                     }
                 }
             }
@@ -230,35 +222,28 @@ impl Parser {
             }
             Some(':') => consume(r, 1, Terminal::Colon),
             Some('-') => consume(r, 1, Terminal::Dash),
+            Some('.') => consume(r, 1, Terminal::Dot),
             Some('?') => consume(r, 1, Terminal::QuestionMark),
             Some('*') => consume(r, 1, Terminal::Asterisk),
             Some('&') => consume(r, 1, Terminal::Ampersand),
             Some('!') => consume(r, 1, Terminal::ExclamationMark),
             Some('|') => consume(r, 1, Terminal::VerticalBar),
             Some('>') => consume(r, 1, Terminal::GraterThan),
-            Some('%') => ParseErrDetail::invalid_input(r),
+            Some('%') => consume(r, 1, Terminal::Percent),
             Some('@') => consume(r, 1, Terminal::At),
+            Some(' ') | Some('\t') => consume(r, 1, Terminal::Whitespace),
             Some('`') => consume(r, 1, Terminal::GraveAccent),
             Some('"') => consume(r, 1, Terminal::String),
             Some('\'') => consume(r, 1, Terminal::String),
-            Some(_) => self.fetch_plain_scalar(r),
+            Some(_) => {
+                println!("here");
+                let p1 = r.position();
+                r.skip_while(&mut is_string)?;
+                let p2 = r.position();
+                Ok(Token::new(Terminal::String, p1, p2))
+            },
 //            Some(_) => ParseErrDetail::invalid_input(r), //Temporary
 //            Some(_) => consume(r, 1, Terminal::String), // Only for test purposes
-        }
-    }
-
-    fn fetch_plain_scalar(&mut self, r: &mut dyn CharReader) {
-        loop {
-            if (r.match_str("---")? || r.match_str("...")?) && r.position().column == 0 {
-                if let Some(c) = r.peek_char(3)? {
-                    if is_break(c) {
-                        break;
-                    }
-                }
-            }
-            if r.peek_char(0) == '#' {
-                break;
-            }
         }
     }
 }
@@ -323,49 +308,45 @@ mod tests {
 
         #[test]
         fn document_start_lf() {
-            let input: &str = "---\n";
-
-            let terms = vec![
-                             Terminal::DocumentStart,
-                             Terminal::Newline,
-                             Terminal::End];
-            assert_terms!(input, terms);
-        }
-
-        //#[test]
-        fn document_start() {
             let input: &str = "---";
 
             let terms = vec![
-                Terminal::DocumentStart,
-                Terminal::End];
+                             Terminal::Dash,
+                             Terminal::Dash,
+                             Terminal::Dash];
             assert_terms!(input, terms);
         }
 
         #[test]
         fn document_end_lf() {
-            let input: &str = "...\n";
-
-            let terms = vec![
-                Terminal::DocumentEnd,
-                Terminal::Newline,
-                Terminal::End];
-            assert_terms!(input, terms);
-        }
-
-        //#[test]
-        fn document_end() {
             let input: &str = "...";
 
             let terms = vec![
-                Terminal::DocumentStart,
+                Terminal::Dot,
+                Terminal::Dot,
+                Terminal::Dot];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn test2() {
+            let input: &str = r#"key: value"#;
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
                 Terminal::End];
             assert_terms!(input, terms);
         }
 
         //#[test]
         fn test() {
+            // language=yaml
             let input: &str = r#"---
+%:%:bbb: value
+
 receipt: Oz-Ware Purchase Invoice
 date: 2007-08-06
 customer:
