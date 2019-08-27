@@ -108,6 +108,17 @@ pub enum Terminal {
 
 impl LexTerm for Terminal {}
 
+fn is_blank_or_break(c: char) -> bool {
+    is_blank(c) || is_break(c)
+}
+
+fn is_blank(c: char) -> bool {
+    c == ' ' || c == '\t'
+}
+
+fn is_break(c: char) -> bool {
+    c == '\n' || c == '\r'
+}
 #[derive(Debug)]
 pub struct Parser {
     token_queue: VecDeque<Token>,
@@ -162,7 +173,7 @@ impl Parser {
         if self.line_start {
             self.line_start = false;
             if let Some(c) = r.peek_char(0)? {
-                if c != '#' {
+                if c != '#' && c != '\n' && c != '\r' {
                     let p2 = r.position();
                     let indent = p2.offset - p1.offset;
                     if self.indent > indent {
@@ -171,6 +182,27 @@ impl Parser {
                     } else if self.indent < indent {
                         self.indent = indent;
                         return Ok(Token::new(Terminal::Indent, p1, p2))
+                    }
+                }
+                if c == '%' && r.position().column == 0 {
+                    unimplemented!() //TODO MC Directives
+                }
+                if r.match_str("---")? && r.position().column == 0 {
+                    if let Some(c) = r.peek_char(3)? {
+                        if is_break(c) {
+                            return consume(r, 3, Terminal::DocumentStart);
+                        }
+                    } else {
+                        unimplemented!() //TODO MC Error
+                    }
+                }
+                if r.match_str("...")? && r.position().column == 0 {
+                    if let Some(c) = r.peek_char(3)? {
+                        if is_break(c) {
+                            return consume(r, 3, Terminal::DocumentEnd);
+                        }
+                    } else {
+                        unimplemented!() //TODO MC Error
                     }
                 }
             }
@@ -204,8 +236,29 @@ impl Parser {
             Some('!') => consume(r, 1, Terminal::ExclamationMark),
             Some('|') => consume(r, 1, Terminal::VerticalBar),
             Some('>') => consume(r, 1, Terminal::GraterThan),
-//            Some(_) => ParseErrDetail::invalid_input(r),
-            Some(_) => consume(r, 1, Terminal::String), // Only for test purposes
+            Some('%') => ParseErrDetail::invalid_input(r),
+            Some('@') => consume(r, 1, Terminal::At),
+            Some('`') => consume(r, 1, Terminal::GraveAccent),
+            Some('"') => consume(r, 1, Terminal::String),
+            Some('\'') => consume(r, 1, Terminal::String),
+            Some(_) => self.fetch_plain_scalar(r),
+//            Some(_) => ParseErrDetail::invalid_input(r), //Temporary
+//            Some(_) => consume(r, 1, Terminal::String), // Only for test purposes
+        }
+    }
+
+    fn fetch_plain_scalar(&mut self, r: &mut dyn CharReader) {
+        loop {
+            if (r.match_str("---")? || r.match_str("...")?) && r.position().column == 0 {
+                if let Some(c) = r.peek_char(3)? {
+                    if is_break(c) {
+                        break;
+                    }
+                }
+            }
+            if r.peek_char(0) == '#' {
+                break;
+            }
         }
     }
 }
@@ -222,8 +275,12 @@ mod tests {
                 let mut parser = Parser::new();
 
                 for t in $expected {
-                    let token = parser.lex(&mut r).expect("Cannot get token!");
-                    assert_eq!(token.term(), t);
+                    match parser.lex(&mut r){
+                        Ok(token) => assert_eq!(token.term(), t),
+                        Err(err) => {
+                            println!("Cannot get token: {}", err)
+                        }
+                    }
                 }
             };
         }
@@ -252,11 +309,61 @@ mod tests {
         fn comment_lf() {
             let input: &str = "# comment\n";
 
-            let terms = vec![Terminal::Comment, Terminal::Newline,Terminal::End];
+            let terms = vec![Terminal::Comment, Terminal::Newline, Terminal::End];
             assert_terms!(input, terms);
         }
 
         #[test]
+        fn comment_crlf() {
+            let input: &str = "# comment\r\n";
+
+            let terms = vec![Terminal::Comment, Terminal::Newline, Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn document_start_lf() {
+            let input: &str = "---\n";
+
+            let terms = vec![
+                             Terminal::DocumentStart,
+                             Terminal::Newline,
+                             Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        //#[test]
+        fn document_start() {
+            let input: &str = "---";
+
+            let terms = vec![
+                Terminal::DocumentStart,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn document_end_lf() {
+            let input: &str = "...\n";
+
+            let terms = vec![
+                Terminal::DocumentEnd,
+                Terminal::Newline,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        //#[test]
+        fn document_end() {
+            let input: &str = "...";
+
+            let terms = vec![
+                Terminal::DocumentStart,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        //#[test]
         fn test() {
             let input: &str = r#"---
 receipt: Oz-Ware Purchase Invoice
@@ -304,5 +411,9 @@ specialDelivery: >
                 eprintln!("token = {}", token);
             }
         }
+        /*
+        TODO MC Tests:
+        - empty line and \r\n at the end
+        */
     }
 }
