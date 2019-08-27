@@ -1,5 +1,5 @@
 use super::*;
-use crate::opath::expr::func::FuncCallErrorDetail::{NonBinaryNode, RegexParseError};
+use crate::opath::expr::func::FuncCallErrorDetail::{NonBinaryNode, RegexParse};
 pub type FuncCallError = BasicDiag;
 
 pub type FuncCallResult = Result<(), FuncCallError>;
@@ -10,8 +10,10 @@ pub type FuncCallResult = Result<(), FuncCallError>;
 pub enum FuncCallErrorDetail {
     #[display(fmt = "unknown function '{name}'")]
     UnknownFunc { name: String },
+
     #[display(fmt = "unknown method '{name}' for type '{kind}'")]
     UnknownMethod { name: String, kind: Kind },
+
     #[display(
         fmt = "method '{id}' for type '{kind}' requires {required} parameters, but {supplied} were supplied"
     )]
@@ -21,6 +23,7 @@ pub enum FuncCallErrorDetail {
         supplied: u32,
         required: u32,
     },
+
     #[display(
         fmt = "method '{id}' for type '{kind}' requires at least {required_min} parameters, but {supplied} were supplied"
     )]
@@ -30,6 +33,7 @@ pub enum FuncCallErrorDetail {
         supplied: u32,
         required_min: u32,
     },
+
     #[display(
         fmt = "method '{id}' for type '{kind}' requires from {required_min} to {required_max} parameters, but {supplied} were supplied"
     )]
@@ -40,6 +44,7 @@ pub enum FuncCallErrorDetail {
         required_min: u32,
         required_max: u32,
     },
+
     #[display(
         fmt = "function '{id}' requires {required} parameters, but {supplied} were supplied"
     )]
@@ -48,6 +53,7 @@ pub enum FuncCallErrorDetail {
         supplied: u32,
         required: u32,
     },
+
     #[display(
         fmt = "function '{id}' requires at least {required_min} parameters, but {supplied} were supplied"
     )]
@@ -56,6 +62,7 @@ pub enum FuncCallErrorDetail {
         supplied: u32,
         required_min: u32,
     },
+
     #[display(
         fmt = "function '{id}' requires from {required_min} to {required_max} parameters, but {supplied} were supplied"
     )]
@@ -65,13 +72,18 @@ pub enum FuncCallErrorDetail {
         required_min: u32,
         required_max: u32,
     },
+
     #[display(fmt = "cannot parse node from type {kind}")]
     NonBinaryNode { kind: Kind },
+
     #[display(fmt = "cannot parse regex: {err}")]
-    RegexParseError { err: regex::Error },
+    RegexParse { err: regex::Error },
 
     #[display(fmt = "cannot parse expression")]
     ParseErr,
+
+    #[display(fmt = "cannot parse expression")]
+    NodeParse,
 
     #[display(fmt = "error while calling method '{id}' for type '{kind}'")]
     MethodCallCustom {
@@ -598,13 +610,10 @@ pub(super) fn apply_func_to(
 
                 for (p, f) in paths.into_iter().zip(formats.into_iter()) {
                     let format: FileFormat = f.data().as_string().as_ref().into();
-                    match NodeRef::from_file(
-                        &resolve_path_str(p.data().as_string().as_ref()),
-                        Some(format),
-                    ) {
-                        Ok(n) => out.add(n),
-                        Err(_err) => {} //FIXME (jc) errors should be reported to the user somehow?
-                    }
+
+                    let n = NodeRef::from_file(&resolve_path_str(p.data().as_string().as_ref()), Some(format))
+                        .map_err(|err| FuncCallErrorDetail::custom_func(id, err))?;
+                    out.add(n);
                 }
             }
             Ok(())
@@ -615,10 +624,10 @@ pub(super) fn apply_func_to(
             for n in res.into_iter() {
                 let n = n.data();
                 let s = n.as_string();
-                match NodeRef::from_json(&s) {
-                    Ok(n) => out.add(n),
-                    Err(_) => {} //FIXME (jc)
-                }
+
+                let n = NodeRef::from_json(&s)
+                    .map_err_as_cause(|| FuncCallErrorDetail::NodeParse)?;
+                out.add(n);
             }
             Ok(())
         }
@@ -629,10 +638,10 @@ pub(super) fn apply_func_to(
             for r in rows {
                 let ref content = r[0];
                 let format: FileFormat = r[1].data().as_string().as_ref().into();
-                match NodeRef::from_str(content.data().as_string(), format) {
-                    Ok(n) => out.add(n),
-                    Err(_err) => {} //FIXME (jc) errors should be reported to the user somehow?
-                }
+
+                let n = NodeRef::from_str(content.data().as_string(), format)
+                    .map_err(|err| FuncCallErrorDetail::custom_func(id, err))?;
+                out.add(n);
             }
             Ok(())
         }
@@ -757,10 +766,10 @@ pub(super) fn apply_func_to(
                 }
                 let bytes = res.unwrap();
 
-                match NodeRef::from_bytes(bytes.as_slice(), format) {
-                    Ok(n) => out.add(n),
-                    Err(_err) => {} //FIXME (jc) errors should be reported to the user somehow?
-                }
+                let n = NodeRef::from_bytes(bytes.as_slice(), format)
+                    .map_err(|err| FuncCallErrorDetail::custom_func(id, err))?;
+                out.add(n)
+
             }
             Ok(())
         }
@@ -1096,7 +1105,7 @@ pub(super) fn apply_method_to(
 
                 let re = args.resolve_column(true, 0, env)?.into_one().unwrap();
                 let regex =
-                    Regex::new(&re.data().as_string()).map_err(|err| RegexParseError { err })?;
+                    Regex::new(&re.data().as_string()).map_err(|err| RegexParse { err })?;
                 let replacement = {
                     if args.count() == 2 {
                         args.resolve_column(true, 1, env)?
@@ -1129,7 +1138,7 @@ pub(super) fn apply_method_to(
                 args.check_count_method(id, kind, 1, 2)?;
                 let re = args.resolve_column(true, 0, env)?.into_one().unwrap();
                 let regex = Regex::new(re.data().as_string().as_ref())
-                    .map_err(|err| RegexParseError { err })?;
+                    .map_err(|err| RegexParse { err })?;
 
                 let value = env.current().data();
                 let s = value.as_string();
