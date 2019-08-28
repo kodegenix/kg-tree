@@ -35,7 +35,12 @@ macro_rules! assert_detail {
                 $block;
                 (err, det)
             }
-            err => panic!("Expected error {} got {:?}", stringify!($variant), err),
+            err => panic!(
+                "Expected error {} got {:?} : \n{}",
+                stringify!($variant),
+                err,
+                err
+            ),
         }
     }};
 }

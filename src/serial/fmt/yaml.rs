@@ -17,6 +17,15 @@ pub enum ParseErrDetail{
     },
     #[display(fmt = "unexpected end of input")]
     UnexpectedEoi { pos: Position },
+    #[display(fmt = "invalid character '{input}', expected '{expected}'")]
+    InvalidCharOne {
+        input: char,
+        from: Position,
+        to: Position,
+        expected: char,
+    },
+    #[display(fmt = "unexpected end of input, expected '{expected}'")]
+    UnexpectedEoiOne { pos: Position, expected: char },
 }
 
 impl ParseErrDetail {
@@ -36,6 +45,30 @@ impl ParseErrDetail {
             }
             None => parse_diag!(ParseErrDetail::UnexpectedEoi {
                 pos: p1,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
+        };
+        Err(err)
+    }
+
+    pub fn invalid_input_one<T>(r: &mut dyn CharReader, expected: char) -> Result<T, Error> {
+        let p1 = r.position();
+        let err = match r.next_char()? {
+            Some(c) => {
+                let p2 = r.position();
+                parse_diag!(ParseErrDetail::InvalidCharOne {
+                    input: c,
+                    from: p1,
+                    to: p2,
+                    expected,
+                }, r, {
+                    p1, p2 => "invalid character",
+                })
+            }
+            None => parse_diag!(ParseErrDetail::UnexpectedEoiOne {
+                pos: p1,
+                expected,
             }, r, {
                 p1, p1 => "unexpected end of input",
             }),
@@ -128,6 +161,7 @@ fn is_string(c: char) -> bool {
     match c {
         ':' => false,
         '\n' => false,
+        ' ' => false,
         _ => true
     }
 }
@@ -183,10 +217,19 @@ impl Parser {
 
         let p1 = r.position();
         if self.line_start {
-            r.skip_whitespace_nonl()?;
+            r.skip_until(&mut |c: char| c != ' ')?;
             self.line_start = false;
             if let Some(c) = r.peek_char(0)? {
-                if c != '#' && c != '\n' && c != '\r' {
+                if c.is_whitespace() && c != '\n' && c != '\r' {
+                    return ParseErrDetail::invalid_input(r);
+                }
+                if c == '\r' {
+                    if let Some(nc) = r.next_char()? {
+                        if nc != '\n' {
+                            return ParseErrDetail::invalid_input_one(r, '\n');
+                        }
+                    }
+                } else if c != '#' && c != '\n' {
                     let p2 = r.position();
                     let indent = p2.offset - p1.offset;
                     if self.indent > indent {
@@ -260,7 +303,8 @@ mod tests {
                     match parser.lex(&mut r){
                         Ok(token) => assert_eq!(token.term(), t),
                         Err(err) => {
-                            println!("Cannot get token: {}", err)
+                            println!("Cannot get token: {}", err);
+                            panic!()
                         }
                     }
                 }
@@ -277,6 +321,22 @@ mod tests {
             let token = parser.lex(&mut r).unwrap();
 
             assert_eq!(Terminal::End, token.term());
+        }
+
+        #[test]
+        fn line_feed() {
+            let input: &str = "      \n";
+
+            let terms = vec![Terminal::Newline, Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn carriage_return_line_feed() {
+            let input: &str = "      \r\n";
+
+            let terms = vec![Terminal::Newline, Terminal::End];
+            assert_terms!(input, terms);
         }
 
         #[test]
@@ -326,6 +386,21 @@ mod tests {
         }
 
         #[test]
+        fn mapping_key_character() {
+            let input: &str = r#"? key: value"#;
+
+            let terms = vec![
+                Terminal::QuestionMark,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
         fn key_value() {
             let input: &str = r#"key: value"#;
 
@@ -335,6 +410,35 @@ mod tests {
                 Terminal::Whitespace,
                 Terminal::String,
                 Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn key_tab_value() {
+            let input: &str = "key:\tvalue";
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn key_value_comment() {
+            let input: &str = r#"key: value # comment"#;
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::Whitespace,
+                Terminal::Comment,
+                Terminal::End,
+            ];
             assert_terms!(input, terms);
         }
 
@@ -358,22 +462,6 @@ key2: value2"#;
         }
 
         #[test]
-        fn key_indent_with_tabs_key_value() {
-            let input: &str = "key:\n\tkey: value";
-
-            let terms = vec![
-                Terminal::String,
-                Terminal::Colon,
-                Terminal::Newline,
-                Terminal::Indent,
-                Terminal::String,
-                Terminal::Colon,
-                Terminal::Whitespace,
-                Terminal::String,
-                Terminal::End];
-            assert_terms!(input, terms);
-        }
-
         fn key_indent_key_value() {
             let input: &str = r#"key:
    key: value"#;
@@ -388,6 +476,96 @@ key2: value2"#;
                 Terminal::Whitespace,
                 Terminal::String,
                 Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn sequence() {
+            let input: &str = r#"- one
+- two
+- three"#;
+
+            let terms = vec![
+                Terminal::Dash,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::Dash,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::Dash,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn sequence_in_mapping() {
+            let input: &str = r#"key1:
+   - one
+   - two
+key2:
+   - three
+   - four"#;
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Newline,
+                Terminal::Indent,
+                Terminal::Dash,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::Dash,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::Dedent,
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Newline,
+                Terminal::Indent,
+                Terminal::Dash,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::Dash,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::End
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn mapping_in_sequence() {
+            let input: &str = r#"-
+   key1: value1
+-
+   key2: value2"#;
+
+            let terms = vec![
+                Terminal::Dash,
+                Terminal::Newline,
+                Terminal::Indent,
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::Dedent,
+                Terminal::Dash,
+                Terminal::Newline,
+                Terminal::Indent,
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::End,
+            ];
             assert_terms!(input, terms);
         }
 
@@ -444,7 +622,7 @@ specialDelivery: >
         }
         /*
         TODO MC Tests:
-        - empty line and \r\n at the end
+        - string and \r at the end
         */
     }
 }
