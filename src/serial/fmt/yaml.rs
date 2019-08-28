@@ -127,7 +127,7 @@ fn is_break(c: char) -> bool {
 fn is_string(c: char) -> bool {
     match c {
         ':' => false,
-        '%' => false,
+        '\n' => false,
         _ => true
     }
 }
@@ -236,14 +236,11 @@ impl Parser {
             Some('"') => consume(r, 1, Terminal::String),
             Some('\'') => consume(r, 1, Terminal::String),
             Some(_) => {
-                println!("here");
                 let p1 = r.position();
                 r.skip_while(&mut is_string)?;
                 let p2 = r.position();
                 Ok(Token::new(Terminal::String, p1, p2))
             },
-//            Some(_) => ParseErrDetail::invalid_input(r), //Temporary
-//            Some(_) => consume(r, 1, Terminal::String), // Only for test purposes
         }
     }
 }
@@ -329,7 +326,7 @@ mod tests {
         }
 
         #[test]
-        fn test2() {
+        fn key_value() {
             let input: &str = r#"key: value"#;
 
             let terms = vec![
@@ -341,8 +338,61 @@ mod tests {
             assert_terms!(input, terms);
         }
 
+        #[test]
+        fn multiple_key_value() {
+            let input: &str = r#"key1: value1
+key2: value2"#;
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn key_indent_with_tabs_key_value() {
+            let input: &str = "key:\n\tkey: value";
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Newline,
+                Terminal::Indent,
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        fn key_indent_key_value() {
+            let input: &str = r#"key:
+   key: value"#;
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Newline,
+                Terminal::Indent,
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
         //#[test]
-        fn test() {
+        fn token_list() {
             // language=yaml
             let input: &str = r#"---
 %:%:bbb: value
