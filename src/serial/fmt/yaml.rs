@@ -1,5 +1,7 @@
 use super::*;
 
+use kg_display::ListDisplay;
+
 use std::collections::VecDeque;
 
 pub type Error = ParseDiag;
@@ -26,6 +28,21 @@ pub enum ParseErrDetail{
     },
     #[display(fmt = "unexpected end of input, expected '{expected}'")]
     UnexpectedEoiOne { pos: Position, expected: char },
+    #[display(
+    fmt = "invalid character '{input}', expected one of: {expected}",
+    expected = "ListDisplay(expected)"
+    )]
+    InvalidCharMany {
+        input: char,
+        from: Position,
+        to: Position,
+        expected: Vec<char>,
+    },
+    #[display(
+    fmt = "unexpected end of input, expected one of: {expected}",
+    expected = "ListDisplay(expected)"
+    )]
+    UnexpectedEoiMany { pos: Position, expected: Vec<char> },
 }
 
 impl ParseErrDetail {
@@ -67,6 +84,30 @@ impl ParseErrDetail {
                 })
             }
             None => parse_diag!(ParseErrDetail::UnexpectedEoiOne {
+                pos: p1,
+                expected,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
+        };
+        Err(err)
+    }
+
+    pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
+        let p1 = r.position();
+        let err = match (r.peek_char(0)?, r.next_char()?) {
+            (Some(current), Some(_c)) => {
+                let p2 = r.position();
+                parse_diag!(ParseErrDetail::InvalidCharMany {
+                    input: current,
+                    from: p1,
+                    to: p2,
+                    expected,
+                }, r, {
+                    p1, p2 => "invalid character",
+                })
+            }
+            _ => parse_diag!(ParseErrDetail::UnexpectedEoiMany {
                 pos: p1,
                 expected,
             }, r, {
@@ -173,6 +214,22 @@ fn is_string(c: char) -> bool {
     }
 }
 
+fn is_hex_char(ch: char) -> bool {
+    ('A' <= ch && ch <= 'F') || ('a' <= ch && ch <= 'f') || ('0' <= ch && ch <= '9')
+}
+
+fn is_oct_char(ch: char) -> bool {
+    ('0' <= ch && ch <= '7')
+}
+
+fn is_bin_char(ch: char) -> bool {
+    ch == '0' || ch == '1'
+}
+
+fn is_sign(ch: char) -> bool {
+    ch == '-' || ch == '+'
+}
+
 #[derive(Debug)]
 pub struct Parser {
     token_queue: VecDeque<Token>,
@@ -192,6 +249,46 @@ impl Parser {
     }
 
     fn lex(&mut self, r: &mut dyn CharReader) -> Result<Token, Error> {
+
+        fn process_scientific_notation(
+            r: &mut dyn CharReader,
+            p1: Position,
+        ) -> Result<Token, Error> {
+            r.next_char()?;
+            match r.peek_char(0)? {
+                Some('-') | Some('+') => {
+                    r.skip_chars(1)?;
+                    let mut has_digits = false;
+                    r.skip_while(&mut |c| {
+                        if c.is_digit(10) {
+                            has_digits = true;
+                            true
+                        } else {
+                            false
+                        }
+                    })?;
+                    if has_digits {
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Float, p1, p2))
+                    } else {
+                        ParseErrDetail::invalid_input_many(
+                            r,
+                            vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+                        )
+                    }
+                }
+                Some(c) if c.is_digit(10) => {
+                    r.skip_chars(1)?;
+                    r.skip_while(&mut |c| c.is_digit(10))?;
+                    let p2 = r.position();
+                    Ok(Token::new(Terminal::Float, p1, p2))
+                }
+                _ => ParseErrDetail::invalid_input_many(
+                    r,
+                    vec!['-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+                ),
+            }
+        }
 
         fn consume(r: &mut dyn CharReader, count: usize, term: Terminal) -> Result<Token, Error> {
             let p1 = r.position();
@@ -220,6 +317,21 @@ impl Parser {
             }
             let p2 = r.position();
             Ok(Token::new(term, p1, p2))
+        }
+
+        fn consume_int_prefix(
+            r: &mut dyn CharReader,
+            f: &dyn Fn(char) -> bool,
+            p1: Position,
+        ) -> Result<Token, Error> {
+            r.next_char()?;
+            if let Some('_') = r.next_char()? {
+                // underscore is not allowed between prefix and number
+                return ParseErrDetail::invalid_input(r);
+            }
+            r.skip_while(&mut |c| f(c) || c == '_')?;
+            let p2 = r.position();
+            return Ok(Token::new(Terminal::Integer, p1, p2));
         }
 
         let p1 = r.position();
@@ -285,6 +397,51 @@ impl Parser {
             Some('`') => consume(r, 1, Terminal::GraveAccent),
             Some('"') => consume(r, 1, Terminal::String),
             Some('\'') => consume(r, 1, Terminal::String),
+            Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
+                let p1 = r.position();
+                let next = r.peek_char(1)?;
+
+                match (c, next) {
+                    // Check integers prefix notation
+                    ('0', Some('x')) => return consume_int_prefix(r, &|c| is_hex_char(c), p1),
+                    ('0', Some('o')) => return consume_int_prefix(r, &|c| is_oct_char(c), p1),
+                    ('0', Some('b')) => return consume_int_prefix(r, &|c| is_bin_char(c), p1),
+
+                    // Check special floats
+                    (first, Some('i')) if is_sign(first) => {
+                        if r.match_str_term(&format!("{}inf", first), &mut is_non_alphanumeric)? {
+                            return consume(r, 4, Terminal::Float);
+                        }
+                    }
+                    (first, Some('n')) if is_sign(first) => {
+                        if r.match_str_term(&format!("{}nan", first), &mut is_non_alphanumeric)? {
+                            return consume(r, 4, Terminal::Float);
+                        }
+                    }
+                    _ => {}
+                }
+
+                r.next_char()?;
+                r.skip_while(&mut |c| c.is_digit(10) || c == '_')?;
+                match r.peek_char(0)? {
+                    Some('.') => {
+                        r.next_char()?;
+                        r.skip_while(&mut |c| c.is_digit(10) || c == '_')?;
+                        match r.peek_char(0)? {
+                            Some('e') | Some('E') => process_scientific_notation(r, p1),
+                            _ => {
+                                let p2 = r.position();
+                                Ok(Token::new(Terminal::Float, p1, p2))
+                            }
+                        }
+                    }
+                    Some('e') | Some('E') => process_scientific_notation(r, p1),
+                    _ => {
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Integer, p1, p2))
+                    }
+                }
+            }
             Some(_) => {
                 let p1 = r.position();
                 r.skip_while(&mut is_string)?;
@@ -650,15 +807,37 @@ two,
 three]"#;
 
             let terms = vec![
+                Terminal::Indent,
                 Terminal::BracketLeft,
                 Terminal::String,
                 Terminal::Comma,
                 Terminal::Newline,
+                Terminal::Dedent,
                 Terminal::String,
                 Terminal::Comma,
                 Terminal::Newline,
                 Terminal::String,
                 Terminal::BracketRight,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn integers() {
+            let input: &str = r#"+99
+42
+0
+-17"#;
+
+            let terms = vec![
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
