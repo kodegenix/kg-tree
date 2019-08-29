@@ -160,8 +160,15 @@ fn is_break(c: char) -> bool {
 fn is_string(c: char) -> bool {
     match c {
         ':' => false,
+        '?' => false,
+        '-' => false,
         '\n' => false,
         ' ' => false,
+        ',' => false,
+        '[' => false,
+        ']' => false,
+        '{' => false,
+        '}' => false,
         _ => true
     }
 }
@@ -299,9 +306,14 @@ mod tests {
                 let mut r = MemCharReader::new($input.as_bytes());
                 let mut parser = Parser::new();
 
-                for t in $expected {
+                for (idx, t) in $expected.iter().enumerate() {
                     match parser.lex(&mut r){
-                        Ok(token) => assert_eq!(token.term(), t),
+                        Ok(token) => {
+                            if &token.term() != t {
+                                eprintln!("\nIndex: {}", idx);
+                                assert_eq!(&token.term(), t);
+                            }
+                        },
                         Err(err) => {
                             println!("Cannot get token: {}", err);
                             panic!()
@@ -564,6 +576,89 @@ key2:
                 Terminal::Colon,
                 Terminal::Whitespace,
                 Terminal::String,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn sequence_in_sequence() {
+            let input: &str = r#"- [one, two, three]"#;
+
+            let terms = vec![
+                Terminal::Dash,
+                Terminal::Whitespace,
+                Terminal::BracketLeft,
+                Terminal::String,
+                Terminal::Comma,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::Comma,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::BracketRight,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn mapping_in_mapping() {
+            let input: &str = r#"key: {key: value}"#;
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::BraceLeft,
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::BraceRight,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn sequence_with_indentation() {
+            let input: &str = r#"[one,
+two,
+   three]"#;
+
+            let terms = vec![
+                Terminal::BracketLeft,
+                Terminal::String,
+                Terminal::Comma,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Comma,
+                Terminal::Newline,
+                Terminal::Indent,
+                Terminal::String,
+                Terminal::BracketRight,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn indentation_before_sequence() {
+            let input: &str = r#"   [one,
+two,
+three]"#;
+
+            let terms = vec![
+                Terminal::BracketLeft,
+                Terminal::String,
+                Terminal::Comma,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Comma,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::BracketRight,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
