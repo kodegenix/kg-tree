@@ -202,7 +202,6 @@ fn is_string(c: char) -> bool {
     match c {
         ':' => false,
         '?' => false,
-        '-' => false,
         '\n' => false,
         ' ' => false,
         ',' => false,
@@ -334,6 +333,59 @@ impl Parser {
             return Ok(Token::new(Terminal::Integer, p1, p2));
         }
 
+        fn consume_number(r: &mut dyn CharReader, c: char) -> Result<Token, Error> {
+            let p1 = r.position();
+            let next = r.peek_char(1)?;
+
+            match (c, next) {
+                // Check integers prefix notation
+                ('0', Some('x')) => return consume_int_prefix(r, &|c| is_hex_char(c), p1),
+                ('0', Some('o')) => return consume_int_prefix(r, &|c| is_oct_char(c), p1),
+                ('0', Some('b')) => return consume_int_prefix(r, &|c| is_bin_char(c), p1),
+
+                // Check special floats
+                (first, Some('i')) if is_sign(first) => {
+                    if r.match_str_term(&format!("{}inf", first), &mut is_non_alphanumeric)? {
+                        return consume(r, 4, Terminal::Float);
+                    }
+                }
+                (first, Some('n')) if is_sign(first) => {
+                    if r.match_str_term(&format!("{}nan", first), &mut is_non_alphanumeric)? {
+                        return consume(r, 4, Terminal::Float);
+                    }
+                }
+                _ => {}
+            }
+
+            r.next_char()?;
+            r.skip_while(&mut |c| c.is_digit(10) || c == '_')?;
+            match r.peek_char(0)? {
+                Some('.') => {
+                    r.next_char()?;
+                    r.skip_while(&mut |c| c.is_digit(10) || c == '_')?;
+                    match r.peek_char(0)? {
+                        Some('e') | Some('E') => process_scientific_notation(r, p1),
+                        _ => {
+                            let p2 = r.position();
+                            Ok(Token::new(Terminal::Float, p1, p2))
+                        }
+                    }
+                }
+                Some('e') | Some('E') => process_scientific_notation(r, p1),
+                _ => {
+                    let p2 = r.position();
+                    Ok(Token::new(Terminal::Integer, p1, p2))
+                }
+            }
+        }
+
+        fn consume_string(r: &mut dyn CharReader) -> Result<Token, Error> {
+            let p1 = r.position();
+            r.skip_while(&mut is_string)?;
+            let p2 = r.position();
+            Ok(Token::new(Terminal::String, p1, p2))
+        }
+
         let p1 = r.position();
         if self.line_start {
             r.skip_until(&mut |c: char| c != ' ')?;
@@ -353,10 +405,10 @@ impl Parser {
                     let indent = p2.offset - p1.offset;
                     if self.indent > indent {
                         self.indent = indent;
-                        return Ok(Token::new(Terminal::Dedent, p1, p2))
+                        return Ok(Token::new(Terminal::Dedent, p1, p2));
                     } else if self.indent < indent {
                         self.indent = indent;
-                        return Ok(Token::new(Terminal::Indent, p1, p2))
+                        return Ok(Token::new(Terminal::Indent, p1, p2));
                     }
                 }
             }
@@ -383,14 +435,14 @@ impl Parser {
                 }
             }
             Some(':') => consume(r, 1, Terminal::Colon),
-            Some('-') => {
+            Some(c) if c == '-' => {
                 if r.match_str("---")? && r.position().column == 0 {
                     if let Some(c) = r.peek_char(3)? {
                         if is_break(c) {
                             return consume(r, 3, Terminal::DocumentStart);
                         } else {
                             r.skip_chars(3);
-                            ParseErrDetail::invalid_input_many(r, vec!['\n', '\r'],)
+                            ParseErrDetail::invalid_input_many(r, vec!['\n', '\r'])
                         }
                     } else {
                         unimplemented!() //TODO MC Which error should be returned?
@@ -400,15 +452,17 @@ impl Parser {
                         if is_blank_or_break(nc) {
                             return consume(r, 1, Terminal::Dash);
                         } else {
-                            unimplemented!() //TODO MC Call fn associated with numbers or fn associated with strings
-                            // Check if the next char after '-' is number and if yes, call fn associated with numbers
-                            // If not call fn associated with strings
+                            if nc.is_digit(10) {
+                                return consume_number(r, c);
+                            } else {
+                                return consume_string(r);
+                            }
                         }
                     } else {
                         unimplemented!() //TODO MC Which error should be returned?
                     }
                 }
-            },
+            }
             Some('.') => consume(r, 1, Terminal::Dot),
             Some('?') => consume(r, 1, Terminal::QuestionMark),
             Some('*') => consume(r, 1, Terminal::Asterisk),
@@ -422,57 +476,8 @@ impl Parser {
             Some('`') => consume(r, 1, Terminal::GraveAccent),
             Some('"') => consume(r, 1, Terminal::String),
             Some('\'') => consume(r, 1, Terminal::String),
-            Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
-                let p1 = r.position();
-                let next = r.peek_char(1)?;
-
-                match (c, next) {
-                    // Check integers prefix notation
-                    ('0', Some('x')) => return consume_int_prefix(r, &|c| is_hex_char(c), p1),
-                    ('0', Some('o')) => return consume_int_prefix(r, &|c| is_oct_char(c), p1),
-                    ('0', Some('b')) => return consume_int_prefix(r, &|c| is_bin_char(c), p1),
-
-                    // Check special floats
-                    (first, Some('i')) if is_sign(first) => {
-                        if r.match_str_term(&format!("{}inf", first), &mut is_non_alphanumeric)? {
-                            return consume(r, 4, Terminal::Float);
-                        }
-                    }
-                    (first, Some('n')) if is_sign(first) => {
-                        if r.match_str_term(&format!("{}nan", first), &mut is_non_alphanumeric)? {
-                            return consume(r, 4, Terminal::Float);
-                        }
-                    }
-                    _ => {}
-                }
-
-                r.next_char()?;
-                r.skip_while(&mut |c| c.is_digit(10) || c == '_')?;
-                match r.peek_char(0)? {
-                    Some('.') => {
-                        r.next_char()?;
-                        r.skip_while(&mut |c| c.is_digit(10) || c == '_')?;
-                        match r.peek_char(0)? {
-                            Some('e') | Some('E') => process_scientific_notation(r, p1),
-                            _ => {
-                                let p2 = r.position();
-                                Ok(Token::new(Terminal::Float, p1, p2))
-                            }
-                        }
-                    }
-                    Some('e') | Some('E') => process_scientific_notation(r, p1),
-                    _ => {
-                        let p2 = r.position();
-                        Ok(Token::new(Terminal::Integer, p1, p2))
-                    }
-                }
-            }
-            Some(_) => {
-                let p1 = r.position();
-                r.skip_while(&mut is_string)?;
-                let p2 = r.position();
-                Ok(Token::new(Terminal::String, p1, p2))
-            },
+            Some(c) if c.is_digit(10) || c == '+' || c == '-' => consume_number(r, c),
+            Some(_) => consume_string(r),
         }
     }
 }
@@ -495,7 +500,7 @@ mod tests {
                                 eprintln!("\nIndex: {}", idx);
                                 assert_eq!(&token.term(), t);
                             }
-                        },
+                        }
                         Err(err) => {
                             println!("Cannot get token: {}", err);
                             panic!()
@@ -590,7 +595,8 @@ mod tests {
                 Terminal::Colon,
                 Terminal::Whitespace,
                 Terminal::String,
-                Terminal::End];
+                Terminal::End,
+            ];
             assert_terms!(input, terms);
         }
 
@@ -603,7 +609,8 @@ mod tests {
                 Terminal::Colon,
                 Terminal::Whitespace,
                 Terminal::String,
-                Terminal::End];
+                Terminal::End,
+            ];
             assert_terms!(input, terms);
         }
 
@@ -616,7 +623,8 @@ mod tests {
                 Terminal::Colon,
                 Terminal::Whitespace,
                 Terminal::String,
-                Terminal::End];
+                Terminal::End,
+            ];
             assert_terms!(input, terms);
         }
 
@@ -651,7 +659,8 @@ key2: value2"#;
                 Terminal::Colon,
                 Terminal::Whitespace,
                 Terminal::String,
-                Terminal::End];
+                Terminal::End,
+            ];
             assert_terms!(input, terms);
         }
 
@@ -669,7 +678,8 @@ key2: value2"#;
                 Terminal::Colon,
                 Terminal::Whitespace,
                 Terminal::String,
-                Terminal::End];
+                Terminal::End,
+            ];
             assert_terms!(input, terms);
         }
 
@@ -691,7 +701,8 @@ key2: value2"#;
                 Terminal::Dash,
                 Terminal::Whitespace,
                 Terminal::String,
-                Terminal::End];
+                Terminal::End,
+            ];
             assert_terms!(input, terms);
         }
 
@@ -729,7 +740,7 @@ key2:
                 Terminal::Dash,
                 Terminal::Whitespace,
                 Terminal::String,
-                Terminal::End
+                Terminal::End,
             ];
             assert_terms!(input, terms);
         }
@@ -849,6 +860,20 @@ three]"#;
         }
 
         #[test]
+        fn string_with_dash_at_the_begining() {
+            let input: &str = r#"-key: value"#;
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
         fn integers() {
             let input: &str = r#"+99
 42
@@ -863,6 +888,74 @@ three]"#;
                 Terminal::Integer,
                 Terminal::Newline,
                 Terminal::Integer,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn integers_hex() {
+            let input: &str = r#"0xDEADBEEF
+0xdeadbeef
+0xdead_beef"#;
+
+            let terms = vec![
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn integers_oct() {
+            let input: &str = r#"0o01234567
+0o755"#;
+
+            let terms = vec![
+                Terminal::Integer,
+                Terminal::Newline,
+                Terminal::Integer,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn integers_bin() {
+            let input: &str = r#"0b11010110"#;
+
+            let terms = vec![Terminal::Integer, Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn floats() {
+            let input: &str = r#"+1.0
+3.1415
+-0.01
+5e+22
+1e6
+2E-2
+6.626e-34"#;
+
+            let terms = vec![
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -922,6 +1015,7 @@ specialDelivery: >
         /*
         TODO MC Tests:
         - string and \r at the end
+        - test char after char for integers
         */
     }
 }
