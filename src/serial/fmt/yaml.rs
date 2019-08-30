@@ -130,8 +130,6 @@ pub enum Terminal {
     Percent,
     #[display(fmt = "'-'")]
     Dash,
-    #[display(fmt = "'.'")]
-    Dot,
     #[display(fmt = "':'")]
     Colon,
     #[display(fmt = "INDENT")]
@@ -422,6 +420,7 @@ impl Parser {
             Some(']') => consume(r, 1, Terminal::BracketRight),
             Some('{') => consume(r, 1, Terminal::BraceLeft),
             Some('}') => consume(r, 1, Terminal::BraceRight),
+            Some(':') => consume(r, 1, Terminal::Colon),
             Some('\n') => {
                 self.line_start = true;
                 consume(r, 1, Terminal::Newline)
@@ -434,7 +433,6 @@ impl Parser {
                     ParseErrDetail::invalid_input(r)
                 }
             }
-            Some(':') => consume(r, 1, Terminal::Colon),
             Some(c) if c == '-' => {
                 if r.match_str("---")? && r.position().column == 0 {
                     if let Some(c) = r.peek_char(3)? {
@@ -445,7 +443,7 @@ impl Parser {
                             ParseErrDetail::invalid_input_many(r, vec!['\n', '\r'])
                         }
                     } else {
-                        unimplemented!() //TODO MC Which error should be returned?
+                        return consume(r, 3, Terminal::DocumentStart);
                     }
                 } else {
                     if let Some(nc) = r.peek_char(1)? {
@@ -459,11 +457,26 @@ impl Parser {
                             }
                         }
                     } else {
-                        unimplemented!() //TODO MC Which error should be returned?
+                        return consume(r, 1, Terminal::Dash);
                     }
                 }
             }
-            Some('.') => consume(r, 1, Terminal::Dot),
+            Some('.') => {
+                if r.match_str("...")? && r.position().column == 0 {
+                    if let Some(c) = r.peek_char(3)? {
+                        if is_break(c) {
+                            return consume(r, 3, Terminal::DocumentEnd);
+                        } else {
+                            r.skip_chars(3);
+                            ParseErrDetail::invalid_input_many(r, vec!['\n', '\r'])
+                        }
+                    } else {
+                        return consume(r, 3, Terminal::DocumentEnd);
+                    }
+                } else {
+                    return consume_string(r);
+                }
+            },
             Some('?') => consume(r, 1, Terminal::QuestionMark),
             Some('*') => consume(r, 1, Terminal::Asterisk),
             Some('&') => consume(r, 1, Terminal::Ampersand),
@@ -574,13 +587,46 @@ mod tests {
         }
 
         #[test]
+        fn document_start() {
+            let input: &str = "---";
+
+            let terms = vec![
+                Terminal::DocumentStart,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
         fn document_end_lf() {
+            let input: &str = "...\n";
+
+            let terms = vec![
+                Terminal::DocumentEnd,
+                Terminal::Newline,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn document_end() {
             let input: &str = "...";
 
             let terms = vec![
-                Terminal::Dot,
-                Terminal::Dot,
-                Terminal::Dot];
+                Terminal::DocumentEnd,
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn string_with_dot_at_the_begining() {
+            let input: &str = ".key: value";
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Colon,
+                Terminal::Whitespace,
+                Terminal::String,
+                Terminal::End];
             assert_terms!(input, terms);
         }
 
@@ -678,6 +724,17 @@ key2: value2"#;
                 Terminal::Colon,
                 Terminal::Whitespace,
                 Terminal::String,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn dash_end() {
+            let input: &str = r#"-"#;
+
+            let terms = vec![
+                Terminal::Dash,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
