@@ -331,7 +331,7 @@ impl Parser {
             return Ok(Token::new(Terminal::Integer, p1, p2));
         }
 
-        fn consume_number(r: &mut dyn CharReader, c: char) -> Result<Token, Error> {
+        fn consume_number(r: &mut dyn CharReader, c: char) -> Result<Token, Error> { // FIXME MC inf and nan must have dot '.' before themselves. Add Inf, INF, Nan, NAN.
             let p1 = r.position();
             let next = r.peek_char(1)?;
 
@@ -473,6 +473,13 @@ impl Parser {
                     } else {
                         return consume(r, 3, Terminal::DocumentEnd);
                     }
+                } else if r.match_str(".inf")?
+                    || r.match_str(".Inf")?
+                    || r.match_str(".INF")?
+                    || r.match_str(".nan")?
+                    || r.match_str(".Nan")?
+                    || r.match_str(".NAN")? {
+                    return consume(r, 4, Terminal::Float);
                 } else {
                     return consume_string(r);
                 }
@@ -489,7 +496,7 @@ impl Parser {
             Some('`') => consume(r, 1, Terminal::GraveAccent),
             Some('"') => consume(r, 1, Terminal::String),
             Some('\'') => consume(r, 1, Terminal::String),
-            Some(c) if c.is_digit(10) || c == '+' || c == '-' => consume_number(r, c),
+            Some(c) if c.is_digit(10) || c == '+' => consume_number(r, c),
             Some(_) => consume_string(r),
         }
     }
@@ -1002,6 +1009,32 @@ three]"#;
             let terms = vec![
                 Terminal::Float,
                 Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn infs_and_nans() {
+            let input: &str = r#".inf
+.Inf
+.INF
+.nan
+.Nan
+.NAN"#;
+
+            let terms = vec![
                 Terminal::Float,
                 Terminal::Newline,
                 Terminal::Float,
