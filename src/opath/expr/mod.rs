@@ -153,13 +153,14 @@ impl IntoIterator for NodeSet {
 impl std::fmt::Display for NodeSet {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            NodeSet::Empty => write!(f, "<~>"),
+            NodeSet::Empty => write!(f, "<empty>"),
             NodeSet::One(ref a) => {
-                write!(f, "<1>:")?;
+//                write!(f, "<1>:")?;
                 a.fmt(f)
             }
             NodeSet::Many(ref e) => {
-                write!(f, "<+>:[")?;
+//                write!(f, "<+>:[")?;
+                write!(f, "[")?;
                 let mut n_it = e.iter().peekable();
                 while let Some(n) = n_it.next() {
                     n.fmt(f)?;
