@@ -480,6 +480,20 @@ impl Parser {
                     return consume_string(r);
                 }
             },
+            Some('t') | Some('T') => {
+                if r.match_str("true")? || r.match_str("True")? || r.match_str("TRUE")? {
+                    return consume(r, 4, Terminal::True);
+                } else {
+                    return consume_string(r);
+                }
+            }
+            Some('f') | Some('F') => {
+                if r.match_str("false")? || r.match_str("False")? || r.match_str("FALSE")? {
+                    return consume(r, 5, Terminal::False);
+                } else {
+                    return consume_string(r);
+                }
+            }
             Some('?') => consume(r, 1, Terminal::QuestionMark),
             Some('*') => consume(r, 1, Terminal::Asterisk),
             Some('&') => consume(r, 1, Terminal::Ampersand),
@@ -1048,6 +1062,32 @@ three]"#;
         }
 
         #[test]
+        fn bad_infs_and_nans() {
+            let input: &str = r#".inF
+.INf
+.InF
+.nAn
+.Nan
+.nAN"#;
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
         fn infs_with_plus() {
             let input: &str = r#"+.inf
 +.Inf
@@ -1076,6 +1116,58 @@ three]"#;
                 Terminal::Float,
                 Terminal::Newline,
                 Terminal::Float,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn bools() {
+            let input: &str = r#"true
+True
+TRUE
+false
+False
+FALSE"#;
+
+            let terms = vec![
+                Terminal::True,
+                Terminal::Newline,
+                Terminal::True,
+                Terminal::Newline,
+                Terminal::True,
+                Terminal::Newline,
+                Terminal::False,
+                Terminal::Newline,
+                Terminal::False,
+                Terminal::Newline,
+                Terminal::False,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn bad_bools() {
+            let input: &str = r#"trUe
+TruE
+TrUE
+faLse
+FalsE
+FALsE"#;
+
+            let terms = vec![
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
+                Terminal::Newline,
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1134,6 +1226,8 @@ specialDelivery: >
         }
         /*
         TODO MC Tests:
+        - number .5
+        - number 1.
         - string and \r at the end
         - test char after char for integers
         */
