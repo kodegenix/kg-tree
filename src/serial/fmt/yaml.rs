@@ -457,7 +457,7 @@ impl Parser {
                     }
                 }
             }
-            Some('.') => {
+            Some(c) if c == '.' => {
                 if r.match_str("...")? && r.position().column == 0 {
                     if let Some(c) = r.peek_char(3)? {
                         if is_break(c) {
@@ -477,7 +477,16 @@ impl Parser {
                     || r.match_str(".NAN")? {
                     return consume(r, 4, Terminal::Float);
                 } else {
-                    return consume_string(r);
+                    if let Some(nc) = r.peek_char(1)? {
+                        if nc.is_digit(10) {
+                            unimplemented!() //Here should be: return consume_number(r, c);
+                            //TODO MC Add handling .1 numbers in consume_number(r, c)
+                        } else {
+                            return consume_string(r);
+                        }
+                    } else {
+                        unimplemented!()
+                    }
                 }
             },
             Some('t') | Some('T') => {
@@ -1014,7 +1023,8 @@ three]"#;
 5e+22
 1e6
 2E-2
-6.626e-34"#;
+6.626e-34
+0."#;
 
             let terms = vec![
                 Terminal::Float,
@@ -1030,6 +1040,30 @@ three]"#;
                 Terminal::Float,
                 Terminal::Newline,
                 Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        //#[test] //TODO MC Uncomment
+        fn float_with_dot_at_the_beginning() {
+            let input: &str = r#".1"#;
+
+            let terms = vec![
+                Terminal::Float,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn bad_float_with_dot_at_the_beginning() {
+            let input: &str = r#".a"#;
+
+            let terms = vec![
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
