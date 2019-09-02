@@ -341,15 +341,11 @@ impl Parser {
                 ('0', Some('o')) => return consume_int_prefix(r, &|c| is_oct_char(c), p1),
                 ('0', Some('b')) => return consume_int_prefix(r, &|c| is_bin_char(c), p1),
 
-                // Check special floats
-                (first, Some('i')) if is_sign(first) => {
-                    if r.match_str_term(&format!("{}inf", first), &mut is_non_alphanumeric)? {
-                        return consume(r, 4, Terminal::Float);
-                    }
-                }
-                (first, Some('n')) if is_sign(first) => {
-                    if r.match_str_term(&format!("{}nan", first), &mut is_non_alphanumeric)? {
-                        return consume(r, 4, Terminal::Float);
+                (first, Some('.')) if is_sign(first) => {
+                    if r.match_str_term(&format!("{}.inf", first), &mut is_non_alphanumeric)?
+                        || r.match_str_term(&format!("{}.Inf", first), &mut is_non_alphanumeric)?
+                        || r.match_str_term(&format!("{}.INF", first), &mut is_non_alphanumeric)? {
+                        return consume(r, 5, Terminal::Float);
                     }
                 }
                 _ => {}
@@ -450,7 +446,7 @@ impl Parser {
                         if is_blank_or_break(nc) {
                             return consume(r, 1, Terminal::Dash);
                         } else {
-                            if nc.is_digit(10) {
+                            if nc.is_digit(10) || nc == '.' {
                                 return consume_number(r, c);
                             } else {
                                 return consume_string(r);
@@ -477,7 +473,7 @@ impl Parser {
                     || r.match_str(".Inf")?
                     || r.match_str(".INF")?
                     || r.match_str(".nan")?
-                    || r.match_str(".Nan")?
+                    || r.match_str(".NaN")?
                     || r.match_str(".NAN")? {
                     return consume(r, 4, Terminal::Float);
                 } else {
@@ -1031,7 +1027,7 @@ three]"#;
 .Inf
 .INF
 .nan
-.Nan
+.NaN
 .NAN"#;
 
             let terms = vec![
@@ -1041,6 +1037,40 @@ three]"#;
                 Terminal::Newline,
                 Terminal::Float,
                 Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn infs_with_plus() {
+            let input: &str = r#"+.inf
++.Inf
++.INF"#;
+
+            let terms = vec![
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::Newline,
+                Terminal::Float,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn infs_with_minus() {
+            let input: &str = r#"-.inf
+-.Inf
+-.INF"#;
+
+            let terms = vec![
                 Terminal::Float,
                 Terminal::Newline,
                 Terminal::Float,
