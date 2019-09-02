@@ -1,5 +1,4 @@
-use opath::*;
-use opath::Expr::*;
+use crate::opath::Expr::*;
 
 mod alternative {
     use super::*;

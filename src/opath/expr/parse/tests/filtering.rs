@@ -1,5 +1,4 @@
-use opath::*;
-use opath::Expr::*;
+use crate::opath::Expr::*;
 
 #[test]
 fn index_ge() {
@@ -29,7 +28,7 @@ fn key_ends_with() {
                                     Current,
                                     Property(box String("@key".into()))
                                 ]),
-                                box String("name".into())
+                                box StringEnc("name".into())
                             )
                         )
                 ]))
@@ -47,7 +46,7 @@ fn key_ends_with_or_index() {
                                             Current,
                                             Property(box String("@key".into()))
                                         ]),
-                                        box String("name".into())
+                                        box StringEnc("name".into())
                                     ),
                                     box Ge(
                                         box Sequence(vec![

@@ -1,5 +1,4 @@
-use opath::*;
-use opath::Expr::*;
+use crate::opath::Expr::*;
 use std::string;
 
 #[test]
@@ -36,8 +35,8 @@ fn ne() {
 fn starts_with() {
     assert_expr!("'aaabbb' ^= 'aa'",
         StartsWith(
-            box String(string::String::from("aaabbb")),
-            box String(string::String::from("aa")),
+            box StringEnc(string::String::from("aaabbb")),
+            box StringEnc(string::String::from("aa")),
         ))
 }
 
@@ -45,8 +44,8 @@ fn starts_with() {
 fn contains() {
     assert_expr!("'aaabbb' *= 'aa'",
         Contains(
-            box String(string::String::from("aaabbb")),
-            box String(string::String::from("aa")),
+            box StringEnc(string::String::from("aaabbb")),
+            box StringEnc(string::String::from("aa")),
         ))
 }
 
@@ -54,7 +53,7 @@ fn contains() {
 fn ends_with() {
     assert_expr!("'aaabbb' $= 'aa'",
         EndsWith(
-            box String(string::String::from("aaabbb")),
-            box String(string::String::from("aa")),
+            box StringEnc(string::String::from("aaabbb")),
+            box StringEnc(string::String::from("aa")),
         ))
 }

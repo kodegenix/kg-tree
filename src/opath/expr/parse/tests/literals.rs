@@ -1,5 +1,4 @@
-use opath::Expr;
-use opath::Opath;
+use crate::opath::Expr;
 
 #[test]
 fn positive_integer() {
@@ -27,11 +26,6 @@ fn positive_float_dot_e() {
 }
 
 #[test]
-fn positive_float_dot_e_e() {
-    assert_expr!("1.13e-10", Expr::Float(1.13e-10))
-}
-
-#[test]
 fn positive_float_only_dot() {
     assert_expr!(".e10", Expr::Float(1e10))
 }
@@ -48,17 +42,17 @@ fn negative_float_e() {
 
 #[test]
 fn string_quot() {
-    assert_expr!("'string'", Expr::String(String::from("string")))
+    assert_expr!("'string'", Expr::StringEnc(String::from("string")))
 }
 
 #[test]
 fn string_quot_utf8() {
-    assert_expr!("'ąćźę'", Expr::String(String::from("ąćźę")))
+    assert_expr!("'ąćźę'", Expr::StringEnc(String::from("ąćźę")))
 }
 
 #[test]
 fn string_double_quot() {
-    assert_expr!("\"string\"", Expr::String(String::from("string")))
+    assert_expr!("\"string\"", Expr::StringEnc(String::from("string")))
 }
 
 #[test]

@@ -1,6 +1,5 @@
-use opath::*;
-use opath::Expr::*;
-use opath::NumberRange;
+use crate::opath::Expr::*;
+use crate::opath::NumberRange;
 
 #[test]
 fn _int() {

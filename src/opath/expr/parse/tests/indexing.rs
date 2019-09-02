@@ -1,5 +1,5 @@
-use opath::*;
-use opath::Expr::*;
+use crate::opath::*;
+use crate::opath::Expr::*;
 
 #[test]
 fn range_dot_dot_int_at() {
