@@ -220,6 +220,13 @@ fn is_string_with_escapes(c: char) -> bool {
     }
 }
 
+fn is_string_with_apostrophes(c: char) -> bool {
+    match c {
+        '\'' => false,
+        _ => true
+    }
+}
+
 fn is_hex_char(ch: char) -> bool {
     ('A' <= ch && ch <= 'F') || ('a' <= ch && ch <= 'f') || ('0' <= ch && ch <= '9')
 }
@@ -389,6 +396,25 @@ impl Parser {
             Ok(Token::new(Terminal::String { escapes: false }, p1, p2))
         }
 
+        fn consume_surrounded_string(r: &mut dyn CharReader, c: char, f: &mut dyn FnMut(char) -> bool) -> Result<Token, Error> {
+            let p1 = r.position();
+            r.next_char()?;
+            if r.eof() {
+                return ParseErrDetail::invalid_input_one(r, c);
+            }
+            r.skip_while(f)?;
+            if r.eof() {
+                return ParseErrDetail::invalid_input_one(r, c);
+            }
+            r.next_char()?;
+            let p2 = r.position();
+            if c == '"' {
+                Ok(Token::new(Terminal::String { escapes: true }, p1, p2))
+            } else {
+                Ok(Token::new(Terminal::String { escapes: false }, p1, p2))
+            }
+        }
+
         let p1 = r.position();
         if self.line_start {
             r.skip_until(&mut |c: char| c != ' ')?;
@@ -523,20 +549,11 @@ impl Parser {
                 }
             }
             Some('"') => {
-                let p1 = r.position();
-                r.next_char()?;
-                if r.eof() {
-                    return ParseErrDetail::invalid_input_one(r, '\"');
-                }
-                r.skip_while(&mut is_string_with_escapes)?;
-                if r.eof() {
-                    return ParseErrDetail::invalid_input_one(r, '\"');
-                }
-                r.next_char()?;
-                let p2 = r.position();
-                Ok(Token::new(Terminal::String { escapes: true }, p1, p2))
+                return consume_surrounded_string(r, '"', &mut is_string_with_escapes);
             },
-            Some('\'') => consume(r, 1, Terminal::String { escapes: false }),
+            Some('\'') => {
+                return consume_surrounded_string(r, '\'', &mut is_string_with_apostrophes);
+            },
             Some(c) if c.is_digit(10) || c == '+' => consume_number(r, c),
             Some(_) => consume_string(r),
         }
@@ -1254,10 +1271,44 @@ FALsE"#;
         #[test]
         fn quoted_string_with_special_chars() {
             let input: &str = r#""\:?
- ,[]{}#*&!|>%@`""#;
+ ,[]{}#*&!|>%@`'""#;
 
             let terms = vec![
                 Terminal::String { escapes: true },
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn string_with_apostrophes() {
+            let input: &str = r#"'string'"#;
+
+            let terms = vec![
+                Terminal::String { escapes: false },
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn empty_string_with_apostrophes() {
+            let input: &str = r#"''"#;
+
+            let terms = vec![
+                Terminal::String { escapes: false },
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn string_with_apostrophes_and_special_chars() {
+            let input: &str = r#"'\:?
+ ,[]{}#*&!|>%@`"'"#;
+
+            let terms = vec![
+                Terminal::String { escapes: false },
                 Terminal::End,
             ];
             assert_terms!(input, terms);
