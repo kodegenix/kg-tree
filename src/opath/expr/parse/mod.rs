@@ -10,7 +10,7 @@ pub type Token = LexToken<Terminal>;
 
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 300)]
-pub enum ParseErr {
+pub enum ParseErrorDetail {
     #[display(fmt = "invalid escape")]
     InvalidEscape { from: Position, to: Position },
     #[display(fmt = "invalid character '{input}'")]
@@ -63,20 +63,20 @@ pub enum ParseErr {
     UnclosedGroup(Terminal),
 }
 
-impl ParseErr {
+impl ParseErrorDetail {
     pub fn invalid_escape<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
             Some(_) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidEscape {
+                parse_diag!(ParseErrorDetail::InvalidEscape {
                     from: p1,
                     to: p2
                 }, r, {
                     p1, p2 => "invalid escape",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoi {
+            None => parse_diag!(ParseErrorDetail::UnexpectedEoi {
                 pos: p1,
             }, r, {
                 p1, p1 => "unexpected end of input",
@@ -90,7 +90,7 @@ impl ParseErr {
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidChar {
+                parse_diag!(ParseErrorDetail::InvalidChar {
                     input: c,
                     from: p1,
                     to: p2
@@ -98,7 +98,7 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoi {
+            None => parse_diag!(ParseErrorDetail::UnexpectedEoi {
                 pos: p1,
             }, r, {
                 p1, p1 => "unexpected end of input",
@@ -112,7 +112,7 @@ impl ParseErr {
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidCharOne {
+                parse_diag!(ParseErrorDetail::InvalidCharOne {
                     input: c,
                     from: p1,
                     to: p2,
@@ -121,7 +121,7 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoiOne {
+            None => parse_diag!(ParseErrorDetail::UnexpectedEoiOne {
                 pos: p1,
                 expected,
             }, r, {
@@ -136,7 +136,7 @@ impl ParseErr {
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidCharMany {
+                parse_diag!(ParseErrorDetail::InvalidCharMany {
                     input: c,
                     from: p1,
                     to: p2,
@@ -145,7 +145,7 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoiMany {
+            None => parse_diag!(ParseErrorDetail::UnexpectedEoiMany {
                 pos: p1,
                 expected,
             }, r, {
@@ -158,7 +158,7 @@ impl ParseErr {
     #[inline]
     pub fn unexpected_eoi_str<T>(r: &mut dyn CharReader, expected: String) -> Result<T, Error> {
         let pos = r.position();
-        Err(parse_diag!(ParseErr::UnexpectedEoiOneString {
+        Err(parse_diag!(ParseErrorDetail::UnexpectedEoiOneString {
             pos,
             expected,
         }, r, {
@@ -168,7 +168,7 @@ impl ParseErr {
 
     #[inline]
     pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErr::UnexpectedToken { token }, r, {
+        Err(parse_diag!(ParseErrorDetail::UnexpectedToken { token }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
@@ -180,7 +180,7 @@ impl ParseErr {
         r: &mut dyn CharReader,
     ) -> Result<T, Error> {
         Err(
-            parse_diag!(ParseErr::UnexpectedTokenOne { token, expected }, r, {
+            parse_diag!(ParseErrorDetail::UnexpectedTokenOne { token, expected }, r, {
                 token.from(), token.to() => "unexpected token"
             }),
         )
@@ -193,7 +193,7 @@ impl ParseErr {
         r: &mut dyn CharReader,
     ) -> Result<T, Error> {
         Err(
-            parse_diag!(ParseErr::UnexpectedTokenMany { token, expected }, r, {
+            parse_diag!(ParseErrorDetail::UnexpectedTokenMany { token, expected }, r, {
                 token.from(), token.to() => "unexpected token"
             }),
         )
@@ -426,7 +426,7 @@ impl Parser {
                         let p2 = r.position();
                         Ok(Token::new(Terminal::Or, p1, p2))
                     } else {
-                        ParseErr::invalid_input_one(r, '|')
+                        ParseErrorDetail::invalid_input_one(r, '|')
                     }
                 }
                 Some('&') => {
@@ -437,7 +437,7 @@ impl Parser {
                         let p2 = r.position();
                         Ok(Token::new(Terminal::And, p1, p2))
                     } else {
-                        ParseErr::invalid_input_one(r, '&')
+                        ParseErrorDetail::invalid_input_one(r, '&')
                     }
                 }
                 Some('^') => {
@@ -688,7 +688,7 @@ impl Parser {
                         }
                     }
                     if r.eof() {
-                        ParseErr::invalid_input_one(r, c)
+                        ParseErrorDetail::invalid_input_one(r, c)
                     } else {
                         r.next_char()?;
                         let p2 = r.position();
@@ -702,7 +702,7 @@ impl Parser {
                     if self.partial {
                         Ok(Token::new(Terminal::End, p1, p1))
                     } else {
-                        ParseErr::invalid_input(r)
+                        ParseErrorDetail::invalid_input(r)
                     }
                 }
             }
@@ -732,7 +732,7 @@ impl Parser {
         if t.term() == term {
             Ok(t)
         } else {
-            ParseErr::unexpected_token_one(t, term, r)
+            ParseErrorDetail::unexpected_token_one(t, term, r)
         }
     }
 
@@ -861,7 +861,7 @@ impl Parser {
                     let range = self.parse_number_range(None, r)?;
                     return Ok(Expr::Range(Box::new(range)));
                 } else {
-                    return ParseErr::unexpected_token(t, r);
+                    return ParseErrorDetail::unexpected_token(t, r);
                 }
             }
             _ if ctx == Context::Range => {
@@ -887,7 +887,7 @@ impl Parser {
                     expected.push(Terminal::Star);
                 }
 
-                return ParseErr::unexpected_token_many(t, expected, r);
+                return ParseErrorDetail::unexpected_token_many(t, expected, r);
             }
         };
 
@@ -1072,7 +1072,7 @@ impl Parser {
                 c
             }
             Some(_) => unreachable!(),
-            None => return ParseErr::unexpected_eoi_str(r, "string literal".into()),
+            None => return ParseErrorDetail::unexpected_eoi_str(r, "string literal".into()),
         };
         let mut enc = true;
         while let Some(c) = r.peek_char(0)? {
@@ -1089,7 +1089,7 @@ impl Parser {
                     Some('t') => s.push('\t'),
                     Some('r') => s.push('\r'),
                     Some('n') => s.push('\n'),
-                    _ => return ParseErr::invalid_escape(r),
+                    _ => return ParseErrorDetail::invalid_escape(r),
                 }
             } else if is_ident_char(c) {
                 s.push(c);
@@ -1185,7 +1185,7 @@ impl Parser {
                 }
             }
             _ => {
-                return ParseErr::unexpected_token(t, r);
+                return ParseErrorDetail::unexpected_token(t, r);
             }
         }
 
@@ -1248,7 +1248,7 @@ impl Parser {
                                 Terminal::DoubleStar,
                                 Terminal::ParenLeft,
                             ];
-                            return ParseErr::unexpected_token_many(t, expected, r);
+                            return ParseErrorDetail::unexpected_token_many(t, expected, r);
                         }
                     }
                 }
@@ -1282,7 +1282,7 @@ impl Parser {
                     Terminal::BracketLeft,
                     Terminal::BraceLeft,
                 ];
-                return ParseErr::unexpected_token_many(t, expected, r);
+                return ParseErrorDetail::unexpected_token_many(t, expected, r);
             }
         };
         let op = t;
@@ -1298,7 +1298,7 @@ impl Parser {
                 Terminal::Comma => continue,
                 term if term == tsep => break,
                 _ => {
-                    let err = parse_diag!(ParseErr::UnclosedGroup(tsep), r, {
+                    let err = parse_diag!(ParseErrorDetail::UnclosedGroup(tsep), r, {
                         op.from(), op.to() => "opened here",
                         t.from(), t.to() => "error occurred here",
                     });
@@ -1350,7 +1350,7 @@ impl Parser {
                     }
                     _ => {
                         let expected = vec![Terminal::BraceRight, Terminal::Comma];
-                        return ParseErr::unexpected_token_many(t, expected, r);
+                        return ParseErrorDetail::unexpected_token_many(t, expected, r);
                     }
                 }
             }
@@ -1388,7 +1388,7 @@ impl Parser {
             }
             _ => {
                 let expected = vec![Terminal::Colon, Terminal::DoubleDot];
-                return ParseErr::unexpected_token_many(t, expected, r);
+                return ParseErrorDetail::unexpected_token_many(t, expected, r);
             }
         }
         Ok(range)
