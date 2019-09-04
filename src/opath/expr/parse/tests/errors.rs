@@ -22,7 +22,7 @@ fn or_single_pipe() {
     let diag = Opath::parse("true |   true").unwrap_err();
     let err = parse_err(&diag);
         match *err {
-            ParseErrorDetail::InvalidCharOne { ref input, ref from, ref to, ref expected } => {
+            ParseErrorDetail::InvalidCharOne { .. } => {
 //                assert_eq!(expected, &["|"]);
 //                assert_eq!(token.term(), "t");
             }
@@ -37,7 +37,7 @@ fn or_single_pipe_eoi() {
     let diag = Opath::parse("true | ").unwrap_err();
     let err = parse_err(&diag);
     match *err {
-        ParseErrorDetail::UnexpectedEoiOne { ref pos, ref expected } => {
+        ParseErrorDetail::UnexpectedEoiOne { .. } => {
 //            assert_eq!(pos, "????");
         }
         _ => panic!("Wrong error kind")
@@ -51,7 +51,7 @@ fn and_single_amp() {
     let diag = Opath::parse("true &   true").unwrap_err();
     let err = parse_err(&diag);
     match *err {
-        ParseErrorDetail::InvalidCharOne { ref input, ref from, ref to, ref expected } => {
+        ParseErrorDetail::InvalidCharOne { .. } => {
 //            assert_eq!(expected, &["&"]);
 //            assert_eq!(token, "t");
         }
@@ -66,7 +66,7 @@ fn and_single_amp_eoi() {
     let diag = Opath::parse("true & ").unwrap_err();
     let err = parse_err(&diag);
     match *err {
-        ParseErrorDetail::UnexpectedEoiOne { ref pos, ref expected } => {
+        ParseErrorDetail::UnexpectedEoiOne { .. } => {
 //            assert_eq!(pos, "????");
         }
         _ => panic!("Wrong error kind")
@@ -80,7 +80,7 @@ fn no_digits_after_e_non_alphabetic() {
     let diag = Opath::parse("12.5e-;").unwrap_err();
     let err = parse_error_detail(&diag);
     match *err {
-        DiagParseErrorDetail::UnexpectedInput { ref pos, ref found, ref expected, ref task } => {
+        DiagParseErrorDetail::UnexpectedInput { .. } => {
 //            assert_eq!(found, &String::from(";"));
         }
         _ => panic!("Wrong error kind")
@@ -93,7 +93,7 @@ fn no_digits_after_e_alphabetic() {
     let diag = Opath::parse("12.5e+string").unwrap_err();
     let err = parse_error_detail(&diag);
     match *err {
-        DiagParseErrorDetail::UnexpectedInput { ref pos, ref found, ref expected, ref task } => {
+        DiagParseErrorDetail::UnexpectedInput { .. } => {
 //            assert_eq!(found, &String::from("string"));
         }
         _ => panic!("Wrong error kind")
@@ -106,7 +106,7 @@ fn no_digits_after_e_eof() {
     let diag = Opath::parse("12.5e+").unwrap_err();
     let err = parse_error_detail(&diag);
     match *err {
-        DiagParseErrorDetail::UnexpectedEof { ref pos, ref expected, ref task } => {
+        DiagParseErrorDetail::UnexpectedEof { .. } => {
 //            assert_eq!(pos, "????");
         }
         _ => panic!("Wrong error kind")
@@ -119,7 +119,7 @@ fn scientific_notation_unexp_input() {
     let diag = Opath::parse("12.5e:").unwrap_err();
     let err = parse_error_detail(&diag);
     match *err {
-        DiagParseErrorDetail::UnexpectedInput { ref pos, ref found, ref expected, ref task } => {
+        DiagParseErrorDetail::UnexpectedInput { .. } => {
 //            assert_eq!(expected, &["+", "-", "digit"]);
 //            assert_eq!(found, ":");
         }
@@ -134,7 +134,7 @@ fn literal_eoi() {
     let diag = Opath::parse("'literal").unwrap_err();
     let err = parse_err(&diag);
     match *err {
-        ParseErrorDetail::UnexpectedEoiOne { ref pos, ref expected } => {
+        ParseErrorDetail::UnexpectedEoiOne { .. } => {
 //            assert_eq!(pos, "????");
         }
         _ => panic!("Wrong error kind")
@@ -153,8 +153,8 @@ fn non_partial_parser_invalid_char() {
     let err = parse_err(&diag);
 
     match *err {
-        ParseErrorDetail::InvalidChar { ref input, ref from, ref to } => {
-            let exp: Vec<String> = vec![];
+        ParseErrorDetail::InvalidChar { .. } => {
+//            let exp: Vec<String> = vec![];
 //            assert_eq!(found, "#");
 //            assert_eq!(expected, &exp);
         }
@@ -168,7 +168,7 @@ fn dot_notation() {
     let diag = Opath::parse("prop.: a").unwrap_err();
     let err = parse_err(&diag);
     match *err {
-        ParseErrorDetail::UnexpectedTokenMany { ref expected, ref token } => {
+        ParseErrorDetail::UnexpectedTokenMany { .. } => {
 //            assert_eq!(found, ":");
 //            assert_eq!(expected, &["*", "**", "(", "'", "\""]);
         }
@@ -182,7 +182,7 @@ fn level_range_close1() {
     let diag = Opath::parse("@.**{,1 @").unwrap_err();
     let err = parse_err(&diag);
     match *err {
-        ParseErrorDetail::UnexpectedTokenOne { ref expected, ref token } => {
+        ParseErrorDetail::UnexpectedTokenOne { .. } => {
 //            assert_eq!(found, "@");
 //            assert_eq!(expected, &["}"]);
         }
@@ -196,7 +196,7 @@ fn level_range_close2() {
     let diag = Opath::parse("@.**{1, 2@").unwrap_err();
     let err = parse_err(&diag);
     match *err {
-        ParseErrorDetail::UnexpectedTokenOne { ref expected, ref token } => {
+        ParseErrorDetail::UnexpectedTokenOne { .. } => {
 //            assert_eq!(found, "@");
 //            assert_eq!(expected, &["}"]);
         }
@@ -211,7 +211,7 @@ fn level_range() {
     let diag = Opath::parse("@.**{1 @").unwrap_err();
     let err = parse_err(&diag);
     match *err {
-        ParseErrorDetail::UnexpectedTokenMany { ref expected, ref token } => {
+        ParseErrorDetail::UnexpectedTokenMany { .. } => {
 //            assert_eq!(found, "@");
 //            assert_eq!(expected, &["}", ","]);
         }
@@ -225,7 +225,7 @@ fn parse_expr() {
     let diag = Opath::parse("^").unwrap_err();
     let err = parse_err(&diag);
     match *err {
-        ParseErrorDetail::UnexpectedTokenMany { ref expected, ref token } => {
+        ParseErrorDetail::UnexpectedTokenMany { .. } => {
 //            assert_eq!(found, "^");
 //            assert_eq!(expected, &["$", "@", "-", "!", "not", "(", "[", "**", ":", ".."]);
         }
@@ -239,7 +239,7 @@ fn parse_group_sep() {
     let diag = Opath::parse("(@.prop, @").unwrap_err();
     let err = parse_err(&diag);
     match *err {
-        ParseErrorDetail::UnclosedGroup(ref separator) => {
+        ParseErrorDetail::UnclosedGroup(..) => {
 //            assert_eq!(separator, "(");
         }
         _ => panic!("Wrong error kind")
