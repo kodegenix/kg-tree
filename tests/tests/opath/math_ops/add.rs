@@ -21,7 +21,10 @@ fn integer_integer() {
 fn integer_integer_overflow() {
     let results = query("18446744073709551616 + 3", EXAMPLE_JSON);
 
-    let res = results.get(0).unwrap(); // TODO ws assertion
+    let res = results.get(0).unwrap();
+
+    assert!(res.data().is_float());
+    assert_eq!(res.as_float(), 18446744073709551619.);
 }
 
 #[test]
