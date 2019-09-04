@@ -246,40 +246,49 @@ impl<'de> Deserialize<'de> for ChangeKindMask {
 
 /// Represents single logical model change.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelChange {
-    path: Opath,
+pub struct NodeChange {
     kind: ChangeKind,
+    new_path: Option<Opath>,
+    old_path: Option<Opath>,
 }
 
-impl ModelChange {
-    fn new(path: Opath, kind: ChangeKind) -> ModelChange {
-        ModelChange { path, kind }
-    }
-
-    pub fn path(&self) -> &Opath {
-        &self.path
+impl NodeChange {
+    fn new(kind: ChangeKind, new_path: Option<Opath>, old_path: Option<Opath>) -> NodeChange {
+        NodeChange {
+            kind,
+            new_path,
+            old_path,
+        }
     }
 
     pub fn kind(&self) -> ChangeKind {
         self.kind
     }
+
+    pub fn new_path(&self) -> Option<&Opath> {
+        self.new_path.as_ref()
+    }
+
+    pub fn old_path(&self) -> Option<&Opath> {
+        self.old_path.as_ref()
+    }
 }
 
-impl std::fmt::Display for ModelChange {
+impl std::fmt::Display for NodeChange {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}: {}", self.path, self.kind)
     }
 }
 
-impl PartialEq for ModelChange {
+impl PartialEq for NodeChange {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind && self.path == other.path
     }
 }
 
-impl Eq for ModelChange {}
+impl Eq for NodeChange {}
 
-impl PartialOrd for ModelChange {
+impl PartialOrd for NodeChange {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match self.path.to_string().partial_cmp(&other.path.to_string()) {
             Some(Ordering::Equal) => self.kind.partial_cmp(&other.kind),
@@ -288,7 +297,7 @@ impl PartialOrd for ModelChange {
     }
 }
 
-impl Ord for ModelChange {
+impl Ord for NodeChange {
     fn cmp(&self, other: &Self) -> Ordering {
         match self.path.to_string().cmp(&other.path.to_string()) {
             Ordering::Equal => self.kind.cmp(&other.kind),
@@ -297,28 +306,40 @@ impl Ord for ModelChange {
     }
 }
 
-fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<ModelChange>, cache: &mut dyn OpathCache) {
+fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<NodeChange>, cache: &mut dyn OpathCache) {
     if !a.is_ref_eq(b) {
         match (a.data().value(), b.data().value()) {
             (&Value::Null, &Value::Null) => {}
             (&Value::Boolean(ba), &Value::Boolean(bb)) => {
                 if ba != bb {
-                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                    changes.push(NodeChange::new(
+                        ChangeKind::Updated,
+                        Some(cache.get(b).clone()),
+                        Some(cache.get(a).clone())));
                 }
             }
             (&Value::Integer(na), &Value::Integer(nb)) => {
                 if na != nb {
-                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                    changes.push(NodeChange::new(
+                        ChangeKind::Updated,
+                        Some(cache.get(b).clone()),
+                        Some(cache.get(a).clone())));
                 }
             }
             (&Value::Float(na), &Value::Float(nb)) => {
                 if na.to_bits() != nb.to_bits() {
-                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                    changes.push(NodeChange::new(
+                        ChangeKind::Updated,
+                        Some(cache.get(b).clone()),
+                        Some(cache.get(a).clone())));
                 }
             }
             (&Value::String(ref sa), &Value::String(ref sb)) => {
                 if sa != sb {
-                    changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                    changes.push(NodeChange::new(
+                        ChangeKind::Updated,
+                        Some(cache.get(b).clone()),
+                        Some(cache.get(a).clone())));
                 }
             }
             (&Value::Object(ref propsa), &Value::Object(ref propsb)) => {
@@ -332,10 +353,17 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<ModelChange>, cache: &m
                 for &k in keys.keys() {
                     match (propsa.get(k), propsb.get(k)) {
                         (Some(a), Some(b)) => diff_node(a, b, changes, cache),
-                        (Some(a), None) => changes
-                            .push(ModelChange::new(cache.get(a).clone(), ChangeKind::Removed)),
+                        (Some(a), None) => {
+                            changes.push(NodeChange::new(
+                                ChangeKind::Removed,
+                                None,
+                                Some(cache.get(a).clone())));
+                        },
                         (None, Some(b)) => {
-                            changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Added))
+                            changes.push(NodeChange::new(
+                                ChangeKind::Added,
+                                Some(cache.get(b).clone()),
+                                None));
                         }
                         (None, None) => unreachable!(),
                     }
@@ -349,52 +377,167 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<ModelChange>, cache: &m
                     Ordering::Equal => {}
                     Ordering::Less => {
                         for b in elemsb[elemsa.len()..].iter() {
-                            changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Added));
+                            changes.push(NodeChange::new(
+                                ChangeKind::Added,
+                                Some(cache.get(b).clone()),
+                                None));
                         }
                     }
                     Ordering::Greater => {
                         for a in elemsa[elemsb.len()..].iter() {
-                            changes
-                                .push(ModelChange::new(cache.get(a).clone(), ChangeKind::Removed));
+                            changes.push(NodeChange::new(
+                                ChangeKind::Removed,
+                                None,
+                                Some(cache.get(a).clone())));
                         }
                     }
                 }
             }
             (&Value::Object(ref propsa), _) => {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                changes.push(NodeChange::new(
+                    ChangeKind::Updated,
+                    Some(cache.get(b).clone()),
+                    Some(cache.get(a).clone())));
                 for e in propsa.values() {
-                    changes.push(ModelChange::new(cache.get(e).clone(), ChangeKind::Removed));
+                    changes.push(NodeChange::new(
+                        ChangeKind::Removed,
+                        None,
+                        Some(cache.get(e).clone())));
                 }
             }
             (_, &Value::Object(ref propsb)) => {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                changes.push(NodeChange::new(
+                    ChangeKind::Updated,
+                    Some(cache.get(b).clone()),
+                    Some(cache.get(a).clone())));
                 for e in propsb.values() {
-                    changes.push(ModelChange::new(cache.get(e).clone(), ChangeKind::Added));
+                    changes.push(NodeChange::new(
+                        ChangeKind::Added,
+                        Some(cache.get(e).clone()),
+                        None));
                 }
             }
             (&Value::Array(ref elemsa), _) => {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                changes.push(NodeChange::new(
+                    ChangeKind::Updated,
+                    Some(cache.get(b).clone()),
+                    Some(cache.get(a).clone())));
                 for e in elemsa.iter() {
-                    changes.push(ModelChange::new(cache.get(e).clone(), ChangeKind::Removed));
+                    changes.push(NodeChange::new(
+                        ChangeKind::Removed,
+                        None,
+                        Some(cache.get(e).clone())));
                 }
             }
             (_, &Value::Array(ref elemsb)) => {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                changes.push(NodeChange::new(
+                    ChangeKind::Updated,
+                    Some(cache.get(b).clone()),
+                    Some(cache.get(a).clone())));
                 for e in elemsb.iter() {
-                    changes.push(ModelChange::new(cache.get(e).clone(), ChangeKind::Added));
+                    changes.push(NodeChange::new(
+                        ChangeKind::Added,
+                        Some(cache.get(e).clone()),
+                        None));
                 }
             }
             (_, _) => {
-                changes.push(ModelChange::new(cache.get(b).clone(), ChangeKind::Updated));
+                changes.push(NodeChange::new(
+                    ChangeKind::Updated,
+                    Some(cache.get(b).clone()),
+                    Some(cache.get(a).clone())));
             }
         }
     }
 }
 
+
+struct Move {
+    distance: f64,
+    add_index: usize,
+    del_index: usize,
+}
+
+impl PartialEq for Move {
+    fn eq(&self, other: &Self) -> bool {
+        self.distance.to_bits() == other.distance.to_bits()
+            && self.add_index == other.add_index
+            && self.del_index == other.del_index
+    }
+}
+
+impl Eq for Move { }
+
+impl PartialOrd for Move {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Move {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let o = other.distance.cmp(&self.distance);
+        if o != Ordering::Equal {
+            return o;
+        }
+        let o = self.add_index.cmp(&other.add_index);
+        if o != Ordering::Equal {
+            return o;
+        }
+        self.del_index.cmp(&other.del_index)
+    }
+}
+
+fn diff(a: &NodeRef, b: &NodeRef, opts: DiffOptions, cache: &mut dyn OpathCache) -> Vec<NodeChange> {
+    use std::collections::BinaryHeap;
+
+    let mut changes = Vec::new();
+    diff_node(a, b, &mut changes, cache);
+
+    if opts.detect_move() {
+        let mut adds = 0;
+        let mut dels = 0;
+        for (i, c) in changes.iter().enumerate() {
+            match c.kind {
+                ChangeKind::Added => adds += 1,
+                ChangeKind::Removed => dels += 1,
+                _ => {}
+            }
+        }
+
+        if !adds > 0 && dels > 0 {
+            let max_distance = opts.max_distance().unwrap_or(0.1);
+
+            let mut moves = BinaryHeap::with_capacity(adds * dels);
+            for add in changes.iter().enumerate().filter(|c| c.1.kind == ChangeKind::Added) {
+                let a = add.1.path.apply_one(a, a).unwrap();
+                for del in changes.iter().enumerate().filter(|c| c.1.kind == ChangeKind::Removed) {
+                    let b = del.1.path.apply_one(b, b).unwrap();
+                    let d = distance(&a, &b, opts.min_count());
+                    if d <= max_distance {
+                        moves.push(Move {
+                            distance: d,
+                            add_index: add.0,
+                            del_index: del.0,
+                        });
+                    }
+                }
+            }
+
+            let mut idx = vec![false; changes.len()];
+            for m in moves {
+
+            }
+        }
+    }
+
+    changes
+}
+
 /// Struct representing logical model changes. Operates on in-memory model representation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModelDiff {
-    changes: Vec<ModelChange>,
+    changes: Vec<NodeChange>,
 }
 
 impl ModelDiff {
@@ -433,7 +576,7 @@ impl ModelDiff {
                     if !cache.contains(&pb) {
                         res.insert(
                             i,
-                            ModelChange::new(cache.get(&pb).clone(), ChangeKind::Updated),
+                            NodeChange::new(cache.get(&pb).clone(), ChangeKind::Updated),
                         );
                     } else {
                         break;
@@ -453,7 +596,7 @@ impl ModelDiff {
                 if let Some(a) = c.path.apply(a, a)?.into_one() {
                     a.visit_recursive(|_r, _p, n| {
                         if !a.is_ref_eq(n) {
-                            res.push(ModelChange::new(cache.get(n).clone(), ChangeKind::Removed));
+                            res.push(NodeChange::new(cache.get(n).clone(), ChangeKind::Removed));
                         }
                         return true;
                     });
@@ -464,7 +607,7 @@ impl ModelDiff {
                 if let Some(b) = c.path.apply(b, b)?.into_one() {
                     b.visit_recursive(|_r, _p, n| {
                         if !b.is_ref_eq(n) {
-                            res.push(ModelChange::new(cache.get(n).clone(), ChangeKind::Added));
+                            res.push(NodeChange::new(cache.get(n).clone(), ChangeKind::Added));
                         }
                         return true;
                     });
@@ -481,7 +624,7 @@ impl ModelDiff {
         self.changes.is_empty()
     }
 
-    pub fn changes(&self) -> &Vec<ModelChange> {
+    pub fn changes(&self) -> &Vec<NodeChange> {
         &self.changes
     }
 
