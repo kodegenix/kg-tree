@@ -26,6 +26,9 @@ pub enum ExprErrorDetail {
     #[display(fmt = "variable not found: '{var_name}'")]
     VariableNotFound { var_name: String },
 
+    #[display(fmt = "single node expected, got: '{node_set}'")]
+    SingleNodeExpected { node_set: String },
+
     // This variant should probably be placed in resolve.rs module
     #[display(fmt = "too many iterations while resolving interpolations: '{depth}'")]
     InterpolationDepthReached { depth: usize },
@@ -1459,12 +1462,14 @@ impl Expr {
 
     pub(super) fn apply_one(&self, env: Env<'_>, ctx: Context) -> ExprResult<NodeRef> {
         let n = self.apply(env, ctx)?;
-        let res = match n {
-            NodeSet::Empty => NodeRef::null(),
-            NodeSet::One(n) => n,
-            NodeSet::Many(_) => panic!("multiple results returned"),
-        };
-        Ok(res)
+        match n {
+            NodeSet::One(n) => Ok(n),
+            node_set => {
+                Err(ExprErrorDetail::SingleNodeExpected {
+                    node_set: node_set.to_string()
+                }).into_diag_res()
+            }
+        }
     }
 }
 
