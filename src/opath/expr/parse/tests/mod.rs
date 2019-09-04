@@ -4,7 +4,7 @@ macro_rules! assert_expr {
     ($left:expr, $right:expr) => ({
         match (&$left, &$right) {
             (left_val, right_val) => {
-                match Opath::parse(*left_val) {
+                match crate::opath::Opath::parse(*left_val) {
                     Ok(opath) => {
                         let e = opath.expr();
                         assert_eq!(e, right_val)

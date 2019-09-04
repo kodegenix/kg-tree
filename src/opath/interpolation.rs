@@ -258,7 +258,7 @@ impl Parser {
                             r.skip_chars(self.delims.close.len())?;
                             p0 = r.position();
                         } else {
-                            return self::expr::parse::ParseErr::unexpected_eoi_str(
+                            return self::expr::parse::ParseErrorDetail::unexpected_eoi_str(
                                 r,
                                 self.delims.close.clone(),
                             );

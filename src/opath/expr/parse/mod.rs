@@ -1,8 +1,8 @@
-use std::collections::VecDeque;
-
-use kg_display::ListDisplay;
-
 use super::*;
+
+use std::collections::VecDeque;
+use kg_display::ListDisplay;
+use kg_diag::parse::num::{NumberParser, Number, Notation, Sign};
 
 pub type Error = ParseDiag;
 
@@ -10,7 +10,7 @@ pub type Token = LexToken<Terminal>;
 
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 300)]
-pub enum ParseErr {
+pub enum ParseErrorDetail {
     #[display(fmt = "invalid escape")]
     InvalidEscape { from: Position, to: Position },
     #[display(fmt = "invalid character '{input}'")]
@@ -63,20 +63,20 @@ pub enum ParseErr {
     UnclosedGroup(Terminal),
 }
 
-impl ParseErr {
+impl ParseErrorDetail {
     pub fn invalid_escape<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
             Some(_) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidEscape {
+                parse_diag!(ParseErrorDetail::InvalidEscape {
                     from: p1,
                     to: p2
                 }, r, {
                     p1, p2 => "invalid escape",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoi {
+            None => parse_diag!(ParseErrorDetail::UnexpectedEoi {
                 pos: p1,
             }, r, {
                 p1, p1 => "unexpected end of input",
@@ -90,7 +90,7 @@ impl ParseErr {
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidChar {
+                parse_diag!(ParseErrorDetail::InvalidChar {
                     input: c,
                     from: p1,
                     to: p2
@@ -98,7 +98,7 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoi {
+            None => parse_diag!(ParseErrorDetail::UnexpectedEoi {
                 pos: p1,
             }, r, {
                 p1, p1 => "unexpected end of input",
@@ -112,7 +112,7 @@ impl ParseErr {
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidCharOne {
+                parse_diag!(ParseErrorDetail::InvalidCharOne {
                     input: c,
                     from: p1,
                     to: p2,
@@ -121,7 +121,7 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoiOne {
+            None => parse_diag!(ParseErrorDetail::UnexpectedEoiOne {
                 pos: p1,
                 expected,
             }, r, {
@@ -136,7 +136,7 @@ impl ParseErr {
         let err = match r.next_char()? {
             Some(c) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidCharMany {
+                parse_diag!(ParseErrorDetail::InvalidCharMany {
                     input: c,
                     from: p1,
                     to: p2,
@@ -145,7 +145,7 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoiMany {
+            None => parse_diag!(ParseErrorDetail::UnexpectedEoiMany {
                 pos: p1,
                 expected,
             }, r, {
@@ -158,7 +158,7 @@ impl ParseErr {
     #[inline]
     pub fn unexpected_eoi_str<T>(r: &mut dyn CharReader, expected: String) -> Result<T, Error> {
         let pos = r.position();
-        Err(parse_diag!(ParseErr::UnexpectedEoiOneString {
+        Err(parse_diag!(ParseErrorDetail::UnexpectedEoiOneString {
             pos,
             expected,
         }, r, {
@@ -168,7 +168,7 @@ impl ParseErr {
 
     #[inline]
     pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErr::UnexpectedToken { token }, r, {
+        Err(parse_diag!(ParseErrorDetail::UnexpectedToken { token }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
@@ -180,7 +180,7 @@ impl ParseErr {
         r: &mut dyn CharReader,
     ) -> Result<T, Error> {
         Err(
-            parse_diag!(ParseErr::UnexpectedTokenOne { token, expected }, r, {
+            parse_diag!(ParseErrorDetail::UnexpectedTokenOne { token, expected }, r, {
                 token.from(), token.to() => "unexpected token"
             }),
         )
@@ -193,7 +193,7 @@ impl ParseErr {
         r: &mut dyn CharReader,
     ) -> Result<T, Error> {
         Err(
-            parse_diag!(ParseErr::UnexpectedTokenMany { token, expected }, r, {
+            parse_diag!(ParseErrorDetail::UnexpectedTokenMany { token, expected }, r, {
                 token.from(), token.to() => "unexpected token"
             }),
         )
@@ -288,7 +288,13 @@ pub enum Terminal {
     #[display(fmt = "LITERAL")]
     Literal,
     #[display(fmt = "INT")]
-    Integer,
+    IntDecimal,
+    #[display(fmt = "INTx")]
+    IntHex,
+    #[display(fmt = "INTo")]
+    IntOctal,
+    #[display(fmt = "INTb")]
+    IntBinary,
     #[display(fmt = "FLOAT")]
     Float,
     #[display(fmt = "'true'")]
@@ -318,6 +324,7 @@ enum Context {
 
 #[derive(Debug)]
 pub struct Parser {
+    num_parser: NumberParser,
     partial: bool,
     multiline: bool,
     prev_pos: Position,
@@ -328,6 +335,18 @@ pub struct Parser {
 impl Parser {
     pub fn new() -> Parser {
         Parser {
+            num_parser: {
+                let mut p = NumberParser::new();
+                p.decimal.allow_plus = false;
+                p.decimal.allow_minus = false;
+                p.hex.allow_plus = false;
+                p.hex.allow_minus = false;
+                p.octal.allow_plus = false;
+                p.octal.allow_minus = false;
+                p.binary.allow_plus = false;
+                p.binary.allow_minus = false;
+                p
+            },
             partial: false,
             multiline: true,
             prev_pos: Position::default(),
@@ -363,47 +382,6 @@ impl Parser {
     }
 
     fn lex(&mut self, r: &mut dyn CharReader) -> Result<Token, Error> {
-        #[inline]
-        fn process_scientific_notation(
-            r: &mut dyn CharReader,
-            p1: Position,
-        ) -> Result<Token, Error> {
-            r.next_char()?;
-            match r.peek_char(0)? {
-                Some('-') | Some('+') => {
-                    r.skip_chars(1)?;
-                    let mut has_digits = false;
-                    r.skip_while(&mut |c| {
-                        if c.is_digit(10) {
-                            has_digits = true;
-                            true
-                        } else {
-                            false
-                        }
-                    })?;
-                    if has_digits {
-                        let p2 = r.position();
-                        Ok(Token::new(Terminal::Float, p1, p2))
-                    } else {
-                        ParseErr::invalid_input_many(
-                            r,
-                            vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
-                        )
-                    }
-                }
-                Some(c) if c.is_digit(10) => {
-                    r.skip_chars(1)?;
-                    r.skip_while(&mut |c| c.is_digit(10))?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Float, p1, p2))
-                }
-                _ => ParseErr::invalid_input_many(
-                    r,
-                    vec!['-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
-                ),
-            }
-        }
-
         fn consume(r: &mut dyn CharReader, count: usize, term: Terminal) -> Result<Token, Error> {
             let p1 = r.position();
             r.skip_chars(count)?;
@@ -417,331 +395,315 @@ impl Parser {
             r.skip_whitespace_nonl()?;
         }
 
-        match r.peek_char(0)? {
-            None => Ok(Token::new(Terminal::End, r.position(), r.position())),
-            Some(',') => consume(r, 1, Terminal::Comma),
-            Some('(') => consume(r, 1, Terminal::ParenLeft),
-            Some(')') => consume(r, 1, Terminal::ParenRight),
-            Some('[') => consume(r, 1, Terminal::BracketLeft),
-            Some(']') => consume(r, 1, Terminal::BracketRight),
-            Some('{') => consume(r, 1, Terminal::BraceLeft),
-            Some('}') => consume(r, 1, Terminal::BraceRight),
-            Some(':') => consume(r, 1, Terminal::Colon),
-            Some('+') => consume(r, 1, Terminal::Plus),
-            Some('-') => consume(r, 1, Terminal::Minus),
-            Some('/') => consume(r, 1, Terminal::Slash),
-            Some('|') => {
-                let p1 = r.position();
-                r.next_char()?;
-                if let Some('|') = r.peek_char(0)? {
-                    r.next_char()?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Or, p1, p2))
-                } else {
-                    ParseErr::invalid_input_one(r, '|')
-                }
+        if self.num_parser.is_at_start(r)? {
+            let n = self.num_parser.parse_number(r)?;
+            match n.term().notation() {
+                Notation::Decimal => Ok(Token::new(Terminal::IntDecimal, n.from(), n.to())),
+                Notation::Hex => Ok(Token::new(Terminal::IntHex, n.from(), n.to())),
+                Notation::Octal => Ok(Token::new(Terminal::IntOctal, n.from(), n.to())),
+                Notation::Binary => Ok(Token::new(Terminal::IntBinary, n.from(), n.to())),
+                Notation::Float | Notation::Exponent => Ok(Token::new(Terminal::Float, n.from(), n.to())),
             }
-            Some('&') => {
-                let p1 = r.position();
-                r.next_char()?;
-                if let Some('&') = r.peek_char(0)? {
+        } else {
+            match r.peek_char(0)? {
+                None => Ok(Token::new(Terminal::End, r.position(), r.position())),
+                Some(',') => consume(r, 1, Terminal::Comma),
+                Some('(') => consume(r, 1, Terminal::ParenLeft),
+                Some(')') => consume(r, 1, Terminal::ParenRight),
+                Some('[') => consume(r, 1, Terminal::BracketLeft),
+                Some(']') => consume(r, 1, Terminal::BracketRight),
+                Some('{') => consume(r, 1, Terminal::BraceLeft),
+                Some('}') => consume(r, 1, Terminal::BraceRight),
+                Some(':') => consume(r, 1, Terminal::Colon),
+                Some('+') => consume(r, 1, Terminal::Plus),
+                Some('-') => consume(r, 1, Terminal::Minus),
+                Some('/') => consume(r, 1, Terminal::Slash),
+                Some('|') => {
+                    let p1 = r.position();
                     r.next_char()?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::And, p1, p2))
-                } else {
-                    ParseErr::invalid_input_one(r, '&')
-                }
-            }
-            Some('^') => {
-                let p1 = r.position();
-                r.next_char()?;
-                if let Some('=') = r.peek_char(0)? {
-                    r.next_char()?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::StartsWith, p1, p2))
-                } else {
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Caret, p1, p2))
-                }
-            }
-            Some('=') => {
-                let p1 = r.position();
-                r.next_char()?;
-                if let Some('=') = r.peek_char(0)? {
-                    r.next_char()?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Eq, p1, p2))
-                } else {
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Eq, p1, p2))
-                }
-            }
-            Some('!') => {
-                let p1 = r.position();
-                r.next_char()?;
-                if let Some('=') = r.peek_char(0)? {
-                    r.next_char()?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Ne, p1, p2))
-                } else {
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Not, p1, p2))
-                }
-            }
-            Some('>') => {
-                let p1 = r.position();
-                r.next_char()?;
-                if let Some('=') = r.peek_char(0)? {
-                    r.next_char()?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Ge, p1, p2))
-                } else {
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Gt, p1, p2))
-                }
-            }
-            Some('<') => {
-                let p1 = r.position();
-                r.next_char()?;
-                if let Some('=') = r.peek_char(0)? {
-                    r.next_char()?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Le, p1, p2))
-                } else {
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Lt, p1, p2))
-                }
-            }
-            Some('.') => {
-                let p1 = r.position();
-                r.next_char()?;
-                if let Some('.') = r.peek_char(0)? {
-                    r.next_char()?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::DoubleDot, p1, p2))
-                } else {
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Dot, p1, p2))
-                }
-            }
-            Some('*') => {
-                let p1 = r.position();
-                r.next_char()?;
-                match r.peek_char(0)? {
-                    Some('*') => {
+                    if let Some('|') = r.peek_char(0)? {
                         r.next_char()?;
                         let p2 = r.position();
-                        Ok(Token::new(Terminal::DoubleStar, p1, p2))
-                    }
-                    Some('=') => {
-                        r.next_char()?;
-                        let p2 = r.position();
-                        Ok(Token::new(Terminal::Contains, p1, p2))
-                    }
-                    _ => {
-                        let p2 = r.position();
-                        Ok(Token::new(Terminal::Star, p1, p2))
-                    }
-                }
-            }
-            Some('@') => {
-                let p1 = r.position();
-                r.next_char()?;
-                let mut more = false;
-                r.skip_while(&mut |c| {
-                    if is_ident_char(c) {
-                        more = true;
-                        true
+                        Ok(Token::new(Terminal::Or, p1, p2))
                     } else {
-                        false
+                        ParseErrorDetail::invalid_input_one(r, '|')
                     }
-                })?;
-                let p2 = r.position();
-                if more {
-                    Ok(Token::new(Terminal::Property, p1, p2))
-                } else {
-                    Ok(Token::new(Terminal::Current, p1, p2))
                 }
-            }
-            Some('$') => {
-                let p1 = r.position();
-                r.next_char()?;
-                match r.peek_char(0)? {
-                    Some('=') => {
+                Some('&') => {
+                    let p1 = r.position();
+                    r.next_char()?;
+                    if let Some('&') = r.peek_char(0)? {
                         r.next_char()?;
-                        Ok(Token::new(Terminal::EndsWith, p1, r.position()))
-                    }
-                    Some('{') => {
-                        r.next_char()?;
-                        Ok(Token::new(Terminal::VarBegin, p1, r.position()))
-                    }
-                    _ => {
-                        let mut more = false;
-                        r.skip_while(&mut |c| {
-                            if is_ident_char(c) {
-                                more = true;
-                                true
-                            } else {
-                                false
-                            }
-                        })?;
                         let p2 = r.position();
-                        if more {
-                            Ok(Token::new(Terminal::Var, p1, p2))
-                        } else {
-                            Ok(Token::new(Terminal::Root, p1, p2))
-                        }
+                        Ok(Token::new(Terminal::And, p1, p2))
+                    } else {
+                        ParseErrorDetail::invalid_input_one(r, '&')
                     }
                 }
-            }
-            Some('e') => {
-                if r.match_str("env:")? {
-                    let p1 = r.position();
-                    r.skip_chars(4)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Env, p1, p2))
-                } else {
+                Some('^') => {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&mut is_ident_char)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Property, p1, p2))
+                    if let Some('=') = r.peek_char(0)? {
+                        r.next_char()?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::StartsWith, p1, p2))
+                    } else {
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Caret, p1, p2))
+                    }
                 }
-            }
-            Some('n') => {
-                if r.match_str_term("null", &mut is_non_ident_char)? {
-                    let p1 = r.position();
-                    r.skip_chars(4)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Null, p1, p2))
-                } else if r.match_str_term("not", &mut is_non_ident_char)? {
-                    let p1 = r.position();
-                    r.skip_chars(3)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Not, p1, p2))
-                } else {
+                Some('=') => {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&mut is_ident_char)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Property, p1, p2))
+                    if let Some('=') = r.peek_char(0)? {
+                        r.next_char()?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Eq, p1, p2))
+                    } else {
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Eq, p1, p2))
+                    }
                 }
-            }
-            Some('t') => {
-                if r.match_str_term("true", &mut is_non_ident_char)? {
-                    let p1 = r.position();
-                    r.skip_chars(4)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::True, p1, p2))
-                } else {
+                Some('!') => {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&mut is_ident_char)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Property, p1, p2))
+                    if let Some('=') = r.peek_char(0)? {
+                        r.next_char()?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Ne, p1, p2))
+                    } else {
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Not, p1, p2))
+                    }
                 }
-            }
-            Some('f') => {
-                if r.match_str_term("false", &mut is_non_ident_char)? {
-                    let p1 = r.position();
-                    r.skip_chars(5)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::False, p1, p2))
-                } else {
+                Some('>') => {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&mut is_ident_char)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Property, p1, p2))
+                    if let Some('=') = r.peek_char(0)? {
+                        r.next_char()?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Ge, p1, p2))
+                    } else {
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Gt, p1, p2))
+                    }
                 }
-            }
-            Some('a') => {
-                if r.match_str_term("and", &mut is_non_ident_char)? {
-                    let p1 = r.position();
-                    r.skip_chars(3)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::And, p1, p2))
-                } else {
+                Some('<') => {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&mut is_ident_char)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Property, p1, p2))
+                    if let Some('=') = r.peek_char(0)? {
+                        r.next_char()?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Le, p1, p2))
+                    } else {
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Lt, p1, p2))
+                    }
                 }
-            }
-            Some('o') => {
-                if r.match_str_term("or", &mut is_non_ident_char)? {
-                    let p1 = r.position();
-                    r.skip_chars(2)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Or, p1, p2))
-                } else {
+                Some('.') => {
                     let p1 = r.position();
                     r.next_char()?;
-                    r.skip_while(&mut is_ident_char)?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Property, p1, p2))
+                    if let Some('.') = r.peek_char(0)? {
+                        r.next_char()?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::DoubleDot, p1, p2))
+                    } else {
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Dot, p1, p2))
+                    }
                 }
-            }
-            Some(c) if c.is_alphabetic() || c == '_' => {
-                let p1 = r.position();
-                r.next_char()?;
-                r.skip_while(&mut is_ident_char)?;
-                let p2 = r.position();
-                Ok(Token::new(Terminal::Property, p1, p2))
-            }
-            Some(c) if c.is_digit(10) => {
-                let p1 = r.position();
-                r.next_char()?;
-                r.skip_while(&mut |c| c.is_digit(10))?;
-                match r.peek_char(0)? {
-                    Some('.') => {
-                        if Some('.') == r.peek_char(1)? {
+                Some('*') => {
+                    let p1 = r.position();
+                    r.next_char()?;
+                    match r.peek_char(0)? {
+                        Some('*') => {
+                            r.next_char()?;
                             let p2 = r.position();
-                            return Ok(Token::new(Terminal::Integer, p1, p2));
+                            Ok(Token::new(Terminal::DoubleStar, p1, p2))
                         }
-                        r.next_char()?;
-                        r.skip_while(&mut |c| c.is_digit(10))?;
-                        match r.peek_char(0)? {
-                            Some('e') | Some('E') => process_scientific_notation(r, p1),
-                            _ => {
-                                let p2 = r.position();
-                                Ok(Token::new(Terminal::Float, p1, p2))
+                        Some('=') => {
+                            r.next_char()?;
+                            let p2 = r.position();
+                            Ok(Token::new(Terminal::Contains, p1, p2))
+                        }
+                        _ => {
+                            let p2 = r.position();
+                            Ok(Token::new(Terminal::Star, p1, p2))
+                        }
+                    }
+                }
+                Some('@') => {
+                    let p1 = r.position();
+                    r.next_char()?;
+                    let mut more = false;
+                    r.skip_while(&mut |c| {
+                        if is_ident_char(c) {
+                            more = true;
+                            true
+                        } else {
+                            false
+                        }
+                    })?;
+                    let p2 = r.position();
+                    if more {
+                        Ok(Token::new(Terminal::Property, p1, p2))
+                    } else {
+                        Ok(Token::new(Terminal::Current, p1, p2))
+                    }
+                }
+                Some('$') => {
+                    let p1 = r.position();
+                    r.next_char()?;
+                    match r.peek_char(0)? {
+                        Some('=') => {
+                            r.next_char()?;
+                            Ok(Token::new(Terminal::EndsWith, p1, r.position()))
+                        }
+                        Some('{') => {
+                            r.next_char()?;
+                            Ok(Token::new(Terminal::VarBegin, p1, r.position()))
+                        }
+                        _ => {
+                            let mut more = false;
+                            r.skip_while(&mut |c| {
+                                if is_ident_char(c) {
+                                    more = true;
+                                    true
+                                } else {
+                                    false
+                                }
+                            })?;
+                            let p2 = r.position();
+                            if more {
+                                Ok(Token::new(Terminal::Var, p1, p2))
+                            } else {
+                                Ok(Token::new(Terminal::Root, p1, p2))
                             }
                         }
                     }
-                    Some('e') | Some('E') => process_scientific_notation(r, p1),
-                    _ => {
+                }
+                Some('e') => {
+                    if r.match_str("env:")? {
+                        let p1 = r.position();
+                        r.skip_chars(4)?;
                         let p2 = r.position();
-                        Ok(Token::new(Terminal::Integer, p1, p2))
-                    }
-                }
-            }
-            Some(c) if c == '\'' || c == '\"' => {
-                let p1 = r.position();
-                while let Some(k) = r.next_char()? {
-                    if k == '\\' {
+                        Ok(Token::new(Terminal::Env, p1, p2))
+                    } else {
+                        let p1 = r.position();
                         r.next_char()?;
-                    } else if k == c {
-                        break;
+                        r.skip_while(&mut is_ident_char)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Property, p1, p2))
                     }
                 }
-                if r.eof() {
-                    ParseErr::invalid_input_one(r, c)
-                } else {
-                    r.next_char()?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Literal, p1, p2))
+                Some('n') => {
+                    if r.match_str_term("null", &mut is_non_ident_char)? {
+                        let p1 = r.position();
+                        r.skip_chars(4)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Null, p1, p2))
+                    } else if r.match_str_term("not", &mut is_non_ident_char)? {
+                        let p1 = r.position();
+                        r.skip_chars(3)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Not, p1, p2))
+                    } else {
+                        let p1 = r.position();
+                        r.next_char()?;
+                        r.skip_while(&mut is_ident_char)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Property, p1, p2))
+                    }
                 }
-            }
-            Some(_c) => {
-                let p1 = r.position();
+                Some('t') => {
+                    if r.match_str_term("true", &mut is_non_ident_char)? {
+                        let p1 = r.position();
+                        r.skip_chars(4)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::True, p1, p2))
+                    } else {
+                        let p1 = r.position();
+                        r.next_char()?;
+                        r.skip_while(&mut is_ident_char)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Property, p1, p2))
+                    }
+                }
+                Some('f') => {
+                    if r.match_str_term("false", &mut is_non_ident_char)? {
+                        let p1 = r.position();
+                        r.skip_chars(5)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::False, p1, p2))
+                    } else {
+                        let p1 = r.position();
+                        r.next_char()?;
+                        r.skip_while(&mut is_ident_char)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Property, p1, p2))
+                    }
+                }
+                Some('a') => {
+                    if r.match_str_term("and", &mut is_non_ident_char)? {
+                        let p1 = r.position();
+                        r.skip_chars(3)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::And, p1, p2))
+                    } else {
+                        let p1 = r.position();
+                        r.next_char()?;
+                        r.skip_while(&mut is_ident_char)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Property, p1, p2))
+                    }
+                }
+                Some('o') => {
+                    if r.match_str_term("or", &mut is_non_ident_char)? {
+                        let p1 = r.position();
+                        r.skip_chars(2)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Or, p1, p2))
+                    } else {
+                        let p1 = r.position();
+                        r.next_char()?;
+                        r.skip_while(&mut is_ident_char)?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Property, p1, p2))
+                    }
+                }
+                Some(c) if c.is_alphabetic() || c == '_' => {
+                    let p1 = r.position();
+                    r.next_char()?;
+                    r.skip_while(&mut is_ident_char)?;
+                    let p2 = r.position();
+                    Ok(Token::new(Terminal::Property, p1, p2))
+                }
+                Some(c) if c == '\'' || c == '\"' => {
+                    let p1 = r.position();
+                    while let Some(k) = r.next_char()? {
+                        if k == '\\' {
+                            r.next_char()?;
+                        } else if k == c {
+                            break;
+                        }
+                    }
+                    if r.eof() {
+                        ParseErrorDetail::invalid_input_one(r, c)
+                    } else {
+                        r.next_char()?;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Literal, p1, p2))
+                    }
+                }
+                Some(_c) => {
+                    let p1 = r.position();
 
-                // (jc) do not report lex errors when parsing partial input
-                if self.partial {
-                    Ok(Token::new(Terminal::End, p1, p1))
-                } else {
-                    ParseErr::invalid_input(r)
+                    // (jc) do not report lex errors when parsing partial input
+                    if self.partial {
+                        Ok(Token::new(Terminal::End, p1, p1))
+                    } else {
+                        ParseErrorDetail::invalid_input(r)
+                    }
                 }
             }
         }
@@ -770,7 +732,7 @@ impl Parser {
         if t.term() == term {
             Ok(t)
         } else {
-            ParseErr::unexpected_token_one(t, term, r)
+            ParseErrorDetail::unexpected_token_one(t, term, r)
         }
     }
 
@@ -860,19 +822,29 @@ impl Parser {
                 self.push_token(t);
                 self.parse_sequence(r, c)?
             }
-            Terminal::Integer => {
-                let s = r.slice_pos(t.from(), t.to())?;
-                match s.parse::<i64>() {
+            Terminal::IntDecimal => {
+                match self.num_parser.convert_number::<i64>(&Number::token(t.span(), Notation::Decimal, Sign::None), r) {
                     Ok(n) => Expr::Integer(n),
                     Err(_) => {
-                        //(jc) integer with overflow is reparsed as a float
-                        let n: f64 = s.parse().unwrap();
+                        let n = self.num_parser.convert_number::<f64>(&Number::token(t.span(), Notation::Float, Sign::None), r)?;
                         Expr::Float(n)
                     }
                 }
             }
+            Terminal::IntHex => {
+                let n = self.num_parser.convert_number::<i64>(&Number::token(t.span(), Notation::Hex, Sign::None), r)?;
+                Expr::Integer(n)
+            }
+            Terminal::IntOctal => {
+                let n = self.num_parser.convert_number::<i64>(&Number::token(t.span(), Notation::Octal, Sign::None), r)?;
+                Expr::Integer(n)
+            }
+            Terminal::IntBinary => {
+                let n = self.num_parser.convert_number::<i64>(&Number::token(t.span(), Notation::Binary, Sign::None), r)?;
+                Expr::Integer(n)
+            }
             Terminal::Float => {
-                let n: f64 = r.slice_pos(t.from(), t.to())?.parse().unwrap();
+                let n = self.num_parser.convert_number::<f64>(&Number::token(t.span(), Notation::Float, Sign::None), r)?;
                 Expr::Float(n)
             }
             Terminal::True => Expr::Boolean(true),
@@ -889,7 +861,7 @@ impl Parser {
                     let range = self.parse_number_range(None, r)?;
                     return Ok(Expr::Range(Box::new(range)));
                 } else {
-                    return ParseErr::unexpected_token(t, r);
+                    return ParseErrorDetail::unexpected_token(t, r);
                 }
             }
             _ if ctx == Context::Range => {
@@ -915,7 +887,7 @@ impl Parser {
                     expected.push(Terminal::Star);
                 }
 
-                return ParseErr::unexpected_token_many(t, expected, r);
+                return ParseErrorDetail::unexpected_token_many(t, expected, r);
             }
         };
 
@@ -1100,7 +1072,7 @@ impl Parser {
                 c
             }
             Some(_) => unreachable!(),
-            None => return ParseErr::unexpected_eoi_str(r, "string literal".into()),
+            None => return ParseErrorDetail::unexpected_eoi_str(r, "string literal".into()),
         };
         let mut enc = true;
         while let Some(c) = r.peek_char(0)? {
@@ -1117,7 +1089,7 @@ impl Parser {
                     Some('t') => s.push('\t'),
                     Some('r') => s.push('\r'),
                     Some('n') => s.push('\n'),
-                    _ => return ParseErr::invalid_escape(r),
+                    _ => return ParseErrorDetail::invalid_escape(r),
                 }
             } else if is_ident_char(c) {
                 s.push(c);
@@ -1213,7 +1185,7 @@ impl Parser {
                 }
             }
             _ => {
-                return ParseErr::unexpected_token(t, r);
+                return ParseErrorDetail::unexpected_token(t, r);
             }
         }
 
@@ -1276,7 +1248,7 @@ impl Parser {
                                 Terminal::DoubleStar,
                                 Terminal::ParenLeft,
                             ];
-                            return ParseErr::unexpected_token_many(t, expected, r);
+                            return ParseErrorDetail::unexpected_token_many(t, expected, r);
                         }
                     }
                 }
@@ -1310,7 +1282,7 @@ impl Parser {
                     Terminal::BracketLeft,
                     Terminal::BraceLeft,
                 ];
-                return ParseErr::unexpected_token_many(t, expected, r);
+                return ParseErrorDetail::unexpected_token_many(t, expected, r);
             }
         };
         let op = t;
@@ -1326,7 +1298,7 @@ impl Parser {
                 Terminal::Comma => continue,
                 term if term == tsep => break,
                 _ => {
-                    let err = parse_diag!(ParseErr::UnclosedGroup(tsep), r, {
+                    let err = parse_diag!(ParseErrorDetail::UnclosedGroup(tsep), r, {
                         op.from(), op.to() => "opened here",
                         t.from(), t.to() => "error occurred here",
                     });
@@ -1378,7 +1350,7 @@ impl Parser {
                     }
                     _ => {
                         let expected = vec![Terminal::BraceRight, Terminal::Comma];
-                        return ParseErr::unexpected_token_many(t, expected, r);
+                        return ParseErrorDetail::unexpected_token_many(t, expected, r);
                     }
                 }
             }
@@ -1416,7 +1388,7 @@ impl Parser {
             }
             _ => {
                 let expected = vec![Terminal::Colon, Terminal::DoubleDot];
-                return ParseErr::unexpected_token_many(t, expected, r);
+                return ParseErrorDetail::unexpected_token_many(t, expected, r);
             }
         }
         Ok(range)
@@ -1428,3 +1400,6 @@ impl Default for Parser {
         Parser::new()
     }
 }
+
+#[cfg(test)]
+mod tests;

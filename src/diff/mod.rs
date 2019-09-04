@@ -4,9 +4,15 @@ use std::ops::{BitAnd, BitOr};
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 
-use super::opath::{NodePathCache, Opath, OpathCache};
 use super::*;
-use crate::opath::ExprResult;
+use super::opath::{NodePathCache, Opath, OpathCache, ExprResult};
+
+mod distance;
+mod opts;
+
+use self::distance::distance;
+
+pub use self::opts::DiffOptions;
 
 #[derive(Debug, Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub enum ChangeKind {
@@ -494,6 +500,7 @@ impl std::fmt::Display for ModelDiff {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -590,5 +597,26 @@ mod tests {
         let d = ModelDiff::full(&a, &b).unwrap();
 
         assert_eq!(d.changes().len(), 14);
+    }
+
+    #[test]
+    fn distance() {
+        let jsona = r#"
+        {
+            "star": "*",
+            "pb": "test2"
+        }"#;
+        let jsonb = r#"
+        {
+            "star": "**",
+            "pb": { "aa": "test2", "b": false }
+        }"#;
+
+        let a = NodeRef::from_json(jsona).unwrap();
+        let b = NodeRef::from_json(jsonb).unwrap();
+
+        let d = super::distance(&a, &b, None);
+
+        println!("{}", d);
     }
 }
