@@ -396,6 +396,23 @@ impl Parser {
             Ok(Token::new(Terminal::String { escapes: false }, p1, p2))
         }
 
+        //Used with indicators: '?', ':'.
+        fn consume_string_starting_with_indicator(r: &mut dyn CharReader, t: Terminal) -> Result<Token, Error> {
+            if let Some(nc) = r.peek_char(1)? {
+                if is_blank_or_break(nc) {
+                    return consume(r, 1, t);
+                } else {
+                    let p1 = r.position();
+                    r.next_char();
+                    r.skip_while(&mut is_string)?;
+                    let p2 = r.position();
+                    return Ok(Token::new(Terminal::String { escapes: false }, p1, p2));
+                }
+            } else {
+                return consume(r, 1, t);
+            }
+        }
+
         fn consume_surrounded_string(r: &mut dyn CharReader, c: char, f: &mut dyn FnMut(char) -> bool) -> Result<Token, Error> {
             let p1 = r.position();
             r.next_char()?;
@@ -451,8 +468,6 @@ impl Parser {
             Some(']') => consume(r, 1, Terminal::BracketRight),
             Some('{') => consume(r, 1, Terminal::BraceLeft),
             Some('}') => consume(r, 1, Terminal::BraceRight),
-            Some(':') => consume(r, 1, Terminal::Colon),
-            Some('?') => consume(r, 1, Terminal::QuestionMark),
             Some('*') => consume(r, 1, Terminal::Asterisk),
             Some('&') => consume(r, 1, Terminal::Ampersand),
             Some('!') => consume(r, 1, Terminal::ExclamationMark),
@@ -474,6 +489,12 @@ impl Parser {
                     ParseErrDetail::invalid_input(r)
                 }
             }
+            Some(':') => {
+                consume_string_starting_with_indicator(r, Terminal::Colon)
+            },
+            Some('?') => {
+                consume_string_starting_with_indicator(r, Terminal::QuestionMark)
+            },
             Some(c) if c == '-' => {
                 if r.match_str("---")? && r.position().column == 0 {
                     if let Some(c) = r.peek_char(3)? {
@@ -696,6 +717,16 @@ mod tests {
         }
 
         #[test]
+        fn string_with_colon_at_the_begining() {
+            let input: &str = ":string";
+
+            let terms = vec![
+                Terminal::String { escapes: false },
+                Terminal::End];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
         fn mapping_key_character() {
             let input: &str = r#"? key: value"#;
 
@@ -708,6 +739,16 @@ mod tests {
                 Terminal::String { escapes: false },
                 Terminal::End,
             ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn string_with_question_mark_at_the_begining() {
+            let input: &str = r#"?string"#;
+
+            let terms = vec![
+                Terminal::String { escapes: false },
+                Terminal::End];
             assert_terms!(input, terms);
         }
 
