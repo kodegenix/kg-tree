@@ -1,13 +1,17 @@
-#[derive(Debug, Clone, Default)]
-pub struct DiffOptions {
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NodeDiffOptions {
     detect_move: bool,
     min_count: Option<u32>,
     max_distance: Option<f64>,
 }
 
-impl DiffOptions {
-    pub fn new() -> Self {
-        Self::default()
+impl NodeDiffOptions {
+    pub fn new(detect_move: bool, min_count: Option<u32>, max_distance: Option<f64>) -> Self {
+        NodeDiffOptions {
+            detect_move,
+            min_count,
+            max_distance,
+        }
     }
 
     pub fn detect_move(&self) -> bool {
