@@ -37,6 +37,12 @@ pub mod toml {
     }
 }
 
+pub mod yaml {
+    use super::*;
+    pub use fmt::yaml::ParseErrDetail as YamlParseErrDetail;
+    pub use fmt::yaml::Parser as YamlParser;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

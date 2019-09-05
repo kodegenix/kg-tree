@@ -634,6 +634,27 @@ impl Parser {
             Some(_) => consume_string(r),
         }
     }
+
+    fn next_token(&mut self, r: &mut dyn CharReader) -> Result<Token, Error> {
+        if let Some(t) = self.token_queue.pop_front() {
+            Ok(t)
+        } else {
+            self.lex(r)
+        }
+    }
+
+    pub fn parse(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
+        self.token_queue.clear();
+        self.parse_something(r)
+    }
+
+    fn parse_something(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
+        let t = self.next_token(r)?;
+        match t.term() {
+            Terminal::Null => Ok(NodeRef::null().with_span(t.span())),
+            _ => unimplemented!()
+        }
+    }
 }
 
 #[cfg(test)]

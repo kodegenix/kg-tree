@@ -3,29 +3,7 @@ use crate::tests::NodeRefExt;
 use kg_diag::Diag;
 use kg_diag::ParseDiag;
 use kg_tree::NodeRef;
-
-macro_rules! parse_node {
-    ($input: expr) => {{
-        let mut r = kg_diag::MemCharReader::new($input.as_bytes());
-        let mut parser = crate::serial::toml::TomlParser::new();
-        parser.parse(&mut r).unwrap_or_else(|err| {
-            eprintln!("{}", err);
-            panic!("Error parsing node!")
-        })
-    }};
-}
-
-macro_rules! parse_node_err {
-    ($input: expr) => {{
-        let mut r = kg_diag::MemCharReader::new($input.as_bytes());
-        let mut parser = crate::serial::toml::TomlParser::new();
-        let err = parser
-            .parse(&mut r)
-            .map(|node| panic!("Error expected! got node: {}", node.to_json_pretty()))
-            .unwrap_err();
-        err
-    }};
-}
+use crate::serial::toml::TomlParser as Parser;
 
 macro_rules! assert_err {
     ($err: expr, $variant: pat) => {
