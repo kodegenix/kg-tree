@@ -403,7 +403,7 @@ impl Parser {
                     return consume(r, 1, t);
                 } else {
                     let p1 = r.position();
-                    r.next_char();
+                    r.next_char()?;
                     r.skip_while(&mut is_string)?;
                     let p2 = r.position();
                     return Ok(Token::new(Terminal::String { escapes: false }, p1, p2));
@@ -413,7 +413,8 @@ impl Parser {
             }
         }
 
-        fn consume_surrounded_string(r: &mut dyn CharReader, c: char, f: &mut dyn FnMut(char) -> bool) -> Result<Token, Error> {
+        //FIXME MC Change c: char to t:Terminal
+        fn consume_surrounded_string(r: &mut dyn CharReader, c: char, t: Terminal, f: &mut dyn FnMut(char) -> bool) -> Result<Token, Error> {
             let p1 = r.position();
             r.next_char()?;
             if r.eof() {
@@ -425,11 +426,7 @@ impl Parser {
             }
             r.next_char()?;
             let p2 = r.position();
-            if c == '"' {
-                Ok(Token::new(Terminal::String { escapes: true }, p1, p2))
-            } else {
-                Ok(Token::new(Terminal::String { escapes: false }, p1, p2))
-            }
+            Ok(Token::new(t, p1, p2))
         }
 
         let p1 = r.position();
@@ -501,7 +498,7 @@ impl Parser {
                         if is_break(c) {
                             return consume(r, 3, Terminal::DocumentStart);
                         } else {
-                            r.skip_chars(3);
+                            r.skip_chars(3)?;
                             ParseErrDetail::invalid_input_many(r, vec!['\n', '\r'])
                         }
                     } else {
@@ -529,7 +526,7 @@ impl Parser {
                         if is_break(c) {
                             return consume(r, 3, Terminal::DocumentEnd);
                         } else {
-                            r.skip_chars(3);
+                            r.skip_chars(3)?;
                             ParseErrDetail::invalid_input_many(r, vec!['\n', '\r'])
                         }
                     } else {
@@ -569,11 +566,19 @@ impl Parser {
                     return consume_string(r);
                 }
             }
+            Some('~') => consume(r, 1, Terminal::Null),
+            Some('n') | Some('N') => {
+                if r.match_str("null")? || r.match_str("Null")? || r.match_str("NULL")? {
+                    return consume(r, 4, Terminal::Null);
+                } else {
+                    return consume_string(r);
+                }
+            }
             Some('"') => {
-                return consume_surrounded_string(r, '"', &mut is_string_with_escapes);
+                return consume_surrounded_string(r, '"', Terminal::String { escapes: true }, &mut is_string_with_escapes);
             },
             Some('\'') => {
-                return consume_surrounded_string(r, '\'', &mut is_string_with_apostrophes);
+                return consume_surrounded_string(r, '\'', Terminal::String { escapes: false }, &mut is_string_with_apostrophes);
             },
             Some(c) if c.is_digit(10) || c == '+' => consume_number(r, c),
             Some(_) => consume_string(r),
@@ -1350,6 +1355,51 @@ FALsE"#;
 
             let terms = vec![
                 Terminal::String { escapes: false },
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn nulls() {
+            let input: &str = r#"null
+Null
+NULL"#;
+
+            let terms = vec![
+                Terminal::Null,
+                Terminal::Newline,
+                Terminal::Null,
+                Terminal::Newline,
+                Terminal::Null,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn bad_nulls() {
+            let input: &str = r#"nUll
+NuLl
+NUlL"#;
+
+            let terms = vec![
+                Terminal::String { escapes: false },
+                Terminal::Newline,
+                Terminal::String { escapes: false },
+                Terminal::Newline,
+                Terminal::String { escapes: false },
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn tilde() {
+            let input: &str = r#"~"#;
+
+            let terms = vec![
+                Terminal::Null,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
