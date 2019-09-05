@@ -17,8 +17,6 @@ pub enum ParseErrDetail{
         from: Position,
         to: Position,
     },
-    #[display(fmt = "unexpected end of input")]
-    UnexpectedEoi { pos: Position },
     #[display(fmt = "invalid character '{input}', expected '{expected}'")]
     InvalidCharOne {
         input: char,
@@ -26,8 +24,6 @@ pub enum ParseErrDetail{
         to: Position,
         expected: char,
     },
-    #[display(fmt = "unexpected end of input, expected '{expected}'")]
-    UnexpectedEoiOne { pos: Position, expected: char },
     #[display(
     fmt = "invalid character '{input}', expected one of: {expected}",
     expected = "ListDisplay(expected)"
@@ -38,11 +34,35 @@ pub enum ParseErrDetail{
         to: Position,
         expected: Vec<char>,
     },
+    #[display(fmt = "invalid number literal: {err}")]
+    InvalidIntegerLiteral {
+        err: std::num::ParseIntError,
+        from: Position,
+        to: Position,
+    },
+    #[display(fmt = "invalid number literal: {err}")]
+    InvalidFloatLiteral {
+        err: std::num::ParseFloatError,
+        from: Position,
+        to: Position,
+    },
+    #[display(fmt = "unexpected end of input")]
+    UnexpectedEoi { pos: Position },
+    #[display(fmt = "unexpected end of input, expected '{expected}'")]
+    UnexpectedEoiOne { pos: Position, expected: char },
     #[display(
     fmt = "unexpected end of input, expected one of: {expected}",
     expected = "ListDisplay(expected)"
     )]
     UnexpectedEoiMany { pos: Position, expected: Vec<char> },
+    #[display(
+    fmt = "unexpected symbol {token}, expected one of: {expected}",
+    expected = "ListDisplay(expected)"
+    )]
+    UnexpectedTokenMany {
+        token: Token,
+        expected: Vec<Terminal>,
+    },
 }
 
 impl ParseErrDetail {
@@ -125,6 +145,18 @@ impl ParseErrDetail {
             p1, p1 => "unexpected end of input",
         });
         Err(err)
+    }
+
+    pub fn unexpected_token_many<T>(
+        token: Token,
+        expected: Vec<Terminal>,
+        r: &mut dyn CharReader,
+    ) -> Result<T, Error> {
+        Err(
+            parse_diag!(ParseErrDetail::UnexpectedTokenMany { token, expected }, r, {
+                token.from(), token.to() => "unexpected token"
+            }),
+        )
     }
 }
 
@@ -652,7 +684,37 @@ impl Parser {
         let t = self.next_token(r)?;
         match t.term() {
             Terminal::Null => Ok(NodeRef::null().with_span(t.span())),
-            _ => unimplemented!()
+            Terminal::True => Ok(NodeRef::boolean(true).with_span(t.span())),
+            Terminal::False => Ok(NodeRef::boolean(false).with_span(t.span())),
+            Terminal::Integer => {
+                let s = r.slice_pos(t.from(), t.to())?;
+                let num: i64 = s.parse().map_err(|err| ParseErrDetail::InvalidIntegerLiteral {
+                    err,
+                    from: t.from(),
+                    to: t.to(),
+                })?;
+                Ok(NodeRef::integer(num).with_span(t.span()))
+            }
+            Terminal::Float => {
+                let s = r.slice_pos(t.from(), t.to())?;
+                let num: f64 = s.parse().map_err(|err| ParseErrDetail::InvalidFloatLiteral {
+                    err,
+                    from: t.from(),
+                    to: t.to(),
+                })?;
+                Ok(NodeRef::float(num).with_span(t.span()))
+            }
+            _ => ParseErrDetail::unexpected_token_many(
+                t,
+                vec![
+                    Terminal::Null,
+                    Terminal::True,
+                    Terminal::False,
+                    Terminal::Integer,
+                    Terminal::Float,
+                ],
+                r,
+            ),
         }
     }
 }
