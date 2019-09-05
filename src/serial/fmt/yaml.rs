@@ -116,6 +116,16 @@ impl ParseErrDetail {
         };
         Err(err)
     }
+
+    pub fn unexpected_end_of_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
+        let p1 = r.position();
+        let err = parse_diag!(ParseErrDetail::UnexpectedEoi {
+            pos: p1
+        }, r, {
+            p1, p1 => "unexpected end of input",
+        });
+        Err(err)
+    }
 }
 
 #[derive(Debug, Display, PartialEq, Eq, Clone, Copy)]
@@ -209,6 +219,19 @@ fn is_string(c: char) -> bool {
         ']' => false,
         '{' => false,
         '}' => false,
+        _ => true
+    }
+}
+
+fn is_anchor(c: char) -> bool {
+    match c {
+        ' ' => false,
+        '\t' => false,
+        '[' => false,
+        ']' => false,
+        '{' => false,
+        '}' => false,
+        ',' => false,
         _ => true
     }
 }
@@ -413,7 +436,6 @@ impl Parser {
             }
         }
 
-        //FIXME MC Change c: char to t:Terminal
         fn consume_surrounded_string(r: &mut dyn CharReader, c: char, t: Terminal, f: &mut dyn FnMut(char) -> bool) -> Result<Token, Error> {
             let p1 = r.position();
             r.next_char()?;
@@ -427,6 +449,24 @@ impl Parser {
             r.next_char()?;
             let p2 = r.position();
             Ok(Token::new(t, p1, p2))
+        }
+
+        fn consume_anchor(r: &mut dyn CharReader, t: Terminal) -> Result<Token, Error> {
+            if let Some(nc) = r.peek_char(1)? {
+                if is_blank_or_break(nc) {
+                    r.next_char()?;
+                    ParseErrDetail::invalid_input(r)
+                } else {
+                    let p1 = r.position();
+                    r.next_char()?;
+                    r.skip_while(&mut is_anchor)?;
+                    let p2 = r.position();
+                    return Ok(Token::new(t, p1, p2));
+                }
+            } else {
+                r.next_char()?;
+                ParseErrDetail::unexpected_end_of_input(r)
+            }
         }
 
         let p1 = r.position();
@@ -465,8 +505,6 @@ impl Parser {
             Some(']') => consume(r, 1, Terminal::BracketRight),
             Some('{') => consume(r, 1, Terminal::BraceLeft),
             Some('}') => consume(r, 1, Terminal::BraceRight),
-            Some('*') => consume(r, 1, Terminal::Asterisk),
-            Some('&') => consume(r, 1, Terminal::Ampersand),
             Some('!') => consume(r, 1, Terminal::ExclamationMark),
             Some('|') => consume(r, 1, Terminal::VerticalBar),
             Some('>') => consume(r, 1, Terminal::GraterThan),
@@ -486,12 +524,10 @@ impl Parser {
                     ParseErrDetail::invalid_input(r)
                 }
             }
-            Some(':') => {
-                consume_string_starting_with_indicator(r, Terminal::Colon)
-            },
-            Some('?') => {
-                consume_string_starting_with_indicator(r, Terminal::QuestionMark)
-            },
+            Some('&') => consume_anchor(r, Terminal::Ampersand),
+            Some('*') => consume_anchor(r, Terminal::Asterisk),
+            Some(':') => consume_string_starting_with_indicator(r, Terminal::Colon),
+            Some('?') => consume_string_starting_with_indicator(r, Terminal::QuestionMark),
             Some(c) if c == '-' => {
                 if r.match_str("---")? && r.position().column == 0 {
                     if let Some(c) = r.peek_char(3)? {
@@ -1400,6 +1436,28 @@ NUlL"#;
 
             let terms = vec![
                 Terminal::Null,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn ampersand() {
+            let input: &str = r#"&anchor"#;
+
+            let terms = vec![
+                Terminal::Ampersand,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn asterisk() {
+            let input: &str = r#"*anchor"#;
+
+            let terms = vec![
+                Terminal::Asterisk,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
