@@ -471,6 +471,9 @@ impl Parser {
 
         let p1 = r.position();
         if self.line_start {
+            if let Some('%') = r.peek_char(0)? {
+                return consume_until_newline(r, Terminal::Percent);
+            }
             r.skip_until(&mut |c: char| c != ' ')?;
             self.line_start = false;
             if let Some(c) = r.peek_char(0)? {
@@ -508,7 +511,6 @@ impl Parser {
             Some('!') => consume(r, 1, Terminal::ExclamationMark),
             Some('|') => consume(r, 1, Terminal::VerticalBar),
             Some('>') => consume(r, 1, Terminal::GraterThan),
-            Some('%') => consume(r, 1, Terminal::Percent),
             Some('@') => consume(r, 1, Terminal::At),
             Some('`') => consume(r, 1, Terminal::GraveAccent),
             Some(' ') | Some('\t') => consume(r, 1, Terminal::Whitespace),
@@ -1458,6 +1460,17 @@ NUlL"#;
 
             let terms = vec![
                 Terminal::Asterisk,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn directives() {
+            let input: &str = r#"%YAML 1.2"#;
+
+            let terms = vec![
+                Terminal::Percent,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
