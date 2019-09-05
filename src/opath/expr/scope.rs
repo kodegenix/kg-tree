@@ -210,6 +210,18 @@ trait ScopeMutImpl: ScopeImpl + Sized {
         self.borrow_mut().parent = parent;
     }
 
+    fn remove_func(&self, name: &str) {
+        self.borrow_mut().func_map.remove(name);
+    }
+
+    fn remove_method(&self, name: &str) {
+        self.borrow_mut().method_map.remove(name);
+    }
+
+    fn remove_var(&self, name: &str) {
+        self.borrow_mut().var_map.remove(name);
+    }
+
     fn clear_funcs(&self) {
         self.borrow_mut().func_map.clear();
     }
@@ -364,6 +376,18 @@ impl ScopeMut {
 
     pub fn set_var(&self, name: Symbol, var: NodeSet) {
         ScopeMutImpl::set_var(self, name, var);
+    }
+
+    pub fn remove_func(&self, name: &str) {
+        ScopeMutImpl::remove_func(self, name);
+    }
+
+    pub fn remove_method(&self, name: &str) {
+        ScopeMutImpl::remove_method(self, name);
+    }
+
+    pub fn remove_var(&self, name: &str) {
+        ScopeMutImpl::remove_var(self, name);
     }
 
     pub fn clear_funcs(&self) {
