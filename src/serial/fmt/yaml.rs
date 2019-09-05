@@ -469,6 +469,18 @@ impl Parser {
             }
         }
 
+        fn consume_reserved(r: &mut dyn CharReader, t: Terminal) -> Result<Token, Error> {
+            if let Some(nc) = r.peek_char(1)? {
+                if is_blank_or_break(nc) {
+                    return consume(r, 1, t);
+                } else {
+                    ParseErrDetail::invalid_input_many(r, vec!['\n', '\r', ' ', '\t'])
+                }
+            } else {
+                return consume(r, 1, t);
+            }
+        }
+
         let p1 = r.position();
         if self.line_start {
             if let Some('%') = r.peek_char(0)? {
@@ -511,8 +523,8 @@ impl Parser {
             Some('!') => consume(r, 1, Terminal::ExclamationMark),
             Some('|') => consume(r, 1, Terminal::VerticalBar),
             Some('>') => consume(r, 1, Terminal::GraterThan),
-            Some('@') => consume(r, 1, Terminal::At),
-            Some('`') => consume(r, 1, Terminal::GraveAccent),
+            Some('@') => consume_reserved(r, Terminal::At),
+            Some('`') => consume_reserved(r, Terminal::GraveAccent),
             Some(' ') | Some('\t') => consume(r, 1, Terminal::Whitespace),
             Some('\n') => {
                 self.line_start = true;
@@ -1471,6 +1483,54 @@ NUlL"#;
 
             let terms = vec![
                 Terminal::Percent,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn at() {
+            let input: &str = r#"@"#;
+
+            let terms = vec![
+                Terminal::At,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn at_and_string() {
+            let input: &str = r#"@ string"#;
+
+            let terms = vec![
+                Terminal::At,
+                Terminal::Whitespace,
+                Terminal::String { escapes: false },
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn grave_accent() {
+            let input: &str = r#"`"#;
+
+            let terms = vec![
+                Terminal::GraveAccent,
+                Terminal::End,
+            ];
+            assert_terms!(input, terms);
+        }
+
+        #[test]
+        fn grave_accent_and_string() {
+            let input: &str = r#"` string"#;
+
+            let terms = vec![
+                Terminal::GraveAccent,
+                Terminal::Whitespace,
+                Terminal::String { escapes: false },
                 Terminal::End,
             ];
             assert_terms!(input, terms);
