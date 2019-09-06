@@ -710,17 +710,43 @@ impl Parser {
     }
 
     fn parse_string(&mut self, r: &mut dyn CharReader, t: Token) -> Result<NodeRef, Error> {
-        self.expect_token(r, Terminal::String {escapes: false})?;
+        self.expect_token(r, Terminal::String {escapes: false})?; //TODO MC Delete escapes from string
         let next = self.next_token(r)?;
         match next.term()  {
             Terminal::End => {
                 r.seek(t.from())?;
-                let end_offset = t.to().offset;
-                let start_offset = r.position().offset;
                 self.buf.clear();
-                self.buf.reserve(end_offset - start_offset);
-                let val = r.slice_pos(r.position(), t.to())?;
-                self.buf.push_str(&val);
+                let c = r.next_char()?.unwrap();
+                let end_offset;
+                let start_offset;
+                match c {
+                    '"' => {
+                        r.next_char()?;
+                        start_offset = r.position().offset;
+                        end_offset = t.to().offset;
+                        self.buf.reserve(end_offset - start_offset);
+                        let val = r.slice_pos(r.position(), t.to())?;
+                        self.buf.push_str(&val);
+                        self.buf.pop();
+                    }
+                    '\'' => {
+                        r.next_char()?;
+                        start_offset = r.position().offset;
+                        end_offset = t.to().offset;
+                        self.buf.reserve(end_offset - start_offset);
+                        let val = r.slice_pos(r.position(), t.to())?;
+                        self.buf.push_str(&val);
+                        self.buf.pop();
+                    }
+                    _ => {
+                        start_offset = r.position().offset;
+                        end_offset = t.to().offset;
+                        self.buf.reserve(end_offset - start_offset);
+                        let val = r.slice_pos(r.position(), t.to())?;
+                        self.buf.push_str(&val);
+
+                    }
+                }
                 r.seek(t.to())?;
                 Ok(NodeRef::string(self.buf.clone()).with_span(t.span()))
             }

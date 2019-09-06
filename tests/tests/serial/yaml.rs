@@ -56,3 +56,19 @@ fn string() {
 
     assert_eq!("string", node.as_string_ext());
 }
+
+#[test]
+fn string_with_apostrophes() {
+    let input = r#"'string with apostrophes'"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("string with apostrophes", node.as_string_ext());
+}
+
+#[test]
+fn string_with_quotation_marks() {
+    let input = r#""string with quotation marks""#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("string with quotation marks", node.as_string_ext());
+}
