@@ -8,6 +8,8 @@ pub type Error = ParseDiag;
 
 pub type Token = LexToken<Terminal>;
 
+pub type ParseResult<T> = Result<T, Error>;
+
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 1400)]
 pub enum ParseErrDetail{
@@ -55,6 +57,8 @@ pub enum ParseErrDetail{
     expected = "ListDisplay(expected)"
     )]
     UnexpectedEoiMany { pos: Position, expected: Vec<char> },
+    #[display(fmt = "unexpected symbol {token}, expected {expected}")]
+    UnexpectedTokenOne { token: Token, expected: Terminal },
     #[display(
     fmt = "unexpected symbol {token}, expected one of: {expected}",
     expected = "ListDisplay(expected)"
@@ -66,7 +70,7 @@ pub enum ParseErrDetail{
 }
 
 impl ParseErrDetail {
-    pub fn invalid_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
+    pub fn invalid_input<T>(r: &mut dyn CharReader) -> ParseResult<T> {
         let p1 = r.position();
         let current = r.peek_char(0)?.unwrap();
         let err = match r.next_char()? {
@@ -89,7 +93,7 @@ impl ParseErrDetail {
         Err(err)
     }
 
-    pub fn invalid_input_one<T>(r: &mut dyn CharReader, expected: char) -> Result<T, Error> {
+    pub fn invalid_input_one<T>(r: &mut dyn CharReader, expected: char) -> ParseResult<T> {
         let p1 = r.position();
         let err = match r.next_char()? {
             Some(c) => {
@@ -113,7 +117,7 @@ impl ParseErrDetail {
         Err(err)
     }
 
-    pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> Result<T, Error> {
+    pub fn invalid_input_many<T>(r: &mut dyn CharReader, expected: Vec<char>) -> ParseResult<T> {
         let p1 = r.position();
         let err = match (r.peek_char(0)?, r.next_char()?) {
             (Some(current), Some(_c)) => {
@@ -137,7 +141,7 @@ impl ParseErrDetail {
         Err(err)
     }
 
-    pub fn unexpected_end_of_input<T>(r: &mut dyn CharReader) -> Result<T, Error> {
+    pub fn unexpected_end_of_input<T>(r: &mut dyn CharReader) -> ParseResult<T> {
         let p1 = r.position();
         let err = parse_diag!(ParseErrDetail::UnexpectedEoi {
             pos: p1
@@ -147,11 +151,23 @@ impl ParseErrDetail {
         Err(err)
     }
 
+    pub fn unexpected_token_one<T>(
+        token: Token,
+        expected: Terminal,
+        r: &mut dyn CharReader,
+    ) -> ParseResult<T> {
+        Err(
+            parse_diag!(ParseErrDetail::UnexpectedTokenOne { token, expected }, r, {
+                token.from(), token.to() => "unexpected token"
+            }),
+        )
+    }
+
     pub fn unexpected_token_many<T>(
         token: Token,
         expected: Vec<Terminal>,
         r: &mut dyn CharReader,
-    ) -> Result<T, Error> {
+    ) -> ParseResult<T> {
         Err(
             parse_diag!(ParseErrDetail::UnexpectedTokenMany { token, expected }, r, {
                 token.from(), token.to() => "unexpected token"
@@ -675,9 +691,49 @@ impl Parser {
         }
     }
 
+    fn push_token(&mut self, t: Token) {
+        self.token_queue.push_back(t);
+    }
+
+    fn expect_token(&mut self, r: &mut dyn CharReader, term: Terminal) -> Result<Token, Error> {
+        let t = self.next_token(r)?;
+        if t.term() == term {
+            Ok(t)
+        } else {
+            ParseErrDetail::unexpected_token_one(t, term, r)
+        }
+    }
+
     pub fn parse(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
         self.token_queue.clear();
         self.parse_something(r)
+    }
+
+    fn parse_string(&mut self, r: &mut dyn CharReader, t: Token) -> Result<NodeRef, Error> {
+        self.expect_token(r, Terminal::String {escapes: false})?;
+        let next = self.next_token(r)?;
+        match next.term()  {
+            Terminal::End => {
+                r.seek(t.from())?;
+                let end_offset = t.to().offset;
+                let start_offset = r.position().offset;
+                self.buf.clear();
+                self.buf.reserve(end_offset - start_offset);
+                let val = r.slice_pos(r.position(), t.to())?;
+                self.buf.push_str(&val);
+                r.seek(t.to())?;
+                Ok(NodeRef::string(self.buf.clone()).with_span(t.span()))
+            }
+            _ => {
+                ParseErrDetail::unexpected_token_many(
+                    next,
+                    vec![
+                        Terminal::End
+                    ],
+                    r,
+                )
+            }
+        }
     }
 
     fn parse_something(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
@@ -703,6 +759,10 @@ impl Parser {
                     to: t.to(),
                 })?;
                 Ok(NodeRef::float(num).with_span(t.span()))
+            }
+            Terminal::String{..} => {
+                self.push_token(t);
+                self.parse_string(r, t)
             }
             _ => ParseErrDetail::unexpected_token_many(
                 t,

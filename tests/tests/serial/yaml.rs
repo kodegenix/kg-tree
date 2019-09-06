@@ -48,3 +48,11 @@ fn float() {
 
     assert_eq!(15.21, node.as_float_ext());
 }
+
+#[test]
+fn string() {
+    let input = r#"string"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("string", node.as_string_ext());
+}
