@@ -26,6 +26,7 @@ fn positive_float_dot_e() {
 }
 
 #[test]
+#[should_panic]
 fn positive_float_only_dot() {
     assert_expr!(".e10", Expr::Float(1e10))
 }

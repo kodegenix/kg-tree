@@ -823,28 +823,28 @@ impl Parser {
                 self.parse_sequence(r, c)?
             }
             Terminal::IntDecimal => {
-                match self.num_parser.convert_number::<i64>(&Number::token(t.span(), Notation::Decimal, Sign::None), r) {
+                match self.num_parser.convert_number::<i64>(t.span(), Sign::None, Notation::Decimal, r) {
                     Ok(n) => Expr::Integer(n),
                     Err(_) => {
-                        let n = self.num_parser.convert_number::<f64>(&Number::token(t.span(), Notation::Float, Sign::None), r)?;
+                        let n = self.num_parser.convert_number::<f64>(t.span(), Sign::None, Notation::Float, r)?;
                         Expr::Float(n)
                     }
                 }
             }
             Terminal::IntHex => {
-                let n = self.num_parser.convert_number::<i64>(&Number::token(t.span(), Notation::Hex, Sign::None), r)?;
+                let n = self.num_parser.convert_number::<i64>(t.span(), Sign::None, Notation::Hex, r)?;
                 Expr::Integer(n)
             }
             Terminal::IntOctal => {
-                let n = self.num_parser.convert_number::<i64>(&Number::token(t.span(), Notation::Octal, Sign::None), r)?;
+                let n = self.num_parser.convert_number::<i64>(t.span(), Sign::None, Notation::Octal, r)?;
                 Expr::Integer(n)
             }
             Terminal::IntBinary => {
-                let n = self.num_parser.convert_number::<i64>(&Number::token(t.span(), Notation::Binary, Sign::None), r)?;
+                let n = self.num_parser.convert_number::<i64>(t.span(), Sign::None, Notation::Binary, r)?;
                 Expr::Integer(n)
             }
             Terminal::Float => {
-                let n = self.num_parser.convert_number::<f64>(&Number::token(t.span(), Notation::Float, Sign::None), r)?;
+                let n = self.num_parser.convert_number::<f64>(t.span(), Sign::None, Notation::Float, r)?;
                 Expr::Float(n)
             }
             Terminal::True => Expr::Boolean(true),

@@ -11,7 +11,7 @@ mod ser;
 
 pub mod json {
     use super::*;
-    pub use fmt::json::ParseErr as JsonParseErrDetail;
+    pub use fmt::json::ParseErrorDetail as JsonParseErrorDetail;
     pub use fmt::json::Parser as JsonParser;
     pub use fmt::json::Terminal;
 }
