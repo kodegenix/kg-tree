@@ -1,4 +1,35 @@
-#![feature(specialization, integer_atomics, box_syntax, clamp)]
+#![feature(specialization, integer_atomics, box_syntax, clamp, external_doc)]
+
+#![doc(include = "doc.md")]
+
+//!
+//! Some text
+//! text
+//! text
+//! text
+//! ```
+//! use kg_tree::opath::{Opath, NodeSet};
+//! use kg_tree::NodeRef;
+//!
+//! let model = r#"
+//! {
+//!     "foo": "bar"
+//! }
+//! "#;
+//!
+//! let query = "@.foo";
+//! let result = "bar";
+//!
+//! let expr = Opath::parse(query).unwrap();
+//! let node = NodeRef::from_json(model).unwrap();
+//!
+//! let res = expr.apply(&node, &node).unwrap();
+//!
+//! if let NodeSet::One(n) = res {
+//!    assert_eq!(result, n.to_string());
+//! }
+//!
+//! ```
 
 #[macro_use]
 extern crate kg_diag_derive;
