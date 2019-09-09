@@ -221,9 +221,7 @@ pub enum Terminal {
     #[display(fmt = "'>'")]
     GraterThan,
     #[display(fmt = "STRING")]
-    String {
-        escapes: bool
-    },
+    String,
     #[display(fmt = "INT")]
     Integer,
     #[display(fmt = "FLOAT")]
@@ -464,7 +462,7 @@ impl Parser {
             let p1 = r.position();
             r.skip_while(&mut is_string)?;
             let p2 = r.position();
-            Ok(Token::new(Terminal::String { escapes: false }, p1, p2))
+            Ok(Token::new(Terminal::String, p1, p2))
         }
 
         //Used with indicators: '?', ':'.
@@ -477,7 +475,7 @@ impl Parser {
                     r.next_char()?;
                     r.skip_while(&mut is_string)?;
                     let p2 = r.position();
-                    return Ok(Token::new(Terminal::String { escapes: false }, p1, p2));
+                    return Ok(Token::new(Terminal::String, p1, p2));
                 }
             } else {
                 return consume(r, 1, t);
@@ -673,10 +671,10 @@ impl Parser {
                 }
             }
             Some('"') => {
-                return consume_surrounded_string(r, '"', Terminal::String { escapes: true }, &mut is_string_with_escapes);
+                return consume_surrounded_string(r, '"', Terminal::String, &mut is_string_with_escapes);
             },
             Some('\'') => {
-                return consume_surrounded_string(r, '\'', Terminal::String { escapes: false }, &mut is_string_with_apostrophes);
+                return consume_surrounded_string(r, '\'', Terminal::String, &mut is_string_with_apostrophes);
             },
             Some(c) if c.is_digit(10) || c == '+' => consume_number(r, c),
             Some(_) => consume_string(r),
@@ -710,7 +708,7 @@ impl Parser {
     }
 
     fn parse_string(&mut self, r: &mut dyn CharReader, t: Token) -> Result<NodeRef, Error> {
-        self.expect_token(r, Terminal::String {escapes: false})?; //TODO MC Delete escapes from string
+        self.expect_token(r, Terminal::String)?;
         let next = self.next_token(r)?;
         match next.term()  {
             Terminal::End => {
@@ -932,10 +930,10 @@ mod tests {
             let input: &str = ".key: value";
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End];
             assert_terms!(input, terms);
         }
@@ -945,7 +943,7 @@ mod tests {
             let input: &str = ":string";
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End];
             assert_terms!(input, terms);
         }
@@ -957,10 +955,10 @@ mod tests {
             let terms = vec![
                 Terminal::QuestionMark,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -971,7 +969,7 @@ mod tests {
             let input: &str = r#"?string"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End];
             assert_terms!(input, terms);
         }
@@ -981,10 +979,10 @@ mod tests {
             let input: &str = r#"key: value"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -995,10 +993,10 @@ mod tests {
             let input: &str = "key:\tvalue";
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1009,10 +1007,10 @@ mod tests {
             let input: &str = r#"key: value # comment"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Whitespace,
                 Terminal::Comment,
                 Terminal::End,
@@ -1026,15 +1024,15 @@ mod tests {
 key2: value2"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1046,14 +1044,14 @@ key2: value2"#;
    key: value"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Newline,
                 Terminal::Indent,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1079,15 +1077,15 @@ key2: value2"#;
             let terms = vec![
                 Terminal::Dash,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
                 Terminal::Dash,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
                 Terminal::Dash,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1103,30 +1101,30 @@ key2:
    - four"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Newline,
                 Terminal::Indent,
                 Terminal::Dash,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
                 Terminal::Dash,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
                 Terminal::Dedent,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Newline,
                 Terminal::Indent,
                 Terminal::Dash,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
                 Terminal::Dash,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1143,19 +1141,19 @@ key2:
                 Terminal::Dash,
                 Terminal::Newline,
                 Terminal::Indent,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
                 Terminal::Dedent,
                 Terminal::Dash,
                 Terminal::Newline,
                 Terminal::Indent,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1169,13 +1167,13 @@ key2:
                 Terminal::Dash,
                 Terminal::Whitespace,
                 Terminal::BracketLeft,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Comma,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Comma,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::BracketRight,
                 Terminal::End,
             ];
@@ -1187,14 +1185,14 @@ key2:
             let input: &str = r#"key: {key: value}"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
                 Terminal::BraceLeft,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::BraceRight,
                 Terminal::End,
             ];
@@ -1209,14 +1207,14 @@ two,
 
             let terms = vec![
                 Terminal::BracketLeft,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Comma,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Comma,
                 Terminal::Newline,
                 Terminal::Indent,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::BracketRight,
                 Terminal::End,
             ];
@@ -1232,14 +1230,14 @@ three]"#;
             let terms = vec![
                 Terminal::Indent,
                 Terminal::BracketLeft,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Comma,
                 Terminal::Newline,
                 Terminal::Dedent,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Comma,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::BracketRight,
                 Terminal::End,
             ];
@@ -1251,10 +1249,10 @@ three]"#;
             let input: &str = r#"-key: value"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Colon,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1367,7 +1365,7 @@ three]"#;
             let input: &str = r#".a"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1409,17 +1407,17 @@ three]"#;
 .nAN"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1495,17 +1493,17 @@ FalsE
 FALsE"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1516,7 +1514,7 @@ FALsE"#;
             let input: &str = r#""string""#;
 
             let terms = vec![
-                Terminal::String { escapes: true },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1527,7 +1525,7 @@ FALsE"#;
             let input: &str = r#""""#;
 
             let terms = vec![
-                Terminal::String { escapes: true },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1539,7 +1537,7 @@ FALsE"#;
  ,[]{}#*&!|>%@`'""#;
 
             let terms = vec![
-                Terminal::String { escapes: true },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1550,7 +1548,7 @@ FALsE"#;
             let input: &str = r#"'string'"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1561,7 +1559,7 @@ FALsE"#;
             let input: &str = r#"''"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1573,7 +1571,7 @@ FALsE"#;
  ,[]{}#*&!|>%@`"'"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1603,11 +1601,11 @@ NuLl
 NUlL"#;
 
             let terms = vec![
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::Newline,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1675,7 +1673,7 @@ NUlL"#;
             let terms = vec![
                 Terminal::At,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
@@ -1699,7 +1697,7 @@ NUlL"#;
             let terms = vec![
                 Terminal::GraveAccent,
                 Terminal::Whitespace,
-                Terminal::String { escapes: false },
+                Terminal::String,
                 Terminal::End,
             ];
             assert_terms!(input, terms);
