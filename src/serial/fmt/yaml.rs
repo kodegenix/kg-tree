@@ -12,7 +12,9 @@ pub type ParseResult<T> = Result<T, Error>;
 
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 1400)]
-pub enum ParseErrDetail{
+pub enum ParseErrDetail {
+    #[display(fmt = "invalid escape")]
+    InvalidEscape { from: Position, to: Position },
     #[display(fmt = "invalid character '{input}'")]
     InvalidChar {
         input: char,
@@ -70,6 +72,27 @@ pub enum ParseErrDetail{
 }
 
 impl ParseErrDetail {
+    pub fn invalid_escape<T>(r: &mut dyn CharReader) -> Result<T, Error> {
+        let p1 = r.position();
+        let err = match r.next_char()? {
+            Some(_) => {
+                let p2 = r.position();
+                parse_diag!(ParseErrDetail::InvalidEscape {
+                    from: p1,
+                    to: p2
+                }, r, {
+                    p1, p2 => "invalid escape",
+                })
+            }
+            None => parse_diag!(ParseErrDetail::UnexpectedEoi {
+                pos: p1,
+            }, r, {
+                p1, p1 => "unexpected end of input",
+            }),
+        };
+        Err(err)
+    }
+
     pub fn invalid_input<T>(r: &mut dyn CharReader) -> ParseResult<T> {
         let p1 = r.position();
         let current = r.peek_char(0)?.unwrap();
@@ -726,8 +749,37 @@ impl Parser {
                 let c = r.next_char()?.unwrap();
                 match c {
                     '"' => {
-                        r.next_char()?;
-                        self.push_str_to_buf(r, t)?;
+//                        r.next_char()?;
+//                        self.push_str_to_buf(r, t)?;
+                        let end_offset = t.to().offset;
+                        while r.position().offset < end_offset - 1 {
+                            let c = r.next_char()?.unwrap();
+                            if c == '\\' {
+                                let c = r.next_char()?;
+                                match c {
+                                    Some('b') => self.buf.push('\u{0008}'), // backspace
+                                    Some('t') => self.buf.push('\t'),       // tab
+                                    Some('n') => self.buf.push('\n'),       // linefeed
+                                    Some('f') => self.buf.push('\u{000c}'), // form feed
+                                    Some('r') => self.buf.push('\r'),       // carriage return
+                                    Some('\"') => self.buf.push('\"'),      // quote
+                                    Some('\\') => self.buf.push('\\'),      // backslash
+                                    Some(c) if c.is_whitespace() => {
+                                        // handle line ending backslash
+                                        while let Some(c) = r.peek_char(1)? {
+                                            if c.is_whitespace() {
+                                                r.next_char()?;
+                                            } else {
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    _ => return ParseErrDetail::invalid_escape(r),
+                                }
+                            } else {
+                                self.buf.push(c);
+                            }
+                        }
                         self.buf.pop();
                     }
                     '\'' => {

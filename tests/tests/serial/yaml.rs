@@ -66,9 +66,35 @@ fn string_with_apostrophes() {
 }
 
 #[test]
+fn string_with_apostrophes_and_newline() {
+    let input = r#"'string with apostrophes and
+newline'"#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("string with apostrophes and\nnewline", node.as_string_ext());
+}
+
+#[test]
 fn string_with_quotation_marks() {
     let input = r#""string with quotation marks""#;
     let node: NodeRef = parse_node!(input);
 
     assert_eq!("string with quotation marks", node.as_string_ext());
+}
+
+#[test]
+fn string_with_quotation_marks_and_newline() {
+    let input = r#""string with quotation marks and
+newline""#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!("string with quotation marks and\nnewline", node.as_string_ext());
+}
+
+#[test]
+fn string_with_escape_codes() {
+    let input = r#"" string \n \t""#;
+    let node: NodeRef = parse_node!(input);
+
+    assert_eq!(" string \n \t", node.as_string_ext());
 }
