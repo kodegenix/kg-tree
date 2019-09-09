@@ -141,28 +141,22 @@ impl ChangeKindMask {
         let mut m: u32 = 0;
         let mut mask_it = mask.char_indices();
         while let Some((pos, c)) = mask_it.next() {
-            match c {
-                '+' => m |= ChangeKind::Added as u32,
-                '-' => m |= ChangeKind::Removed as u32,
-                '*' => m |= ChangeKind::Updated as u32,
-                '~' => m |= ChangeKind::Moved as u32,
-                c if c.is_ascii_alphabetic() => {
+            if let Some(kind) = ChangeKind::from_mark(c) {
+                m |= kind as u32;
+            } else {
+                if c.is_ascii_alphabetic() {
                     let r = &mask[pos..];
                     let i = pos + r.find(|c: char| !c.is_ascii_alphabetic()).unwrap_or(r.len());
                     let s = &mask[pos..i];
                     for _ in 0..s.len() {
                         mask_it.next();
                     }
-                    match s {
-                        "all" => m = ChangeKind::Added | ChangeKind::Removed | ChangeKind::Updated | ChangeKind::Moved,
-                        "add" | "added" => m |= ChangeKind::Added as u32,
-                        "remove" | "removed" => m |= ChangeKind::Removed as u32,
-                        "update" | "updated" => m |= ChangeKind::Updated as u32,
-                        "move" | "moved" => m |= ChangeKind::Moved as u32,
-                        _ => {}
+                    if s.eq_ignore_ascii_case("all") {
+                        m = ChangeKind::Added | ChangeKind::Removed | ChangeKind::Updated | ChangeKind::Moved;
+                    } else if let Some(kind) = ChangeKind::from_mark_str(s) {
+                        m |= kind as u32;
                     }
                 }
-                _ => {}
             }
         }
 
@@ -424,7 +418,7 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<NodeChange>, cache: &mu
             (&Value::Object(ref propsa), _) => {
                 changes.push(NodeChange::new(
                     ChangeKind::Updated,
-                    Some(cache.get(a).clone()),
+                    None,
                     Some(cache.get(b).clone())));
                 for e in propsa.values() {
                     changes.push(NodeChange::new(
@@ -436,7 +430,7 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<NodeChange>, cache: &mu
             (_, &Value::Object(ref propsb)) => {
                 changes.push(NodeChange::new(
                     ChangeKind::Updated,
-                    Some(cache.get(a).clone()),
+                    None,
                     Some(cache.get(b).clone())));
                 for e in propsb.values() {
                     changes.push(NodeChange::new(
@@ -448,7 +442,7 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<NodeChange>, cache: &mu
             (&Value::Array(ref elemsa), _) => {
                 changes.push(NodeChange::new(
                     ChangeKind::Updated,
-                    Some(cache.get(a).clone()),
+                    None,
                     Some(cache.get(b).clone())));
                 for e in elemsa.iter() {
                     changes.push(NodeChange::new(
@@ -460,7 +454,7 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<NodeChange>, cache: &mu
             (_, &Value::Array(ref elemsb)) => {
                 changes.push(NodeChange::new(
                     ChangeKind::Updated,
-                    Some(cache.get(a).clone()),
+                    None,
                     Some(cache.get(b).clone())));
                 for e in elemsb.iter() {
                     changes.push(NodeChange::new(
@@ -472,7 +466,7 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<NodeChange>, cache: &mu
             (_, _) => {
                 changes.push(NodeChange::new(
                     ChangeKind::Updated,
-                    Some(cache.get(a).clone()),
+                    None,
                     Some(cache.get(b).clone())));
             }
         }
@@ -616,7 +610,7 @@ impl NodeDiff {
                 ChangeKind::Added => c.new_path().unwrap().parent_path().unwrap(),
                 ChangeKind::Removed => c.old_path().unwrap().parent_path().unwrap(),
                 ChangeKind::Updated => c.new_path().unwrap().parent_path().unwrap(),
-                ChangeKind::Moved => c.new_path().unwrap().parent_path().unwrap(),
+                ChangeKind::Moved => c.old_path().unwrap().parent_path().unwrap(),
             };
             let i = res.len();
             loop {
@@ -625,7 +619,7 @@ impl NodeDiff {
                     let p = cache.get(&pb);
                     res.insert(
                         i,
-                        NodeChange::new(ChangeKind::Updated, Some(p.clone()), Some(p.clone())),
+                        NodeChange::new(ChangeKind::Updated, None, Some(p.clone())),
                     );
                 } else {
                     break;

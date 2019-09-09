@@ -2,7 +2,7 @@ use super::*;
 
 use std::collections::VecDeque;
 use kg_display::ListDisplay;
-use kg_diag::parse::num::{NumberParser, Number, Notation, Sign};
+use kg_diag::parse::num::{NumberParser, Notation, Sign};
 
 pub type Error = ParseDiag;
 

@@ -843,20 +843,6 @@ impl NodeRef {
         self.data_mut().metadata_mut().set_span(Some(span));
         self
     }
-
-    pub(crate) fn set_span_from(&self, from: Position) {
-        let mut d = self.data_mut();
-        let mut s = d.metadata_mut().span().unwrap_or_default();
-        s.from = from;
-        d.metadata_mut().set_span(Some(s));
-    }
-
-    pub(crate) fn set_span_to(&self, to: Position) {
-        let mut d = self.data_mut();
-        let mut s = d.metadata_mut().span().unwrap_or_default();
-        s.to = to;
-        d.metadata_mut().set_span(Some(s));
-    }
 }
 
 impl<'a> Clone for NodeRef {
