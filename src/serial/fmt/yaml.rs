@@ -707,6 +707,15 @@ impl Parser {
         self.parse_something(r)
     }
 
+    fn push_str_to_buf(&mut self, r: &mut dyn CharReader, t: Token) -> Result<(), Error> {
+        let start_offset = r.position().offset;
+        let end_offset = t.to().offset;
+        self.buf.reserve(end_offset - start_offset);
+        let val = r.slice_pos(r.position(), t.to())?;
+        self.buf.push_str(&val);
+        Ok(())
+    }
+
     fn parse_string(&mut self, r: &mut dyn CharReader, t: Token) -> Result<NodeRef, Error> {
         self.expect_token(r, Terminal::String)?;
         let next = self.next_token(r)?;
@@ -715,34 +724,19 @@ impl Parser {
                 r.seek(t.from())?;
                 self.buf.clear();
                 let c = r.next_char()?.unwrap();
-                let end_offset;
-                let start_offset;
                 match c {
                     '"' => {
                         r.next_char()?;
-                        start_offset = r.position().offset;
-                        end_offset = t.to().offset;
-                        self.buf.reserve(end_offset - start_offset);
-                        let val = r.slice_pos(r.position(), t.to())?;
-                        self.buf.push_str(&val);
+                        self.push_str_to_buf(r, t);
                         self.buf.pop();
                     }
                     '\'' => {
                         r.next_char()?;
-                        start_offset = r.position().offset;
-                        end_offset = t.to().offset;
-                        self.buf.reserve(end_offset - start_offset);
-                        let val = r.slice_pos(r.position(), t.to())?;
-                        self.buf.push_str(&val);
+                        self.push_str_to_buf(r, t);
                         self.buf.pop();
                     }
                     _ => {
-                        start_offset = r.position().offset;
-                        end_offset = t.to().offset;
-                        self.buf.reserve(end_offset - start_offset);
-                        let val = r.slice_pos(r.position(), t.to())?;
-                        self.buf.push_str(&val);
-
+                        self.push_str_to_buf(r, t);
                     }
                 }
                 r.seek(t.to())?;
