@@ -749,8 +749,6 @@ impl Parser {
                 let c = r.next_char()?.unwrap();
                 match c {
                     '"' => {
-//                        r.next_char()?;
-//                        self.push_str_to_buf(r, t)?;
                         let end_offset = t.to().offset;
                         while r.position().offset < end_offset - 1 {
                             let c = r.next_char()?.unwrap();

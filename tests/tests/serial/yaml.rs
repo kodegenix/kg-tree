@@ -92,7 +92,7 @@ newline""#;
 }
 
 #[test]
-fn string_with_escape_codes() {
+fn string_with_escape_codes() { //TODO MC Add handling \u1234 escapes
     let input = r#"" string \n \t""#;
     let node: NodeRef = parse_node!(input);
 
