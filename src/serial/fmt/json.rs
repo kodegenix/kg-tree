@@ -3,6 +3,7 @@ use super::*;
 use kg_display::ListDisplay;
 
 use std::collections::VecDeque;
+use kg_diag::parse::*;
 
 pub type Error = ParseDiag;
 
@@ -10,7 +11,7 @@ pub type Token = LexToken<Terminal>;
 
 #[derive(Debug, Display, Detail)]
 #[diag(code_offset = 400)]
-pub enum ParseErr {
+pub enum ParseErrorDetail {
     #[display(fmt = "invalid escape")]
     InvalidEscape { from: Position, to: Position },
     #[display(fmt = "invalid character '{input}'")]
@@ -42,18 +43,6 @@ pub enum ParseErr {
         from: Position,
         to: Position,
     },
-    #[display(fmt = "invalid number literal: {err}")]
-    InvalidIntegerLiteral {
-        err: std::num::ParseIntError,
-        from: Position,
-        to: Position,
-    },
-    #[display(fmt = "invalid number literal: {err}")]
-    InvalidFloatLiteral {
-        err: std::num::ParseFloatError,
-        from: Position,
-        to: Position,
-    },
     #[display(fmt = "unexpected end of input")]
     UnexpectedEoi { pos: Position },
     #[display(fmt = "unexpected end of input, expected '{expected}'")]
@@ -81,15 +70,21 @@ pub enum ParseErr {
     UnclosedGroup(Terminal),
     #[display(fmt = "key '{key}' defined multiple times")]
     RedefinedKey { key: String },
+    #[display(fmt = "invalid number literal")]
+    InvalidNumber {
+        kind: NumericalErrorKind,
+        from: Position,
+        to: Position,
+    },
 }
 
-impl ParseErr {
+impl ParseErrorDetail {
     pub fn invalid_escape<T>(r: &mut dyn CharReader) -> Result<T, Error> {
         let p1 = r.position();
         let err = match r.next_char()? {
             Some(_) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidEscape {
+                parse_diag!(ParseErrorDetail::InvalidEscape {
                     from: p1,
                     to: p2
                 }, r, {
@@ -107,7 +102,7 @@ impl ParseErr {
         let err = match r.next_char()? {
             Some(_c) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidChar {
+                parse_diag!(ParseErrorDetail::InvalidChar {
                     input: current,
                     from: p1,
                     to: p2
@@ -115,7 +110,7 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            None => parse_diag!(ParseErr::UnexpectedEoi {
+            None => parse_diag!(ParseErrorDetail::UnexpectedEoi {
                 pos: p1,
             }, r, {
                 p1, p1 => "unexpected end of input",
@@ -128,7 +123,7 @@ impl ParseErr {
         let p1 = r.position();
         let err = match r.next_char()? {
             Some(_c) => unreachable!(), //There is only one possibility in method lex: unexpected end of input
-            None => parse_diag!(ParseErr::UnexpectedEoiOne {
+            None => parse_diag!(ParseErrorDetail::UnexpectedEoiOne {
                 pos: p1,
                 expected,
             }, r, {
@@ -143,7 +138,7 @@ impl ParseErr {
         let err = match (r.peek_char(0)?, r.next_char()?) {
             (Some(current), Some(_c)) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidCharMany {
+                parse_diag!(ParseErrorDetail::InvalidCharMany {
                     input: current,
                     from: p1,
                     to: p2,
@@ -152,7 +147,7 @@ impl ParseErr {
                     p1, p2 => "invalid character",
                 })
             }
-            _ => parse_diag!(ParseErr::UnexpectedEoiMany {
+            _ => parse_diag!(ParseErrorDetail::UnexpectedEoiMany {
                 pos: p1,
                 expected,
             }, r, {
@@ -167,7 +162,7 @@ impl ParseErr {
         let err = match (r.peek_char(0)?, r.next_char()?) {
             (Some(current), Some(_c)) => {
                 let p2 = r.position();
-                parse_diag!(ParseErr::InvalidControlUTF8Char {
+                parse_diag!(ParseErrorDetail::InvalidControlUTF8Char {
                     input: current,
                     from: p1,
                     to: p2
@@ -182,7 +177,7 @@ impl ParseErr {
 
     pub fn unexpected_eoi_str<T>(r: &mut dyn CharReader, expected: String) -> Result<T, Error> {
         let pos = r.position();
-        Err(parse_diag!(ParseErr::UnexpectedEoiOneString {
+        Err(parse_diag!(ParseErrorDetail::UnexpectedEoiOneString {
             pos,
             expected,
         }, r, {
@@ -191,7 +186,7 @@ impl ParseErr {
     }
 
     pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
-        Err(parse_diag!(ParseErr::UnexpectedToken { token }, r, {
+        Err(parse_diag!(ParseErrorDetail::UnexpectedToken { token }, r, {
             token.from(), token.to() => "unexpected token"
         }))
     }
@@ -202,7 +197,7 @@ impl ParseErr {
         r: &mut dyn CharReader,
     ) -> Result<T, Error> {
         Err(
-            parse_diag!(ParseErr::UnexpectedTokenOne { token, expected }, r, {
+            parse_diag!(ParseErrorDetail::UnexpectedTokenOne { token, expected }, r, {
                 token.from(), token.to() => "unexpected token"
             }),
         )
@@ -214,7 +209,7 @@ impl ParseErr {
         r: &mut dyn CharReader,
     ) -> Result<T, Error> {
         Err(
-            parse_diag!(ParseErr::UnexpectedTokenMany { token, expected }, r, {
+            parse_diag!(ParseErrorDetail::UnexpectedTokenMany { token, expected }, r, {
                 token.from(), token.to() => "unexpected token"
             }),
         )
@@ -227,7 +222,7 @@ impl ParseErr {
         key: &str,
     ) -> Result<T, Error> {
         Err(
-            parse_diag!(ParseErr::RedefinedKey{key: key.to_string()}, r, {
+            parse_diag!(ParseErrorDetail::RedefinedKey{key: key.to_string()}, r, {
                 redefined.from, redefined.to => "key redefined here",
                 prev.from, prev.to => "previously defined here",
             }),
@@ -245,7 +240,7 @@ impl ParseErr {
             .span()
             .expect("Node should always have span");
 
-        return ParseErr::key_redefined(r, redefined, prev, &key);
+        return ParseErrorDetail::key_redefined(r, redefined, prev, &key);
     }
 }
 
@@ -267,10 +262,8 @@ pub enum Terminal {
     Comma,
     #[display(fmt = "LITERAL")]
     Literal,
-    #[display(fmt = "INT")]
-    Integer,
-    #[display(fmt = "FLOAT")]
-    Float,
+    #[display(fmt = "NUMBER")]
+    Number(Number),
     #[display(fmt = "'true'")]
     True,
     #[display(fmt = "'false'")]
@@ -281,65 +274,31 @@ pub enum Terminal {
 
 impl LexTerm for Terminal {}
 
-fn is_hex_char(ch: char) -> bool {
-    ('A' <= ch && ch <= 'F') || ('a' <= ch && ch <= 'f') || ('0' <= ch && ch <= '9')
-}
 
 #[derive(Debug)]
 pub struct Parser {
+    num_parser: NumberParser,
     token_queue: VecDeque<Token>,
     buf: String,
 }
 
 impl Parser {
     pub fn new() -> Parser {
+        let mut num = NumberParser::new();
+        num.decimal.allow_plus = false;
+        num.decimal.allow_underscores = false;
+        num.hex.enabled = false;
+        num.octal.enabled = false;
+        num.binary.enabled = false;
+
         Parser {
+            num_parser: num,
             token_queue: VecDeque::new(),
             buf: String::new(),
         }
     }
 
     fn lex(&mut self, r: &mut dyn CharReader) -> Result<Token, Error> {
-        fn process_scientific_notation(
-            r: &mut dyn CharReader,
-            p1: Position,
-        ) -> Result<Token, Error> {
-            r.next_char()?;
-            match r.peek_char(0)? {
-                Some('-') | Some('+') => {
-                    r.skip_chars(1)?;
-                    let mut has_digits = false;
-                    r.skip_while(&mut |c| {
-                        if c.is_digit(10) {
-                            has_digits = true;
-                            true
-                        } else {
-                            false
-                        }
-                    })?;
-                    if has_digits {
-                        let p2 = r.position();
-                        Ok(Token::new(Terminal::Float, p1, p2))
-                    } else {
-                        ParseErr::invalid_input_many(
-                            r,
-                            vec!['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
-                        )
-                    }
-                }
-                Some(c) if c.is_digit(10) => {
-                    r.skip_chars(1)?;
-                    r.skip_while(&mut |c| c.is_digit(10))?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Float, p1, p2))
-                }
-                _ => ParseErr::invalid_input_many(
-                    r,
-                    vec!['-', '+', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
-                ),
-            }
-        }
-
         fn consume(r: &mut dyn CharReader, count: usize, term: Terminal) -> Result<Token, Error> {
             let p1 = r.position();
             r.skip_chars(count)?;
@@ -349,76 +308,58 @@ impl Parser {
 
         r.skip_whitespace()?;
 
-        match r.peek_char(0)? {
-            None => Ok(Token::new(Terminal::End, r.position(), r.position())),
-            Some(',') => consume(r, 1, Terminal::Comma),
-            Some('[') => consume(r, 1, Terminal::BracketLeft),
-            Some(']') => consume(r, 1, Terminal::BracketRight),
-            Some('{') => consume(r, 1, Terminal::BraceLeft),
-            Some('}') => consume(r, 1, Terminal::BraceRight),
-            Some(':') => consume(r, 1, Terminal::Colon),
-            Some('n') => {
-                if r.match_str_term("null", &mut is_non_alphanumeric)? {
-                    consume(r, 4, Terminal::Null)
-                } else {
-                    ParseErr::invalid_input(r)
+        if self.num_parser.is_at_start(r)? {
+            let n = self.num_parser.parse_number(r)?;
+            Ok(Token::new(Terminal::Number(n.term()), n.from(), n.to()))
+        } else {
+            match r.peek_char(0)? {
+                None => Ok(Token::new(Terminal::End, r.position(), r.position())),
+                Some(',') => consume(r, 1, Terminal::Comma),
+                Some('[') => consume(r, 1, Terminal::BracketLeft),
+                Some(']') => consume(r, 1, Terminal::BracketRight),
+                Some('{') => consume(r, 1, Terminal::BraceLeft),
+                Some('}') => consume(r, 1, Terminal::BraceRight),
+                Some(':') => consume(r, 1, Terminal::Colon),
+                Some('n') => {
+                    if r.match_str_term("null", &mut is_non_alphanumeric)? {
+                        consume(r, 4, Terminal::Null)
+                    } else {
+                        ParseErrorDetail::invalid_input(r)
+                    }
                 }
-            }
-            Some('t') => {
-                if r.match_str_term("true", &mut is_non_alphanumeric)? {
-                    consume(r, 4, Terminal::True)
-                } else {
-                    ParseErr::invalid_input(r)
+                Some('t') => {
+                    if r.match_str_term("true", &mut is_non_alphanumeric)? {
+                        consume(r, 4, Terminal::True)
+                    } else {
+                        ParseErrorDetail::invalid_input(r)
+                    }
                 }
-            }
-            Some('f') => {
-                if r.match_str_term("false", &mut is_non_alphanumeric)? {
-                    consume(r, 5, Terminal::False)
-                } else {
-                    ParseErr::invalid_input(r)
+                Some('f') => {
+                    if r.match_str_term("false", &mut is_non_alphanumeric)? {
+                        consume(r, 5, Terminal::False)
+                    } else {
+                        ParseErrorDetail::invalid_input(r)
+                    }
                 }
-            }
-            Some(c) if c.is_digit(10) || c == '+' || c == '-' => {
-                let p1 = r.position();
-                r.next_char()?;
-                r.skip_while(&mut |c| c.is_digit(10))?;
-                match r.peek_char(0)? {
-                    Some('.') => {
-                        r.next_char()?;
-                        r.skip_while(&mut |c| c.is_digit(10))?;
-                        match r.peek_char(0)? {
-                            Some('e') | Some('E') => process_scientific_notation(r, p1),
-                            _ => {
-                                let p2 = r.position();
-                                Ok(Token::new(Terminal::Float, p1, p2))
-                            }
+                Some('\"') => {
+                    let p1 = r.position();
+                    while let Some(k) = r.next_char()? {
+                        if k == '\\' {
+                            r.next_char()?;
+                        } else if k == '\"' {
+                            break;
                         }
                     }
-                    Some('e') | Some('E') => process_scientific_notation(r, p1),
-                    _ => {
-                        let p2 = r.position();
-                        Ok(Token::new(Terminal::Integer, p1, p2))
-                    }
-                }
-            }
-            Some('\"') => {
-                let p1 = r.position();
-                while let Some(k) = r.next_char()? {
-                    if k == '\\' {
+                    if r.eof() {
+                        ParseErrorDetail::invalid_input_one(r, '\"')
+                    } else {
                         r.next_char()?;
-                    } else if k == '\"' {
-                        break;
+                        let p2 = r.position();
+                        Ok(Token::new(Terminal::Literal, p1, p2))
                     }
                 }
-                if r.eof() {
-                    ParseErr::invalid_input_one(r, '\"')
-                } else {
-                    r.next_char()?;
-                    let p2 = r.position();
-                    Ok(Token::new(Terminal::Literal, p1, p2))
-                }
+                Some(_) => ParseErrorDetail::invalid_input(r),
             }
-            Some(_) => ParseErr::invalid_input(r),
         }
     }
 
@@ -439,7 +380,7 @@ impl Parser {
         if t.term() == term {
             Ok(t)
         } else {
-            ParseErr::unexpected_token_one(t, term, r)
+            ParseErrorDetail::unexpected_token_one(t, term, r)
         }
     }
 
@@ -462,29 +403,20 @@ impl Parser {
             Terminal::Null => Ok(NodeRef::null().with_span(t.span())),
             Terminal::True => Ok(NodeRef::boolean(true).with_span(t.span())),
             Terminal::False => Ok(NodeRef::boolean(false).with_span(t.span())),
-            Terminal::Integer => {
-                let s = r.slice_pos(t.from(), t.to())?;
-                let num: i64 = s.parse().map_err(|err| ParseErr::InvalidIntegerLiteral {
-                    err,
-                    from: t.from(),
-                    to: t.to(),
-                })?;
-                Ok(NodeRef::integer(num).with_span(t.span()))
-            }
-            Terminal::Float => {
-                let s = r.slice_pos(t.from(), t.to())?;
-                let num: f64 = s.parse().map_err(|err| ParseErr::InvalidFloatLiteral {
-                    err,
-                    from: t.from(),
-                    to: t.to(),
-                })?;
-                Ok(NodeRef::float(num).with_span(t.span()))
+            Terminal::Number(n) => {
+                if n.notation() == Notation::Decimal {
+                    let num: i64 = self.num_parser.convert_number(t.span(), n.sign(), n.notation(), r)?;
+                    Ok(NodeRef::integer(num).with_span(t.span()))
+                } else {
+                    let num: f64 = self.num_parser.convert_number(t.span(), n.sign(), n.notation(), r)?;
+                    Ok(NodeRef::float(num).with_span(t.span()))
+                }
             }
             Terminal::Literal => {
                 self.parse_literal(t, r)?;
                 Ok(NodeRef::string(self.buf.clone()).with_span(t.span()))
             }
-            _ => ParseErr::unexpected_token_many(
+            _ => ParseErrorDetail::unexpected_token_many(
                 t,
                 vec![
                     Terminal::BraceLeft,
@@ -492,8 +424,7 @@ impl Parser {
                     Terminal::Null,
                     Terminal::True,
                     Terminal::False,
-                    Terminal::Integer,
-                    Terminal::Float,
+                    Terminal::Number(Number::new(Sign::None, Notation::Decimal)),
                     Terminal::Literal,
                 ],
                 r,
@@ -525,17 +456,17 @@ impl Parser {
                     self.expect_token(r, Terminal::Colon)?;
                     let value = self.parse_value(r)?;
                     if let Some(child) = props.get(&key) {
-                        return ParseErr::key_redefined_node(r, t.span(), &child, &key);
+                        return ParseErrorDetail::key_redefined_node(r, t.span(), &child, &key);
                     }
                     props.insert(key, value);
                     comma = true;
                     literal = false;
                 }
                 _ if !literal && !comma => {
-                    return ParseErr::unexpected_token_one(t, Terminal::Literal, r)
+                    return ParseErrorDetail::unexpected_token_one(t, Terminal::Literal, r)
                 }
                 _ => {
-                    return ParseErr::unexpected_token_many(
+                    return ParseErrorDetail::unexpected_token_many(
                         t,
                         if comma {
                             vec![Terminal::Comma, Terminal::BraceRight]
@@ -575,7 +506,7 @@ impl Parser {
                     comma = true;
                     bracket_right = true;
                 }
-                _ => return ParseErr::unexpected_token(t, r),
+                _ => return ParseErrorDetail::unexpected_token(t, r),
             }
         }
     }
@@ -606,10 +537,10 @@ impl Parser {
                             let mut val = String::new();
                             for _i in 0..4 {
                                 if let Some(c) = r.next_char()? {
-                                    if is_hex_char(c) {
+                                    if c.is_digit(16) {
                                         val.push(c)
                                     } else {
-                                        return ParseErr::invalid_escape(r);
+                                        return ParseErrorDetail::invalid_escape(r);
                                     }
                                 } else {
                                     unreachable!() // Error UnexpectedEoiOne is returned earlier in lex method
@@ -617,13 +548,7 @@ impl Parser {
                             }
                             // Earlier checks in code protect from error in from_str_radix, so no code coverage.
                             // map_err is present because IntErrorKind in ParseIntError is non-exhaustive
-                            let num: u32 = u32::from_str_radix(&val, 16).map_err(|err| {
-                                ParseErr::InvalidIntegerLiteral {
-                                    err,
-                                    from: p1,
-                                    to: r.position(),
-                                }
-                            })?;
+                            let num: u32 = u32::from_str_radix(&val, 16).unwrap();
 
                             // http://unicode.org/glossary/#unicode_scalar_value
                             if (num <= 0xD7FFu32) || (num >= 0xE000u32 && num <= 0x10FFFFu32) {
@@ -634,13 +559,13 @@ impl Parser {
                                     }
                                 }
                             } else {
-                                return ParseErr::invalid_escape(r);
+                                return ParseErrorDetail::invalid_escape(r);
                             }
                         }
-                        _ => return ParseErr::invalid_escape(r),
+                        _ => return ParseErrorDetail::invalid_escape(r),
                     }
                 }
-                c if c as u32 <= 31 => return ParseErr::invalid_control_utf8_input(r),
+                c if c as u32 <= 31 => return ParseErrorDetail::invalid_control_utf8_input(r),
                 _ => self.buf.push(c),
             }
         }

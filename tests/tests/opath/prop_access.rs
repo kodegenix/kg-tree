@@ -1,5 +1,3 @@
-use kg_tree::diff::ModelDiff;
-
 use super::*;
 
 mod simple {
@@ -369,9 +367,9 @@ mod wildcards {
 
         let res = results.get(0).unwrap();
 
-        let diffs = ModelDiff::minimal(res, &NodeRef::from_json(json).unwrap());
+        let expected = NodeRef::from_json(json).unwrap();
 
-        assert!(diffs.is_empty());
+        assert!(res.is_identical_deep(&expected));
     }
 
     #[test]
@@ -410,10 +408,8 @@ mod wildcards {
         let results = query("@.nested1.nested1prop^", json);
 
         let res = results.get(0).unwrap();
-
-        let diffs = ModelDiff::minimal(res, &NodeRef::from_json(nested1).unwrap());
-
-        assert!(diffs.is_empty());
+        let expected = NodeRef::from_json(nested1).unwrap();
+        assert!(res.is_identical_deep(&expected));
     }
 
     #[test]
@@ -440,8 +436,8 @@ mod wildcards {
 
         //check that root is last element
         let root = results.get(results.len() - 1).unwrap();
-        let diffs = ModelDiff::minimal(root, &NodeRef::from_json(json).unwrap());
-        assert!(diffs.is_empty());
+        let expected = NodeRef::from_json(json).unwrap();
+        assert!(root.is_identical_deep(&expected));
     }
 
     #[test]
@@ -477,8 +473,8 @@ mod wildcards {
         assert_eq!(results.len(), 2);
 
         let n2 = results.get(0).unwrap();
-        let diffs = ModelDiff::minimal(n2, &NodeRef::from_json(nested2).unwrap());
-        assert!(diffs.is_empty());
+        let expected = NodeRef::from_json(nested2).unwrap();
+        assert!(n2.is_identical_deep(&expected));
     }
 
     #[test]
@@ -521,12 +517,12 @@ mod wildcards {
         assert_eq!(results.len(), 2);
 
         let n2 = results.get(1).unwrap();
-        let diffs = ModelDiff::minimal(n2, &NodeRef::from_json(nested2).unwrap());
-        assert!(diffs.is_empty());
+        let exp_n2 = NodeRef::from_json(nested2).unwrap();
+        assert!(n2.is_identical_deep(&exp_n2));
 
         let n3 = results.get(0).unwrap();
-        let diffs = ModelDiff::minimal(n3, &NodeRef::from_json(nested3).unwrap());
-        assert!(diffs.is_empty());
+        let exp_n3 = NodeRef::from_json(nested3).unwrap();
+        assert!(n3.is_identical_deep(&exp_n3));
     }
 
     #[test]
@@ -566,11 +562,11 @@ mod wildcards {
         assert_eq!(results.len(), 3);
 
         let n1 = results.get(1).unwrap();
-        let diffs = ModelDiff::minimal(n1, &NodeRef::from_json(nested1).unwrap());
-        assert!(diffs.is_empty());
+        let exp_n1 = NodeRef::from_json(nested1).unwrap();
+        assert!(n1.is_identical_deep(&exp_n1));
 
         let root = results.get(2).unwrap();
-        let diffs = ModelDiff::minimal(root, &NodeRef::from_json(json).unwrap());
-        assert!(diffs.is_empty());
+        let exp_root = NodeRef::from_json(json).unwrap();
+        assert!(root.is_identical_deep(&exp_root));
     }
 }

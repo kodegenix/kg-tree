@@ -1,4 +1,5 @@
-use crate::serial::json::JsonParseErrDetail;
+use crate::serial::json::JsonParseErrorDetail;
+use kg_diag::parse::ParseErrorDetail;
 use crate::tests::NodeRefExt;
 use kg_diag::Diag;
 use kg_diag::ParseDiag;
@@ -10,8 +11,19 @@ macro_rules! assert_err {
     ($err: expr, $variant: pat) => {
         let detail = $err
             .detail()
-            .downcast_ref::<JsonParseErrDetail>()
-            .expect("cannot downcast to JsonParseErrDetail");
+            .downcast_ref::<JsonParseErrorDetail>()
+            .expect("cannot downcast to JsonParseErrorDetail");
+
+        match detail {
+            $variant => {}
+            err => panic!("Expected error {} got {:?}", stringify!($variant), err),
+        }
+    };
+    ($err: expr, $err_type: ty, $variant: pat) => {
+        let detail = $err
+            .detail()
+            .downcast_ref::<$err_type>()
+            .expect(concat!("cannot downcast to ", stringify!($err_type)));
 
         match detail {
             $variant => {}
@@ -26,7 +38,7 @@ fn unexpected_end_of_input() {
         "key": "\"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedEoiOne {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedEoiOne {..});
 }
 
 #[test]
@@ -34,7 +46,7 @@ fn invalid_char() {
     let input = r#"{=}"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+    assert_err!(err, JsonParseErrorDetail::InvalidChar {..});
 }
 
 #[test]
@@ -42,7 +54,7 @@ fn left_brace_right_box_bracket() {
     let input = r#"{]"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedTokenMany {..});
 }
 
 #[test]
@@ -139,7 +151,7 @@ fn integers_invalid_integer() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidIntegerLiteral {..});
+    assert_err!(err, ParseErrorDetail, ParseErrorDetail::Numerical {..});
 }
 
 #[test]
@@ -187,7 +199,7 @@ fn scientific_notation_invalid_char() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidCharMany {..});
+    assert_err!(err, ParseErrorDetail, ParseErrorDetail::UnexpectedInput {..});
 }
 
 #[test]
@@ -197,7 +209,7 @@ fn scientific_notation_invalid_char_2() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidCharMany {..});
+    assert_err!(err, ParseErrorDetail, ParseErrorDetail::UnexpectedInput {..});
 }
 
 #[test]
@@ -207,7 +219,7 @@ fn parse_float_err() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidFloatLiteral {..});
+    assert_err!(err, ParseErrorDetail, ParseErrorDetail::UnexpectedInput {..});
 }
 
 #[test]
@@ -216,7 +228,7 @@ fn scientific_notation_unexpected_end_of_input() {
         "num": 1.2e+"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedEoiMany {..});
+    assert_err!(err, ParseErrorDetail, ParseErrorDetail::UnexpectedEof {..});
 }
 
 #[test]
@@ -270,7 +282,7 @@ fn invalid_custom_escape_with_unexpected_end_of_input() {
         "str1": "\u00f"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedEoiOne {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedEoiOne {..});
 }
 
 #[test]
@@ -280,7 +292,7 @@ fn character_g_in_hexadecimal_custom_escape() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
+    assert_err!(err, JsonParseErrorDetail::InvalidEscape {..});
 }
 
 #[test]
@@ -290,7 +302,7 @@ fn bad_custom_escape() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
+    assert_err!(err, JsonParseErrorDetail::InvalidEscape {..});
 }
 
 #[test]
@@ -300,7 +312,7 @@ fn too_short_custom_escape() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
+    assert_err!(err, JsonParseErrorDetail::InvalidEscape {..});
 }
 
 #[test]
@@ -310,7 +322,7 @@ fn string_bad_escape() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidEscape {..});
+    assert_err!(err, JsonParseErrorDetail::InvalidEscape {..});
 }
 
 #[test]
@@ -321,7 +333,7 @@ fn control_char_in_string() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidControlUTF8Char {..});
+    assert_err!(err, JsonParseErrorDetail::InvalidControlUTF8Char {..});
 }
 
 #[test]
@@ -329,7 +341,7 @@ fn control_char_in_string_2() {
     let input = "{\"key\": \"val\u{0009}ue\"}";
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidControlUTF8Char {..});
+    assert_err!(err, JsonParseErrorDetail::InvalidControlUTF8Char {..});
 }
 
 #[test]
@@ -337,7 +349,7 @@ fn control_char_in_string_3() {
     let input = "{\"key\": \"val\u{0014}ue\"}";
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidControlUTF8Char {..});
+    assert_err!(err, JsonParseErrorDetail::InvalidControlUTF8Char {..});
 }
 
 #[test]
@@ -345,7 +357,7 @@ fn control_char_in_string_with_unexpected_end_of_input() {
     let input = "{\"key\": \"val\u{0014}";
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedEoiOne {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedEoiOne {..});
 }
 
 #[test]
@@ -354,7 +366,7 @@ fn invalid_input_in_null_with_unexpected_end_of_input() {
         "key": n"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedEoi {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedEoi {..});
 }
 
 #[test]
@@ -364,7 +376,7 @@ fn invalid_input_in_true_with_invalid_char() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidChar {..});
+    assert_err!(err, JsonParseErrorDetail::InvalidChar {..});
 }
 
 #[test]
@@ -373,7 +385,7 @@ fn invalid_input_in_false_with_unexpected_end_of_input() {
         "key": f"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedEoi {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedEoi {..});
 }
 
 #[test]
@@ -411,7 +423,7 @@ fn no_colon() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedTokenOne {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedTokenOne {..});
 }
 
 #[test]
@@ -421,7 +433,7 @@ fn unexpected_token_after_key() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedTokenMany {..});
 }
 
 #[test]
@@ -432,7 +444,7 @@ fn control_char_in_key() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::InvalidControlUTF8Char {..});
+    assert_err!(err, JsonParseErrorDetail::InvalidControlUTF8Char {..});
 }
 
 #[test]
@@ -453,7 +465,7 @@ fn duplicated_keys() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::RedefinedKey {..});
+    assert_err!(err, JsonParseErrorDetail::RedefinedKey {..});
 }
 
 #[test]
@@ -570,7 +582,7 @@ fn array_unexpected_token() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedToken {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedToken {..});
 }
 
 #[test]
@@ -702,15 +714,15 @@ fn object_with_unexpected_token() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedTokenMany {..});
 
     let detail = err
         .detail()
-        .downcast_ref::<JsonParseErrDetail>()
-        .expect("cannot downcast to JsonParseErrDetail");
+        .downcast_ref::<JsonParseErrorDetail>()
+        .expect("cannot downcast to JsonParseErrorDetail");
 
     match detail {
-        JsonParseErrDetail::UnexpectedTokenMany { expected, .. } => {
+        JsonParseErrorDetail::UnexpectedTokenMany { expected, .. } => {
             assert_eq!(Terminal::Comma, expected[0]);
             assert_eq!(Terminal::BraceRight, expected[1]);
         }
@@ -726,7 +738,7 @@ fn brace_right_after_comma() {
 
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedTokenOne {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedTokenOne {..});
 }
 
 #[test]
@@ -735,7 +747,7 @@ fn square_bracket_right_after_comma() {
 
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedTokenMany {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedTokenMany {..});
 }
 
 #[test]
@@ -745,7 +757,7 @@ fn unexpected_eoi_one() {
     }"#;
     let err: ParseDiag = parse_node_err!(input);
 
-    assert_err!(err, JsonParseErrDetail::UnexpectedEoiOne {..});
+    assert_err!(err, JsonParseErrorDetail::UnexpectedEoiOne {..});
 }
 //#########################################
 
