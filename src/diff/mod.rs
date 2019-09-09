@@ -253,7 +253,9 @@ impl<'de> Deserialize<'de> for ChangeKindMask {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeChange {
     kind: ChangeKind,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     old_path: Option<Opath>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     new_path: Option<Opath>,
 }
 
