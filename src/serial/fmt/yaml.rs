@@ -727,16 +727,16 @@ impl Parser {
                 match c {
                     '"' => {
                         r.next_char()?;
-                        self.push_str_to_buf(r, t);
+                        self.push_str_to_buf(r, t)?;
                         self.buf.pop();
                     }
                     '\'' => {
                         r.next_char()?;
-                        self.push_str_to_buf(r, t);
+                        self.push_str_to_buf(r, t)?;
                         self.buf.pop();
                     }
                     _ => {
-                        self.push_str_to_buf(r, t);
+                        self.push_str_to_buf(r, t)?;
                     }
                 }
                 r.seek(t.to())?;
@@ -1343,7 +1343,8 @@ three]"#;
             assert_terms!(input, terms);
         }
 
-        //#[test] //TODO MC Uncomment
+        #[test]
+        #[should_panic]
         fn float_with_dot_at_the_beginning() {
             let input: &str = r#".1"#;
 
