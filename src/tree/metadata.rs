@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::rc::{Rc, Weak};
+use std::cell::Cell;
 
 use super::*;
 
@@ -57,73 +58,87 @@ impl std::fmt::Display for FileFormat {
     }
 }
 
+
 #[derive(Debug)]
-pub struct FileInfo {
+struct FileInfoInner {
     file_path: PathBuf,
     file_type: FileType,
-    file_format: FileFormat,
+    file_format: Cell<FileFormat>,
 }
+
+#[derive(Clone)]
+pub struct FileInfo(Rc<FileInfoInner>);
 
 impl FileInfo {
     pub fn new<P: Into<PathBuf> + AsRef<Path>>(
         file_path: P,
         file_type: FileType,
         file_format: FileFormat,
-    ) -> Rc<FileInfo> {
+    ) -> FileInfo {
         debug_assert!(file_path.as_ref().is_absolute());
 
-        Rc::new(FileInfo {
+        FileInfo(Rc::new(FileInfoInner {
             file_path: file_path.into(),
             file_type,
-            file_format,
-        })
+            file_format: Cell::new(file_format),
+        }))
     }
 
     pub fn file_path_abs(&self) -> &Path {
-        &self.file_path
+        &self.0.file_path
     }
 
     pub fn file_path(&self) -> &Path {
-        crate::relative_path(&self.file_path)
+        crate::relative_path(&self.0.file_path)
     }
 
     pub fn file_type(&self) -> FileType {
-        self.file_type
+        self.0.file_type
     }
 
     pub fn file_format(&self) -> FileFormat {
-        self.file_format
+        self.0.file_format.get()
+    }
+
+    pub fn set_file_format(&mut self, file_format: FileFormat) {
+        self.0.file_format.set(file_format);
+    }
+}
+
+impl std::fmt::Debug for FileInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        std::fmt::Debug::fmt(&self.0, f)
     }
 }
 
 impl std::fmt::Display for FileInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if f.alternate() {
-            match self.file_type {
-                FileType::Dir => write!(f, "{}:{}", self.file_type, self.file_path.display()),
+            match self.file_type() {
+                FileType::Dir => write!(f, "{}:{}", self.file_type(), self.file_path().display()),
                 FileType::File => write!(
                     f,
                     "{}<{}>:{}",
-                    self.file_type,
-                    self.file_format,
-                    self.file_path.display()
+                    self.file_type(),
+                    self.file_format(),
+                    self.file_path().display()
                 ),
                 _ => unreachable!(),
             }
         } else {
-            match self.file_type {
+            match self.file_type() {
                 FileType::Dir => write!(
                     f,
                     "{}:{}",
-                    self.file_type,
-                    crate::relative_path(&self.file_path).display()
+                    self.file_type(),
+                    crate::relative_path(&self.file_path()).display()
                 ),
                 FileType::File => write!(
                     f,
                     "{}<{}>:{}",
-                    self.file_type,
-                    self.file_format,
-                    crate::relative_path(&self.file_path).display()
+                    self.file_type(),
+                    self.file_format(),
+                    crate::relative_path(&self.file_path()).display()
                 ),
                 _ => unreachable!(),
             }
@@ -133,7 +148,11 @@ impl std::fmt::Display for FileInfo {
 
 impl PartialEq<FileInfo> for FileInfo {
     fn eq(&self, other: &FileInfo) -> bool {
-        self.file_path == other.file_path
+        if Rc::ptr_eq(&self.0, &other.0) {
+            true
+        } else {
+            self.file_path() == other.file_path()
+        }
     }
 }
 
@@ -141,25 +160,25 @@ impl Eq for FileInfo {}
 
 impl PartialOrd<FileInfo> for FileInfo {
     fn partial_cmp(&self, other: &FileInfo) -> Option<Ordering> {
-        self.file_path.partial_cmp(&other.file_path)
+        self.file_path().partial_cmp(other.file_path())
     }
 }
 
 impl Ord for FileInfo {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.file_path.cmp(&other.file_path)
+        self.file_path().cmp(other.file_path())
     }
 }
 
 impl Hash for FileInfo {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.file_path.hash(state);
+        self.file_path().hash(state);
     }
 }
 
 impl HeapSizeOf for FileInfo {
     fn heap_size_of_children(&self) -> usize {
-        PathBufHeapSize(&self.file_path).heap_size_of_children()
+        PathBufHeapSize(&self.0.file_path).heap_size_of_children()
     }
 }
 
@@ -168,7 +187,7 @@ pub struct Metadata {
     parent: Option<Weak<RefCell<Node>>>,
     index: usize,
     key: Symbol,
-    file: Option<Rc<FileInfo>>,
+    file: Option<FileInfo>,
     span: Option<Box<Span>>,
 }
 
@@ -214,11 +233,11 @@ impl Metadata {
         self.index = index;
     }
 
-    pub fn file(&self) -> Option<&Rc<FileInfo>> {
+    pub fn file(&self) -> Option<&FileInfo> {
         self.file.as_ref()
     }
 
-    pub fn set_file(&mut self, file: Option<Rc<FileInfo>>) {
+    pub fn set_file(&mut self, file: Option<FileInfo>) {
         self.file = file;
     }
 
