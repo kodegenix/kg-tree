@@ -116,6 +116,10 @@ impl NodeSet {
             }
         }
     }
+
+    pub fn from_json(json: &str) -> Result<NodeSet, serde_json::Error> {
+        serde_json::from_str(json)
+    }
 }
 
 impl Remappable for NodeSet {
