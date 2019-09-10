@@ -2,6 +2,35 @@
 
 #![doc(include = "../doc/doc.md")]
 
+//TODO MC Finish data types example
+//!```rust
+//!use kg_tree::opath::{Opath, NodeSet};
+//!use kg_tree::NodeRef;
+//!
+//!let model = r#"{
+//!  "null": null
+//!  "number": 1
+//!  "boolean": true
+//!  "string": "apple"
+//!  "binary": ????
+//!  "object": { "key": "value" }
+//!  "array": [ 1, 2, 3, 4 ]
+//!}"#;
+//!
+//!let query = "$.foo";
+//!
+//!let result = r#"{
+//!  "type": "one",
+//!  "data": "bar"
+//!}"#;
+//!
+//!let expr = Opath::parse(query).unwrap();
+//!let node = NodeRef::from_json(model).unwrap();
+//!let res = expr.apply(&node, &node).unwrap();
+//!let expected = NodeSet::from_json(result).unwrap();
+//!assert_eq!(res, expected);
+//!```
+
 #[macro_use]
 extern crate kg_diag_derive;
 #[macro_use]
