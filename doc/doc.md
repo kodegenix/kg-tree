@@ -172,7 +172,7 @@ let query = r#"count + 1"#;
 
 let result = r#"{
   "type": "one",
-  "data": "2"
+  "data": 2
 }"#;
 
 let expr = Opath::parse(query).unwrap();
@@ -196,7 +196,7 @@ let query = r#"count - 1"#;
 
 let result = r#"{
   "type": "one",
-  "data": "1"
+  "data": 1
 }"#;
 
 let expr = Opath::parse(query).unwrap();
@@ -220,7 +220,7 @@ let query = r#"count * 3"#;
 
 let result = r#"{
   "type": "one",
-  "data": "6"
+  "data": 6
 }"#;
 
 let expr = Opath::parse(query).unwrap();
@@ -244,7 +244,7 @@ let query = r#"count / 3"#;
 
 let result = r#"{
   "type": "one",
-  "data": "2"
+  "data": 2
 }"#;
 
 let expr = Opath::parse(query).unwrap();
@@ -270,7 +270,7 @@ let query = r#"count + 6 / 2"#;
 
 let result = r#"{
   "type": "one",
-  "data": "5"
+  "data": 5
 }"#;
 
 let expr = Opath::parse(query).unwrap();
@@ -294,7 +294,7 @@ let query = r#"(count + 6) / 2"#;
 
 let result = r#"{
   "type": "one",
-  "data": "4"
+  "data": 4
 }"#;
 
 let expr = Opath::parse(query).unwrap();
@@ -380,7 +380,7 @@ assert_eq!(res, expected);
 
 # Comparison operators
 
-Greater than ">":
+Greater than `>`:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -404,7 +404,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-Greater than or equal to ">=":
+Greater than or equal to `>=`:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -428,7 +428,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-Less than "<":
+Less than `<`:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -452,7 +452,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-Less than or equal to "<=":
+Less than or equal to `<=`:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -476,7 +476,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-Equal to "==":
+Equal to `==`:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -500,7 +500,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-Not equal to "!=":
+Not equal to `!=`:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -583,6 +583,146 @@ let model = r#"{
 }"#;
 
 let query = r#"string $= 'bb'"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+# Logical operators
+
+`not true` and `!true`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "bool": true
+}"#;
+
+let query = r#"not bool"#;
+
+let result = r#"{
+  "type": "one",
+  "data": false
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "bool": true
+}"#;
+
+let query = r#"!bool"#;
+
+let result = r#"{
+  "type": "one",
+  "data": false
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`true and true` and `true && true`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "bool": true
+}"#;
+
+let query = r#"bool and true"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "bool": true
+}"#;
+
+let query = r#"bool && true"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`true or false` and `true || false`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "bool": true
+}"#;
+
+let query = r#"bool or false"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "bool": true
+}"#;
+
+let query = r#"bool || false"#;
 
 let result = r#"{
   "type": "one",
