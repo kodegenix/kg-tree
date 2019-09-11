@@ -215,7 +215,7 @@ impl NodeRef {
         fs::read_to_string(&file_path, &mut s)?;
         let n = NodeRef::from_str(s.into(), format)?;
         n.data_mut()
-            .set_file(Some(&FileInfo::new(&file_path_, FileType::File, format)));
+            .set_file(Some(FileInfo::new_file(&file_path_, format)));
         Ok(n)
     }
 
@@ -726,27 +726,6 @@ impl NodeRef {
             }
             _ => false,
         }
-    }
-
-    pub fn heap_size(&self) -> usize {
-        use std::collections::HashSet;
-
-        let mut size = self.heap_size_of_children();
-        let mut fmap: HashSet<*const FileInfo> = HashSet::new();
-        self.visit_recursive(|_r, _p, n| {
-            let nd = n.data();
-            if let Some(f) = nd.metadata().file() {
-                fmap.insert(Rc::into_raw(f.clone()));
-            }
-            true
-        });
-
-        for f in fmap.into_iter() {
-            size += unsafe { heapsize::heap_size_of(f) };
-            let f = unsafe { Rc::from_raw(f) };
-            size += f.heap_size_of_children()
-        }
-        size
     }
 
     pub fn is_equal(&self, other: &NodeRef) -> bool {

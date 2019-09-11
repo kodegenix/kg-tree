@@ -58,6 +58,12 @@ impl std::fmt::Display for FileFormat {
     }
 }
 
+impl Default for FileFormat {
+    fn default() -> Self {
+        FileFormat::Binary
+    }
+}
+
 
 #[derive(Debug)]
 struct FileInfoInner {
@@ -81,6 +87,31 @@ impl FileInfo {
             file_path: file_path.into(),
             file_type,
             file_format: Cell::new(file_format),
+        }))
+    }
+
+    pub fn new_file<P: Into<PathBuf> + AsRef<Path>>(
+        file_path: P,
+        file_format: FileFormat,
+    ) -> FileInfo {
+        debug_assert!(file_path.as_ref().is_absolute());
+
+        FileInfo(Rc::new(FileInfoInner {
+            file_path: file_path.into(),
+            file_type: FileType::File,
+            file_format: Cell::new(file_format),
+        }))
+    }
+
+    pub fn new_dir<P: Into<PathBuf> + AsRef<Path>>(
+        file_path: P,
+    ) -> FileInfo {
+        debug_assert!(file_path.as_ref().is_absolute());
+
+        FileInfo(Rc::new(FileInfoInner {
+            file_path: file_path.into(),
+            file_type: FileType::Dir,
+            file_format: Cell::new(FileFormat::default()),
         }))
     }
 

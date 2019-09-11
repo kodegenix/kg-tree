@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use super::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -423,29 +421,29 @@ impl Node {
     }
 
     pub fn file(&self) -> Option<&FileInfo> {
-        self.metadata.file().map(|f| &**f)
+        self.metadata.file()
     }
 
-    pub fn set_file(&mut self, file: Option<&Rc<FileInfo>>) {
-        fn update_file(d: &mut Node, file: &Rc<FileInfo>) {
-            d.metadata_mut().set_file(Some(file.clone()));
+    pub fn set_file(&mut self, file: Option<FileInfo>) {
+        fn update_file(d: &mut Node, file: FileInfo) {
             match d.value {
                 Value::Object(ref props) => {
                     for p in props.values() {
                         if p.data().metadata().file().is_none() {
-                            update_file(&mut p.data_mut(), file);
+                            update_file(&mut p.data_mut(), file.clone());
                         }
                     }
                 }
                 Value::Array(ref elems) => {
                     for e in elems.iter() {
                         if e.data().metadata().file().is_none() {
-                            update_file(&mut e.data_mut(), file);
+                            update_file(&mut e.data_mut(), file.clone());
                         }
                     }
                 }
                 _ => {}
             }
+            d.metadata_mut().set_file(Some(file));
         }
         match file {
             Some(file) => update_file(self, file),

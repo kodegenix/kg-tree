@@ -1800,7 +1800,7 @@ mod tests {
             set_base_path(Path::new("/tmp"));
 
             let n = NodeRef::null();
-            n.data_mut().set_file(Some(&FileInfo::new(
+            n.data_mut().set_file(Some(FileInfo::new(
                 Path::new("/tmp/some/path/file.json"),
                 FileType::File,
                 FileFormat::Json,
