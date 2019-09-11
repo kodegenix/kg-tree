@@ -152,6 +152,137 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
+# Indexing for arrays
+
+Array elements can be accessed with `[]` notation. Arrays are indexed starting from `0`.
+
+`@[0]` - returns the first element of the **current** array:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three"]"#;
+
+let query = r#"@[0]"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "one"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@[0, 1..3, 5]` - arrays can be indexed by multiple comma-separated indices as well as ranges of indices:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three", "four", "five", "six"]"#;
+
+let query = r#"@[0, 1..3, 5]"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["one", "two", "three", "four", "six"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@[-1,-2]` - negative indices are calculated from the end of an array, `-1` being the last element of an array:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three"]"#;
+
+let query = r#"@[-1, -2]"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["three", "two"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@[3..]` - when using ranges in array indexing expressions (inside `[]`), range ending value can be omitted, 
+and it will be equal to the array length (number of array elements):
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three", "four", "five", "six"]"#;
+
+let query = r#"@[3..]"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["four", "five", "six"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+Accessing array with out-of-bounds index values yields empty result:
+
+[comment]: <> (TODO MC How to present result?)
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three"]"#;
+
+let query = r#"@[4]"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::Empty;
+assert_eq!(res, expected);
+```
+
+Accessing array element on a non-array and non-object type yields empty result:
+
+[comment]: <> (TODO MC How to present result?)
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#""string""#;
+
+let query = r#"@[0]"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::Empty;
+assert_eq!(res, expected);
+```
+
 ## Mathematical operators
 
 Typical mathematical operators and parentheses are supported.
