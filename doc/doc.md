@@ -68,6 +68,8 @@ Same as ECMAScript, integers promoted to floats when mixed operands (do rozwinie
 
 ## Context
 
+[comment]: <> (TODO MC Better code with example?)
+
 Every `Opath` expression is executed in the context of **root** (denoted `$`) and **current** 
 (denoted `@`) elements. To access any element in the object tree, it's relation to 
 the **current** (`@`) or **root** (`$`) element needs to be defined, much like for 
@@ -151,21 +153,144 @@ assert_eq!(res, expected);
 ```
 
 ## Mathematical operators
-Numerical addition
+
+Typical mathematical operators and parentheses are supported.
+
+Internally, type conversion is avoided as long as possible, i.e. adding two integer values will yield integer sum.
+
+Numerical addition:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
 use kg_tree::NodeRef;
 
 let model = r#"{
-  "foo": 1
+  "count": 1
 }"#;
 
-let query = "@.foo + 1";
+let query = "count + 1";
 
 let result = r#"{
   "type": "one",
   "data": "2"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+Numerical subtraction:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "count": 2
+}"#;
+
+let query = "count - 1";
+
+let result = r#"{
+  "type": "one",
+  "data": "1"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+Numerical multiplication:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "count": 2
+}"#;
+
+let query = "count * 3";
+
+let result = r#"{
+  "type": "one",
+  "data": "6"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+Numerical division:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "count": 6
+}"#;
+
+let query = "count / 3";
+
+let result = r#"{
+  "type": "one",
+  "data": "2"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+Mathematical order of performing actions:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "count": 2
+}"#;
+
+let query = "count + 6 / 2";
+
+let result = r#"{
+  "type": "one",
+  "data": "5"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "count": 2
+}"#;
+
+let query = "(count + 6) / 2";
+
+let result = r#"{
+  "type": "one",
+  "data": "4"
 }"#;
 
 let expr = Opath::parse(query).unwrap();
