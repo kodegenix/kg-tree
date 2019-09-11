@@ -283,6 +283,136 @@ let expected = NodeSet::Empty;
 assert_eq!(res, expected);
 ```
 
+## Property access for objects
+
+Properties in objects can be accessed with typical `.` or `[]` notations.
+
+`name` - returns the value of property "name" from the **current** element:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "name": "value"
+}"#;
+
+let query = r#"name"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "value"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@["name"]` and `@['name']` and `@."name"` - property names can be quoted, and if so, can contain
+spaces and special characters:
+
+[comment]: <> (TODO MC What with @[name]?)
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "name": "value"
+}"#;
+
+let query = r#"@["name"]"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "value"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "name": "value"
+}"#;
+
+let query = r#"@['name']"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "value"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "name": "value"
+}"#;
+
+let query = r#"@."name""#;
+
+let result = r#"{
+  "type": "one",
+  "data": "value"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@.(first_name, last_name)` - one can select a few properties with a single expression using parentheses:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "first_name": "John",
+  "last_name": "Doe"
+}"#;
+
+let query = r#"@.(first_name, last_name)"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "value"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`[name]` and `@[name]` - this is illegal!
+
+`"name"` - this is string literal, not property access!
+
+
+
 ## Mathematical operators
 
 Typical mathematical operators and parentheses are supported.
