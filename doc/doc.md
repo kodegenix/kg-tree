@@ -90,7 +90,7 @@ let model = r#"{
   "foo": "bar"
 }"#;
 
-let query = "@.foo";
+let query = r#"@.foo"#;
 
 let result = r#"{
   "type": "one",
@@ -114,7 +114,7 @@ let model = r#"{
   "foo": "bar"
 }"#;
 
-let query = "foo";
+let query = r#"foo"#;
 
 let result = r#"{
   "type": "one",
@@ -138,7 +138,7 @@ let model = r#"{
   "foo": "bar"
 }"#;
 
-let query = "$.foo";
+let query = r#"$.foo"#;
 
 let result = r#"{
   "type": "one",
@@ -168,7 +168,7 @@ let model = r#"{
   "count": 1
 }"#;
 
-let query = "count + 1";
+let query = r#"count + 1"#;
 
 let result = r#"{
   "type": "one",
@@ -192,7 +192,7 @@ let model = r#"{
   "count": 2
 }"#;
 
-let query = "count - 1";
+let query = r#"count - 1"#;
 
 let result = r#"{
   "type": "one",
@@ -216,7 +216,7 @@ let model = r#"{
   "count": 2
 }"#;
 
-let query = "count * 3";
+let query = r#"count * 3"#;
 
 let result = r#"{
   "type": "one",
@@ -240,7 +240,7 @@ let model = r#"{
   "count": 6
 }"#;
 
-let query = "count / 3";
+let query = r#"count / 3"#;
 
 let result = r#"{
   "type": "one",
@@ -254,7 +254,9 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-Mathematical order of performing actions:
+Mathematical order of performing actions.
+
+This expression yields value 5, as expected:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -264,7 +266,7 @@ let model = r#"{
   "count": 2
 }"#;
 
-let query = "count + 6 / 2";
+let query = r#"count + 6 / 2"#;
 
 let result = r#"{
   "type": "one",
@@ -278,6 +280,8 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
+This expression yields value 4, as expected:
+
 ```
 use kg_tree::opath::{Opath, NodeSet};
 use kg_tree::NodeRef;
@@ -286,7 +290,7 @@ let model = r#"{
   "count": 2
 }"#;
 
-let query = "(count + 6) / 2";
+let query = r#"(count + 6) / 2"#;
 
 let result = r#"{
   "type": "one",
@@ -314,7 +318,7 @@ let model = r#"{
   "number": 2
 }"#;
 
-let query = "number + \"3\"";
+let query = r#"number + "3""#;
 
 let result = r#"{
   "type": "one",
@@ -336,7 +340,7 @@ let model = r#"{
   "string": "2"
 }"#;
 
-let query = "string + 3";
+let query = r#"string + 3"#;
 
 let result = r#"{
   "type": "one",
@@ -360,7 +364,7 @@ let model = r#"{
   "first_name": "John"
 }"#;
 
-let query = "first_name + \" \" + 'Doe'";
+let query = r#"first_name + " " + 'Doe'"#;
 
 let result = r#"{
   "type": "one",
