@@ -299,3 +299,77 @@ let res = expr.apply(&node, &node).unwrap();
 let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
+
+# String concatenation
+
+If any of the addition operands has a string value, addition will become string concatenation
+
+`2 + "3"`, `"2" + 3` - both expressions yield string value `"23"`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "number": 2
+}"#;
+
+let query = "number + \"3\"";
+
+let result = r#"{
+  "type": "one",
+  "data": "23"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "string": "2"
+}"#;
+
+let query = "string + 3";
+
+let result = r#"{
+  "type": "one",
+  "data": "23"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`"John" + " " + 'Doe'` - yields `"John Doe"`
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "first_name": "John"
+}"#;
+
+let query = "first_name + \" \" + 'Doe'";
+
+let result = r#"{
+  "type": "one",
+  "data": "John Doe"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
