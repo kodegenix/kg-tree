@@ -8,13 +8,7 @@
 //!use kg_tree::NodeRef;
 //!
 //!let model = r#"{
-//!  "null": null
-//!  "number": 1
-//!  "boolean": true
-//!  "string": "apple"
-//!  "binary": ????
-//!  "object": { "key": "value" }
-//!  "array": [ 1, 2, 3, 4 ]
+//!  "foo": "bar"
 //!}"#;
 //!
 //!let query = "$.foo";
