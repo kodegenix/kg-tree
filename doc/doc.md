@@ -377,3 +377,221 @@ let res = expr.apply(&node, &node).unwrap();
 let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
+
+# Comparison operators
+
+Greater than ">":
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "number": 2
+}"#;
+
+let query = r#"number > 1"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+Greater than or equal to ">=":
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "number": 1
+}"#;
+
+let query = r#"number >= 1"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+Less than "<":
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "number": 1
+}"#;
+
+let query = r#"number < 2"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+Less than or equal to "<=":
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "number": 1
+}"#;
+
+let query = r#"number <= 1"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+Equal to "==":
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "number": 3
+}"#;
+
+let query = r#"number == 3"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+Not equal to "!=":
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "number": 1
+}"#;
+
+let query = r#"number != 3"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`'aaabbb' ^= 'aa'` - `true` if left string operand starts with right string operand:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "string": "aaabbb"
+}"#;
+
+let query = r#"string ^= 'aa'"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`'aaabbb' *= 'ab'` - `true` if left string operand contains right string operand:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "string": "aaabbb"
+}"#;
+
+let query = r#"string *= 'ab'"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`'aaabbb' $= 'bb'` - `true` if left string operand ends with right string operand:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "string": "aaabbb"
+}"#;
+
+let query = r#"string $= 'bb'"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
