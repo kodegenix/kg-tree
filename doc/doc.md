@@ -3,7 +3,7 @@
 Opath is a simple language for object tree lookup and transformation, similar to 
 [XPath](https://www.w3.org/TR/xpath/) in function.
 
-# Data types
+## Data types
 
 All data types transferable through `json`, `yaml` and `toml` formats are supported.
 
@@ -50,7 +50,7 @@ let model = r#"{
 }"#;
 ```
 
-# Literals
+## Literals
 
 [comment]: <> (TODO MC Code with example?)
 
@@ -60,7 +60,7 @@ let model = r#"{
 * `true`, `false` - boolean values
 * `null` - null value
 
-# Type conversions
+## Type conversions
 
 [comment]: <> (TODO MC Code with example?)
 
@@ -152,7 +152,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-# Indexing for arrays
+## Indexing for arrays
 
 Array elements can be accessed with `[]` notation. Arrays are indexed starting from `0`.
 
@@ -435,7 +435,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-# String concatenation
+## String concatenation
 
 If any of the addition operands has a string value, addition will become string concatenation
 
@@ -509,7 +509,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-# Comparison operators
+## Comparison operators
 
 Greater than `>`:
 
@@ -727,7 +727,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-# Logical operators
+## Logical operators
 
 `not true` and `!true`:
 
@@ -858,6 +858,140 @@ let query = r#"bool || false"#;
 let result = r#"{
   "type": "one",
   "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+## Number ranges
+
+`:4` - range from `0` (inclusive) to `4` (inclusive):
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three", "four", "five", "six"]"#;
+
+let query = r#"@[:4]"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["one", "two", "three", "four", "five"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`1:4` - range from `1` (inclusive) to `4` (inclusive):
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three", "four", "five", "six"]"#;
+
+let query = r#"@[1:4]"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["two", "three", "four", "five"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`0:2:4` - range from `0` (inclusive) to `10` (inclusive) with `2` increments:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three", "four", "five", "six"]"#;
+
+let query = r#"@[0:2:4]"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["one", "three", "five"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`0:1.5:5` - floats in ranges are also supported:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three", "four", "five", "six"]"#;
+
+let query = r#"@[0:1.5:5]"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["one", "two", "four", "five"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`1..3` - range from `1` (inclusive) to `3` (inclusive):
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three", "four", "five", "six"]"#;
+
+let query = r#"@[1..3]"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["two", "three", "four"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`..3` - range from `0` (inclusive) to `10` (inclusive):
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three", "four", "five", "six"]"#;
+
+let query = r#"@[..3]"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["one", "two", "three", "four"]
 }"#;
 
 let expr = Opath::parse(query).unwrap();
