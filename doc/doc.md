@@ -178,6 +178,54 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
+`$[0]` - returns the first element of the **root** array:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"["one", "two", "three"]"#;
+
+let query = r#"$[0]"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "one"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@[1][2]` - returns the third element of the second array from **current** array:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"[
+  ["one", "two", "three"],
+  ["four", "five", "six"],
+  ["seven", "eight", "nine"]
+]"#;
+
+let query = r#"@[1][2]"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "six"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
 `@[0, 1..3, 5]` - arrays can be indexed by multiple comma-separated indices as well as ranges of indices:
 
 ```
@@ -412,8 +460,6 @@ assert_eq!(res, expected);
 `"name"` - this is string literal, not property access!
 
 ## Property indexing for objects
-
-[comment]: <> (TODO MC Add example for $[0] and @[0][0])
 
 Every object can also be indexed as an array, where index value will correspond with property position within 
 the object. For example if **current** object will be:
