@@ -634,8 +634,6 @@ like `".data.yml"` stem will be `".data"`:
 
 `@.@path` - path to the **current** element from the **root**, for instance `"$.nested.array[3]"`:
 
-[comment]: <> (TODO MC How to show it?)
-
 ```
 use kg_tree::opath::{Opath, NodeSet};
 use kg_tree::NodeRef;
@@ -646,7 +644,7 @@ let model = r#"{
   }
 }"#;
 
-let query = r#"$[0][0].@path"#;
+let query = r#"@[0][0].@path"#;
 
 let result = r#"{
   "type": "one",
