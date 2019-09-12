@@ -658,6 +658,64 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
+# Property / element filtering
+
+Properties in objects or elements in arrays can also be filtered with logical expressions inside `[]` notation.
+
+Note that inside the `[]` expression the **current** element (`@`) becomes the child of the outer element.
+
+`@[@.@key $= "name"]` - yields **current** element property values for which property name ends with `"name"`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "first_name": "John",
+  "last_name": "Doe",
+  "age": 30
+}"#;
+
+let query = r#"@[@.@key $= "name"]"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["John", "Doe"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@[@.@index >= 2]` - yields **current** element properties / elements with index greater or equal `2`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "first_name": "John",
+  "last_name": "Doe",
+  "age": 30
+}"#;
+
+let query = r#"@[@.@index >= 2]"#;
+
+let result = r#"{
+  "type": "one",
+  "data": 30
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
 ## Mathematical operators
 
 Typical mathematical operators and parentheses are supported.
