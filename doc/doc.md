@@ -382,30 +382,6 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-`@[0]` - returns the value of property with index 0 from the **current** element:
-
-```
-use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::NodeRef;
-
-let model = r#"{
-  "name": "value"
-}"#;
-
-let query = r#"@[0]"#;
-
-let result = r#"{
-  "type": "one",
-  "data": "value"
-}"#;
-
-let expr = Opath::parse(query).unwrap();
-let node = NodeRef::from_json(model).unwrap();
-let res = expr.apply(&node, &node).unwrap();
-let expected = NodeSet::from_json(result).unwrap();
-assert_eq!(res, expected);
-```
-
 `@.(first_name, last_name)` - one can select a few properties with a single expression using parentheses:
 
 ```
@@ -434,6 +410,42 @@ assert_eq!(res, expected);
 `[name]` and `@[name]` - this is illegal!
 
 `"name"` - this is string literal, not property access!
+
+## Property indexing for objects
+
+Every object can also be indexed as an array, where index value will correspond with property position within 
+the object. For example if **current** object will be:
+```json
+{
+   "first_name": "John",
+   "last_name": "Doe"
+}
+```
+expression `@[1]` will yield string value `"Doe"` (value of the secod property). Objects have strictly defined 
+and stable insertion order of properties:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "first_name": "John",
+  "last_name": "Doe"
+}"#;
+
+let query = r#"@[1]"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "Doe"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
 
 ## Mathematical operators
 
