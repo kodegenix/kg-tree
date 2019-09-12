@@ -707,6 +707,35 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
+## Property / element access wildcard operator `*`
+
+`@.*`, `@[*]` - yields all properties of the **current** object or all elements of the **current** array, or 
+empty result, depending on the **current** type:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "first_name": "John",
+  "last_name": "Doe",
+  "age": 30
+}"#;
+
+let query = r#"@.*"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["John", "Doe", 30]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
 ## Mathematical operators
 
 Typical mathematical operators and parentheses are supported.
