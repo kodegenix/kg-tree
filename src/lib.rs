@@ -2,27 +2,28 @@
 
 #![doc(include = "../doc/doc.md")]
 
-//TODO MC Finish data types example
 //!```rust
 //!use kg_tree::opath::{Opath, NodeSet};
 //!use kg_tree::NodeRef;
 //!
 //!let model = r#"{
-//!  "foo": "bar"
+//!  "null": null,
+//!  "number": 1,
+//!  "boolean": true,
+//!  "string": "apple",
+//!  "object": { "key": "value" },
+//!  "array": [ 1, 2, 3, 4 ],
+//!  "binary": "RXhhbXBsZQ=="
 //!}"#;
 //!
-//!let query = "$.foo";
-//!
-//!let result = r#"{
-//!  "type": "one",
-//!  "data": "bar"
-//!}"#;
-//!
-//!let expr = Opath::parse(query).unwrap();
 //!let node = NodeRef::from_json(model).unwrap();
-//!let res = expr.apply(&node, &node).unwrap();
-//!let expected = NodeSet::from_json(result).unwrap();
-//!assert_eq!(res, expected);
+//!assert!(node.is_object());
+//!assert!(node.get_child_key("null").unwrap().is_null());
+//!assert!(node.get_child_key("number").unwrap().is_integer());
+//!assert!(node.get_child_key("boolean").unwrap().is_boolean());
+//!assert!(node.get_child_key("string").unwrap().is_string());
+//!assert!(node.get_child_key("object").unwrap().is_object());
+//!assert!(node.get_child_key("array").unwrap().is_array());
 //!```
 
 #[macro_use]

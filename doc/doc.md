@@ -15,9 +15,12 @@ All data types transferable through `json`, `yaml` and `toml` formats are suppor
 * *object* - object or map, can contain string-keyed properties
 * *array* - array or sequence of elements
 
-[comment]: <> (TODO MC Assertion?)
+[comment]: <> (TODO MC How to do binary data?)
 
 ```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
 let model = r#"{
   "null": null,
   "number": 1,
@@ -25,29 +28,17 @@ let model = r#"{
   "string": "apple",
   "object": { "key": "value" },
   "array": [ 1, 2, 3, 4 ],
-  "binary": "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
-  Z"
+  "binary": "RXhhbXBsZQ=="
 }"#;
+
+let node = NodeRef::from_json(model).unwrap();
+assert!(node.is_object());
+assert!(node.get_child_key("null").unwrap().is_null());
+assert!(node.get_child_key("number").unwrap().is_integer());
+assert!(node.get_child_key("boolean").unwrap().is_boolean());
+assert!(node.get_child_key("string").unwrap().is_string());
+assert!(node.get_child_key("object").unwrap().is_object());
+assert!(node.get_child_key("array").unwrap().is_array());
 ```
 
 ## Literals
@@ -495,7 +486,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-# Metadata (attributes)
+## Metadata (attributes)
 
 All elements contain readable metadata (attributes). Those attributes are accessed like regular properties, but with 
 name prefixed with `@` character.
@@ -658,7 +649,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-# Property / element filtering
+## Property / element filtering
 
 Properties in objects or elements in arrays can also be filtered with logical expressions inside `[]` notation.
 
