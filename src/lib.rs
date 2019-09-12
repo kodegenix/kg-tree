@@ -7,23 +7,22 @@
 //!use kg_tree::NodeRef;
 //!
 //!let model = r#"{
-//!  "null": null,
-//!  "number": 1,
-//!  "boolean": true,
-//!  "string": "apple",
-//!  "object": { "key": "value" },
-//!  "array": [ 1, 2, 3, 4 ],
-//!  "binary": "RXhhbXBsZQ=="
+//!  "key0": "value0",
+//!  "key1": "value1",
+//!  "key2": {
+//!    "key20": "value20",
+//!    "key21": "value21"
+//!  }
 //!}"#;
 //!
+//!let query = r#"@.**"#;
+//!
+//!
+//!let expr = Opath::parse(query).unwrap();
 //!let node = NodeRef::from_json(model).unwrap();
-//!assert!(node.is_object());
-//!assert!(node.get_child_key("null").unwrap().is_null());
-//!assert!(node.get_child_key("number").unwrap().is_integer());
-//!assert!(node.get_child_key("boolean").unwrap().is_boolean());
-//!assert!(node.get_child_key("string").unwrap().is_string());
-//!assert!(node.get_child_key("object").unwrap().is_object());
-//!assert!(node.get_child_key("array").unwrap().is_array());
+//!let res = expr.apply(&node, &node).unwrap();
+//!
+//!assert_eq!(5, res.len());
 //!```
 
 #[macro_use]

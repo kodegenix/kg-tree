@@ -738,7 +738,7 @@ assert_eq!(res, expected);
 
 # Property / element access recursive descent operator `**`
 
-* `@.**`, `@[**]` - yields all properties of the **current** object, and recursively all of their properties in 
+* `@.**`, `@[**]`, `@."**"`, `@['**']` - yields all properties of the **current** object, and recursively all of their properties in 
   depth-first descending order.
 
 [comment]: <> (TODO MC Make proper example)
@@ -758,18 +758,11 @@ let model = r#"{
 
 let query = r#"@.**"#;
 
-let result = r#"{
-  "type": "many",
-  "data": ["value0", "value1", "value20", "value21"]
-}"#;
-
 let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
-let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(5, res.len());
 ```
-
-`@."**"`, `@['**']` - this will also proto.work as above.
 
 [comment]: <> (TODO MC Make example)
 
@@ -803,6 +796,7 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
 ```
 
 `@.name^` - if **current** element is an object and contains "name" property, this expression will yield 
@@ -828,6 +822,7 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
 ```
 
 # Ascendant access recursive operator `^**`
