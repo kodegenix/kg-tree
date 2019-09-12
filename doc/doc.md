@@ -736,6 +736,107 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
+# Property / element access recursive descent operator `**`
+
+* `@.**`, `@[**]` - yields all properties of the **current** object, and recursively all of their properties in 
+  depth-first descending order.
+
+[comment]: <> (TODO MC Make proper example)
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1",
+  "key2": {
+    "key20": "value20",
+    "key21": "value21"
+  }
+}"#;
+
+let query = r#"@.**"#;
+
+let result = r#"{
+  "type": "many",
+  "data": ["value0", "value1", "value20", "value21"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+```
+
+`@."**"`, `@['**']` - this will also proto.work as above.
+
+[comment]: <> (TODO MC Make example)
+
+`@.**{1,4}`, `@.**{,4}`, `@.**{2}`, `@.**{0,2}`- optionally depth level range can be specified. The depth level 
+is specified relative from the element being accessed (**current** in those examples).
+- if minimal depth level value is omitted, `1` is assumed.
+- if maximal depth level is omitted, descend operator will be unbound from the top, i.e. will continue for all descendants.
+- if minimal depth level value is `0`, the result will also include accessed element itself.
+
+# Parent access operator `^`
+
+`@^` - this yields parent element of the **current** element:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "name": "value",
+  "name1": "value1"
+}"#;
+
+let query = r#"@[0]^.name1"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "value1"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+```
+
+`@.name^` - if **current** element is an object and contains "name" property, this expression will yield 
+**current** element:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "name": "value",
+  "name1": "value1"
+}"#;
+
+let query = r#"@.name^.name1"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "value1"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+```
+
+# Ascendant access recursive operator `^**`
+
+* `@^**` - yields all ascendants of the **current** element, in order of decreasing depth. The last element will 
+  be **root**.
+* `@^**{1,4}`, `@^**{,4}`, `@^**{2}`- optionally recursive distance range can be specified, analogically like 
+  for `**`. The distance is specified relative from the element being accessed.
+
 ## Mathematical operators
 
 Typical mathematical operators and parentheses are supported.
