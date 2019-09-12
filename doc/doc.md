@@ -413,6 +413,8 @@ assert_eq!(res, expected);
 
 ## Property indexing for objects
 
+[comment]: <> (TODO MC Add example for $[0] and @[0][0])
+
 Every object can also be indexed as an array, where index value will correspond with property position within 
 the object. For example if **current** object will be:
 ```json
@@ -438,6 +440,171 @@ let query = r#"@[1]"#;
 let result = r#"{
   "type": "one",
   "data": "Doe"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+# Metadata (attributes)
+
+All elements contain readable metadata (attributes). Those attributes are accessed like regular properties, but with 
+name prefixed with `@` character.
+
+`@.@index` - index of **current** element in its parent (if the parent is an object, this will be the property
+position):
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1"
+}"#;
+
+let query = r#"key1.@index"#;
+
+let result = r#"{
+  "type": "one",
+  "data": 1
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@.@key` - property name of **current** element in its parent (for arrays this will be string value of index):
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0"
+}"#;
+
+let query = r#"@[0].@key"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "key0"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@.@level` - distance from the **root** element for **current** element:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": {
+    "key00": "value00"
+  }
+}"#;
+
+let query = r#"key0.key00.@level"#;
+
+let result = r#"{
+  "type": "one",
+  "data": 2
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@.@kind` - string value of **current** element's kind, either one of `"null"`, `"boolean"`, `"integer"`, `"float"`, `"string"`, 
+`"binary"`, `"object"`, `"array"`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": 0.1
+}"#;
+
+let query = r#"key0.@kind"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "float"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@.@file` - string describing the file or file structure, **current** element was read from (if any), for instance 
+`"file<yaml>:./data.yml"`:
+
+[comment]: <> (TODO MC Add example)
+
+`@.@file_type`- string with file type (if any), either `"file"` or `"dir"`:
+
+[comment]: <> (TODO MC Add example)
+
+`@.@file_format`- string with file format (if any), supported values are: `"json"`, `"yaml"`, `"toml"`, `"text"`, 
+`"binary"`: 
+
+[comment]: <> (TODO MC Add example)
+
+`@.@file_path`- string with file path (if any), for instance `"./data.yml"`:
+
+[comment]: <> (TODO MC Add example)
+
+`@.@file_name`- string with file name (if any), for instance `"data.yml"`:
+
+[comment]: <> (TODO MC Add example)
+
+`@.@file_stem`- string with file stem (if any), for instance `"data"`. For file names starting with `"."`, 
+like `".data.yml"` stem will be `".data"`:
+
+[comment]: <> (TODO MC Add example)
+
+`@.@file_ext`- string with file extension (if any), for instance `"yml"`:
+
+[comment]: <> (TODO MC Add example)
+
+`@.@path` - path to the **current** element from the **root**, for instance `"$.nested.array[3]"`:
+
+[comment]: <> (TODO MC How to show it?)
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": {
+    "key00": "value00"
+  }
+}"#;
+
+let query = r#"$[0][0].@path"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "$.key0.key00"
 }"#;
 
 let expr = Opath::parse(query).unwrap();
