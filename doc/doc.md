@@ -382,6 +382,30 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
+`@[0]` - returns the value of property with index 0 from the **current** element:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "name": "value"
+}"#;
+
+let query = r#"@[0]"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "value"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
 `@.(first_name, last_name)` - one can select a few properties with a single expression using parentheses:
 
 ```
@@ -396,8 +420,8 @@ let model = r#"{
 let query = r#"@.(first_name, last_name)"#;
 
 let result = r#"{
-  "type": "one",
-  "data": "value"
+  "type": "many",
+  "data": ["John", "Doe"]
 }"#;
 
 let expr = Opath::parse(query).unwrap();
@@ -410,8 +434,6 @@ assert_eq!(res, expected);
 `[name]` and `@[name]` - this is illegal!
 
 `"name"` - this is string literal, not property access!
-
-
 
 ## Mathematical operators
 
