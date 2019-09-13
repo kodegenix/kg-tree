@@ -23,7 +23,8 @@ use kg_tree::NodeRef;
 
 let model = r#"{
   "null": null,
-  "number": 1,
+  "integer": 1,
+  "float": 0.1,
   "boolean": true,
   "string": "apple",
   "object": { "key": "value" },
@@ -34,7 +35,8 @@ let model = r#"{
 let node = NodeRef::from_json(model).unwrap();
 assert!(node.is_object());
 assert!(node.get_child_key("null").unwrap().is_null());
-assert!(node.get_child_key("number").unwrap().is_integer());
+assert!(node.get_child_key("integer").unwrap().is_integer());
+assert!(node.get_child_key("float").unwrap().is_float());
 assert!(node.get_child_key("boolean").unwrap().is_boolean());
 assert!(node.get_child_key("string").unwrap().is_string());
 assert!(node.get_child_key("object").unwrap().is_object());
@@ -43,7 +45,7 @@ assert!(node.get_child_key("array").unwrap().is_array());
 
 ## Literals
 
-[comment]: <> (TODO MC Code with example?)
+[comment]: <> (TODO MC Code with example? Delete?)
 
 * `123`, `-2` - 64-bit integer values
 * `1.13`, `.e10`, `-1E-2`, `.3` - 64-bit float values
