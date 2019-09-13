@@ -761,16 +761,104 @@ let query = r#"@.**"#;
 let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
-assert_eq!(5, res.len());
+assert_eq!(res.len(), 5);
 ```
-
-[comment]: <> (TODO MC Make example)
 
 `@.**{1,4}`, `@.**{,4}`, `@.**{2}`, `@.**{0,2}`- optionally depth level range can be specified. The depth level 
 is specified relative from the element being accessed (**current** in those examples).
-- if minimal depth level value is omitted, `1` is assumed.
-- if maximal depth level is omitted, descend operator will be unbound from the top, i.e. will continue for all descendants.
-- if minimal depth level value is `0`, the result will also include accessed element itself.
+
+[comment]: <> (TODO MC Show order of elements in examples below)
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1",
+  "key2": {
+    "key20": "value20",
+    "key21": "value21"
+  }
+}"#;
+
+let query = r#"@.**{2,2}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+assert_eq!(res.len(), 2);
+```
+
+if minimal depth level value is omitted, `1` is assumed:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1",
+  "key2": {
+    "key20": "value20",
+    "key21": "value21"
+  }
+}"#;
+
+let query = r#"@.**{,2}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+assert_eq!(res.len(), 5);
+```
+
+if maximal depth level is omitted, descend operator will be unbound from the top, i.e. will
+continue for all descendants:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1",
+  "key2": {
+    "key20": "value20",
+    "key21": "value21"
+  }
+}"#;
+
+let query = r#"@.**{1}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+assert_eq!(res.len(), 5);
+```
+
+if minimal depth level value is `0`, the result will also include accessed element itself:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1",
+  "key2": {
+    "key20": "value20",
+    "key21": "value21"
+  }
+}"#;
+
+let query = r#"@.**{0,2}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+assert_eq!(res.len(), 6);
+```
 
 # Parent access operator `^`
 
@@ -827,10 +915,101 @@ assert_eq!(res, expected);
 
 # Ascendant access recursive operator `^**`
 
-* `@^**` - yields all ascendants of the **current** element, in order of decreasing depth. The last element will 
-  be **root**.
-* `@^**{1,4}`, `@^**{,4}`, `@^**{2}`- optionally recursive distance range can be specified, analogically like 
-  for `**`. The distance is specified relative from the element being accessed.
+`@^**` - yields all ascendants of the **current** element, in order of decreasing depth. The last element will 
+be **root**:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1",
+  "key2": {
+    "key20": "value20",
+    "key21": "value21"
+  }
+}"#;
+
+let query = r#"key2.key20^**"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+assert_eq!(res.len(), 2);
+```
+
+`@^**{2,2}`, `@^**{,2}`, `@^**{1}`- optionally recursive distance range can be specified, analogically like 
+for `**`. The distance is specified relative from the element being accessed:
+
+`@^**{2,2}`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1",
+  "key2": {
+    "key20": "value20",
+    "key21": "value21"
+  }
+}"#;
+
+let query = r#"key2.key20^**{2,2}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+assert_eq!(res.len(), 1);
+```
+
+`@^**{,2}`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1",
+  "key2": {
+    "key20": "value20",
+    "key21": "value21"
+  }
+}"#;
+
+let query = r#"key2.key20^**{,2}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+assert_eq!(res.len(), 2);
+```
+
+`@^**{1}`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1",
+  "key2": {
+    "key20": "value20",
+    "key21": "value21"
+  }
+}"#;
+
+let query = r#"key2.key20^**{1}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+assert_eq!(res.len(), 2);
+```
 
 ## Mathematical operators
 
