@@ -787,6 +787,14 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 assert_eq!(res.len(), 5);
+let nodes = res.into_vec();
+assert_eq!(nodes[0].as_string(), "value0");
+assert_eq!(nodes[1].as_string(), "value1");
+assert!(nodes[2].is_object());
+assert_eq!(nodes[2].get_child_key("key20").unwrap().as_string(), "value20");
+assert_eq!(nodes[2].get_child_key("key21").unwrap().as_string(), "value21");
+assert_eq!(nodes[3].as_string(), "value20");
+assert_eq!(nodes[4].as_string(), "value21");
 ```
 
 `@.**{1,4}`, `@.**{,4}`, `@.**{2}`, `@.**{0,2}`- optionally depth level range can be specified. The depth level 
@@ -813,6 +821,9 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 assert_eq!(res.len(), 2);
+let nodes = res.into_vec();
+assert_eq!(nodes[0].as_string(), "value20");
+assert_eq!(nodes[1].as_string(), "value21");
 ```
 
 if minimal depth level value is omitted, `1` is assumed:
@@ -836,6 +847,14 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 assert_eq!(res.len(), 5);
+let nodes = res.into_vec();
+assert_eq!(nodes[0].as_string(), "value0");
+assert_eq!(nodes[1].as_string(), "value1");
+assert!(nodes[2].is_object());
+assert_eq!(nodes[2].get_child_key("key20").unwrap().as_string(), "value20");
+assert_eq!(nodes[2].get_child_key("key21").unwrap().as_string(), "value21");
+assert_eq!(nodes[3].as_string(), "value20");
+assert_eq!(nodes[4].as_string(), "value21");
 ```
 
 if maximal depth level is omitted, descend operator will be unbound from the top, i.e. will
@@ -860,6 +879,14 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 assert_eq!(res.len(), 5);
+let nodes = res.into_vec();
+assert_eq!(nodes[0].as_string(), "value0");
+assert_eq!(nodes[1].as_string(), "value1");
+assert!(nodes[2].is_object());
+assert_eq!(nodes[2].get_child_key("key20").unwrap().as_string(), "value20");
+assert_eq!(nodes[2].get_child_key("key21").unwrap().as_string(), "value21");
+assert_eq!(nodes[3].as_string(), "value20");
+assert_eq!(nodes[4].as_string(), "value21");
 ```
 
 if minimal depth level value is `0`, the result will also include accessed element itself:
@@ -883,6 +910,18 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 assert_eq!(res.len(), 6);
+let nodes = res.into_vec();
+assert!(nodes[0].is_object());
+assert_eq!(nodes[0].get_child_key("key0").unwrap().as_string(), "value0");
+assert_eq!(nodes[0].get_child_key("key1").unwrap().as_string(), "value1");
+assert!(nodes[0].get_child_key("key2").unwrap().is_object());
+assert_eq!(nodes[1].as_string(), "value0");
+assert_eq!(nodes[2].as_string(), "value1");
+assert!(nodes[3].is_object());
+assert_eq!(nodes[3].get_child_key("key20").unwrap().as_string(), "value20");
+assert_eq!(nodes[3].get_child_key("key21").unwrap().as_string(), "value21");
+assert_eq!(nodes[4].as_string(), "value20");
+assert_eq!(nodes[5].as_string(), "value21");
 ```
 
 # Parent access operator `^`
@@ -962,6 +1001,13 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 assert_eq!(res.len(), 2);
+let nodes = res.into_vec();
+assert!(nodes[0].is_object());
+assert_eq!(nodes[0].get_child_key("key20").unwrap().as_string(), "value20");
+assert_eq!(nodes[0].get_child_key("key21").unwrap().as_string(), "value21");
+assert!(nodes[1].is_object());
+assert_eq!(nodes[1].get_child_key("key0").unwrap().as_string(), "value0");
+assert_eq!(nodes[1].get_child_key("key1").unwrap().as_string(), "value1");
 ```
 
 `@^**{2,2}`, `@^**{,2}`, `@^**{1}`- optionally recursive distance range can be specified, analogically like 

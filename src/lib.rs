@@ -7,22 +7,28 @@
 //!use kg_tree::NodeRef;
 //!
 //!let model = r#"{
-//!  "integer": 1
+//!  "key0": "value0",
+//!  "key1": "value1",
+//!  "key2": {
+//!    "key20": "value20",
+//!    "key21": "value21"
+//!  }
 //!}"#;
 //!
-//!let query = r#"integer + 1.1"#;
-//!
-//!let result = r#"{
-//!  "type": "one",
-//!  "data": 2.1
-//!}"#;
+//!let query = r#"@.**"#;
 //!
 //!let expr = Opath::parse(query).unwrap();
 //!let node = NodeRef::from_json(model).unwrap();
 //!let res = expr.apply(&node, &node).unwrap();
-//!let expected = NodeSet::from_json(result).unwrap();
-//!assert_eq!(res, expected);
-//!assert!(expected.into_one().unwrap().is_float());
+//!assert_eq!(res.len(), 5);
+//!let nodes = res.into_vec();
+//!assert_eq!(nodes[0].as_string(), "value0");
+//!assert_eq!(nodes[1].as_string(), "value1");
+//!assert!(nodes[2].is_object());
+//!assert_eq!(nodes[2].get_child_key("key20").unwrap().as_string(), "value20");
+//!assert_eq!(nodes[2].get_child_key("key21").unwrap().as_string(), "value21");
+//!assert_eq!(nodes[3].as_string(), "value20");
+//!assert_eq!(nodes[4].as_string(), "value21");
 //!```
 
 #[macro_use]
