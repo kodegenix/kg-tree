@@ -59,6 +59,29 @@ assert!(node.get_child_key("array").unwrap().is_array());
 
 Same as ECMAScript, integers promoted to floats when mixed operands (do rozwiniecia)
 
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "integer": 1
+}"#;
+
+let query = r#"integer + 1.1"#;
+
+let result = r#"{
+  "type": "one",
+  "data": 2.1
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+assert!(expected.into_one().unwrap().is_float());
+```
+
 ## Context
 
 [comment]: <> (TODO MC Better code with example?)

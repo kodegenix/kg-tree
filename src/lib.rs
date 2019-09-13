@@ -7,22 +7,22 @@
 //!use kg_tree::NodeRef;
 //!
 //!let model = r#"{
-//!  "key0": "value0",
-//!  "key1": "value1",
-//!  "key2": {
-//!    "key20": "value20",
-//!    "key21": "value21"
-//!  }
+//!  "integer": 1
 //!}"#;
 //!
-//!let query = r#"@.**"#;
+//!let query = r#"integer + 1.1"#;
 //!
+//!let result = r#"{
+//!  "type": "one",
+//!  "data": 2.1
+//!}"#;
 //!
 //!let expr = Opath::parse(query).unwrap();
 //!let node = NodeRef::from_json(model).unwrap();
 //!let res = expr.apply(&node, &node).unwrap();
-//!
-//!assert_eq!(5, res.len());
+//!let expected = NodeSet::from_json(result).unwrap();
+//!assert_eq!(res, expected);
+//!assert!(expected.into_one().unwrap().is_float());
 //!```
 
 #[macro_use]
