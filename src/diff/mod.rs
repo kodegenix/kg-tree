@@ -274,26 +274,23 @@ impl NodeChange {
     pub fn new_path(&self) -> Option<&Opath> {
         self.new_path.as_ref()
     }
-
-    pub fn path(&self) -> &Opath {
-        if let Some(ref p) = self.old_path {
-            return p;
-        }
-        if let Some(ref p) = self.new_path {
-            return p;
-        }
-        unreachable!();
-    }
 }
 
 impl std::fmt::Display for NodeChange {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.kind {
-            ChangeKind::Added => write!(f, "{}: {}", self.new_path.as_ref().unwrap(), self.kind),
-            ChangeKind::Removed => write!(f, "{}: {}", self.old_path.as_ref().unwrap(), self.kind),
-            ChangeKind::Updated => write!(f, "{}: {}", self.new_path.as_ref().unwrap(), self.kind),
-            ChangeKind::Moved => write!(f, "{} -> {}: {}", self.old_path.as_ref().unwrap(), self.new_path.as_ref().unwrap(), self.kind),
+        write!(f, "{}: ", self.kind)?;
+        if self.old_path.is_some() {
+            write!(f, "{}", self.old_path().unwrap())?;
+        } else {
+            write!(f, ".")?;
         }
+        write!(f, " => ")?;
+        if self.new_path.is_some() {
+            write!(f, "{}", self.new_path().unwrap())?;
+        } else {
+            write!(f, ".")?;
+        }
+        Ok(())
     }
 }
 
@@ -305,20 +302,6 @@ impl PartialEq for NodeChange {
 
 impl Eq for NodeChange {}
 
-impl PartialOrd for NodeChange {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for NodeChange {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match self.path().to_string().cmp(&other.path().to_string()) {
-            Ordering::Equal => self.kind.cmp(&other.kind),
-            o => o,
-        }
-    }
-}
 
 fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<NodeChange>, cache: &mut dyn OpathCache) {
     if !a.is_ref_eq(b) {
@@ -415,58 +398,20 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<NodeChange>, cache: &mu
                     }
                 }
             }
-            (&Value::Object(ref propsa), _) => {
+            (&Value::Array(_), _) | (&Value::Object(_), _) | (_, &Value::Array(_)) | (_, &Value::Object(_)) => {
                 changes.push(NodeChange::new(
-                    ChangeKind::Updated,
+                    ChangeKind::Removed,
+                    Some(cache.get(a).clone()),
+                    None));
+                changes.push(NodeChange::new(
+                    ChangeKind::Added,
                     None,
                     Some(cache.get(b).clone())));
-                for e in propsa.values() {
-                    changes.push(NodeChange::new(
-                        ChangeKind::Removed,
-                        Some(cache.get(e).clone()),
-                        None));
-                }
-            }
-            (_, &Value::Object(ref propsb)) => {
-                changes.push(NodeChange::new(
-                    ChangeKind::Updated,
-                    None,
-                    Some(cache.get(b).clone())));
-                for e in propsb.values() {
-                    changes.push(NodeChange::new(
-                        ChangeKind::Added,
-                        None,
-                        Some(cache.get(e).clone())));
-                }
-            }
-            (&Value::Array(ref elemsa), _) => {
-                changes.push(NodeChange::new(
-                    ChangeKind::Updated,
-                    None,
-                    Some(cache.get(b).clone())));
-                for e in elemsa.iter() {
-                    changes.push(NodeChange::new(
-                        ChangeKind::Removed,
-                        Some(cache.get(e).clone()),
-                        None));
-                }
-            }
-            (_, &Value::Array(ref elemsb)) => {
-                changes.push(NodeChange::new(
-                    ChangeKind::Updated,
-                    None,
-                    Some(cache.get(b).clone())));
-                for e in elemsb.iter() {
-                    changes.push(NodeChange::new(
-                        ChangeKind::Added,
-                        None,
-                        Some(cache.get(e).clone())));
-                }
             }
             (_, _) => {
                 changes.push(NodeChange::new(
                     ChangeKind::Updated,
-                    None,
+                    Some(cache.get(a).clone()),
                     Some(cache.get(b).clone())));
             }
         }
@@ -510,13 +455,48 @@ impl Ord for Move {
     }
 }
 
-fn diff(a: &NodeRef, b: &NodeRef, opts: &NodeDiffOptions, cache: &mut dyn OpathCache) -> Vec<NodeChange> {
+fn diff(a: &NodeRef, b: &NodeRef, opts: &NodeDiffOptions, cache: &mut dyn OpathCache, out: &mut Vec<NodeChange>) {
     use std::collections::BinaryHeap;
 
-    debug_assert_eq!(a.path(), b.path());
+    fn resolve(node: &NodeRef, path: &Opath) -> NodeRef {
+        let n = node.root();
+        path.apply_one(&n, &n).unwrap()
+    }
+
+    fn add_change(c: NodeChange, a: &NodeRef, b: &NodeRef, cache: &mut dyn OpathCache, out: &mut Vec<NodeChange>) {
+        match c.kind {
+            ChangeKind::Removed => {
+                let a = resolve(a, c.old_path().unwrap());
+                out.push(c);
+                a.visit_recursive(|_r, _p, n| {
+                    if !a.is_ref_eq(n) {
+                        out.push(NodeChange::new(ChangeKind::Removed, Some(cache.get(n).clone()), None));
+                    }
+                    return true;
+                });
+            }
+            ChangeKind::Added => {
+                let b = resolve(b, c.new_path().unwrap());
+                out.push(c);
+                b.visit_recursive(|_r, _p, n| {
+                    if !b.is_ref_eq(n) {
+                        out.push(NodeChange::new(ChangeKind::Added, None, Some(cache.get(n).clone())));
+                    }
+                    return true;
+                });
+            }
+            _ => {
+                out.push(c);
+            }
+        }
+    }
 
     let mut changes = Vec::new();
     diff_node(a, b, &mut changes, cache);
+
+    if changes.is_empty() {
+        return;
+    }
 
     if opts.detect_move() {
         let mut adds = 0;
@@ -534,9 +514,9 @@ fn diff(a: &NodeRef, b: &NodeRef, opts: &NodeDiffOptions, cache: &mut dyn OpathC
 
             let mut moves = BinaryHeap::with_capacity(adds * dels);
             for add in changes.iter().enumerate().filter(|c| c.1.kind == ChangeKind::Added) {
-                let b = add.1.new_path().unwrap().apply_one(b, b).unwrap();
+                let b = resolve(b, add.1.new_path().unwrap());
                 for del in changes.iter().enumerate().filter(|c| c.1.kind == ChangeKind::Removed) {
-                    let a = del.1.old_path().unwrap().apply_one(a, a).unwrap();
+                    let a = resolve(a, del.1.old_path().unwrap());
                     let d = distance(&a, &b, opts.min_count());
                     if d <= max_distance {
                         moves.push(Move {
@@ -560,22 +540,28 @@ fn diff(a: &NodeRef, b: &NodeRef, opts: &NodeDiffOptions, cache: &mut dyn OpathC
                 }
             }
 
-            let old_changes = changes;
-            changes = Vec::with_capacity(old_changes.len());
-
-            for (i, c) in old_changes.into_iter().enumerate() {
+            for (i, c) in changes.into_iter().enumerate() {
                 if idx[i] {
                     if c.kind == ChangeKind::Moved {
-                        changes.push(c);
+                        let na = resolve(a, c.old_path().unwrap());
+                        let nb = resolve(b, c.new_path().unwrap());
+                        if !na.is_ref_eq(a) || !nb.is_ref_eq(b) {
+                            out.push(c);
+                            diff(&na, &nb, opts, cache, out);
+                        }
                     }
                 } else {
-                    changes.push(c);
+                    add_change(c, a, b, cache, out);
                 }
             }
+
+            return;
         }
     }
 
-    changes
+    for c in changes {
+        add_change(c, a, b, cache, out);
+    }
 }
 
 /// Struct representing logical model changes. Operates on in-memory model representation.
@@ -585,77 +571,16 @@ pub struct NodeDiff {
 }
 
 impl NodeDiff {
-    pub fn minimal(a: &NodeRef, b: &NodeRef, opts: &NodeDiffOptions) -> NodeDiff {
+    pub fn diff(a: &NodeRef, b: &NodeRef, opts: &NodeDiffOptions) -> NodeDiff {
         let mut cache = NodePathCache::new();
-        NodeDiff::minimal_cache(a, b, opts, &mut cache)
+        NodeDiff::diff_cache(a, b, opts, &mut cache)
     }
 
-    pub fn minimal_cache(a: &NodeRef, b: &NodeRef, opts: &NodeDiffOptions, cache: &mut dyn OpathCache) -> NodeDiff {
-        let changes = diff(a, b, opts, cache);
+    pub fn diff_cache(a: &NodeRef, b: &NodeRef, opts: &NodeDiffOptions, cache: &mut dyn OpathCache) -> NodeDiff {
+        let mut changes = Vec::new();
+        diff(a, b, opts, cache, &mut changes);
+        changes.shrink_to_fit();
         NodeDiff { changes }
-    }
-
-    pub fn full(a: &NodeRef, b: &NodeRef, opts: &NodeDiffOptions) -> NodeDiff {
-        let mut cache = NodePathCache::new();
-        NodeDiff::full_cache(a, b, opts, &mut cache)
-    }
-
-    pub fn full_cache(a: &NodeRef, b: &NodeRef, opts: &NodeDiffOptions, cache: &mut dyn OpathCache) -> NodeDiff {
-        let changes = diff(a, b, opts, cache);
-
-        let mut res = Vec::with_capacity(2 * changes.len());
-
-        for c in changes {
-            let mut ppath = match c.kind {
-                ChangeKind::Added => c.new_path().unwrap().parent_path().unwrap(),
-                ChangeKind::Removed => c.old_path().unwrap().parent_path().unwrap(),
-                ChangeKind::Updated => c.new_path().unwrap().parent_path().unwrap(),
-                ChangeKind::Moved => c.old_path().unwrap().parent_path().unwrap(),
-            };
-            let i = res.len();
-            loop {
-                let pb = ppath.apply_one(b, b).unwrap();
-                if !cache.contains(&pb) {
-                    let p = cache.get(&pb);
-                    res.insert(
-                        i,
-                        NodeChange::new(ChangeKind::Updated, None, Some(p.clone())),
-                    );
-                } else {
-                    break;
-                }
-
-                if let Some(p) = ppath.parent_path() {
-                    ppath = p;
-                } else {
-                    break;
-                }
-            }
-            res.push(c.clone());
-            match c.kind {
-                ChangeKind::Removed => {
-                    let a = c.old_path().unwrap().apply_one(a, a).unwrap();
-                    a.visit_recursive(|_r, _p, n| {
-                        if !a.is_ref_eq(n) {
-                            res.push(NodeChange::new(ChangeKind::Removed, Some(cache.get(n).clone()), None));
-                        }
-                        return true;
-                    });
-                }
-                ChangeKind::Added => {
-                    let b = c.new_path().unwrap().apply_one(b, b).unwrap();
-                    b.visit_recursive(|_r, _p, n| {
-                        if !b.is_ref_eq(n) {
-                            res.push(NodeChange::new(ChangeKind::Added, None, Some(cache.get(n).clone())));
-                        }
-                        return true;
-                    });
-                }
-                _ => {}
-            }
-        }
-
-        NodeDiff { changes: res }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -771,32 +696,32 @@ mod tests {
         let b = NodeRef::from_json(jsonb).unwrap();
 
         let opts = NodeDiffOptions::default();
-        let d = NodeDiff::minimal(&a, &b, &opts);
+        let d = NodeDiff::diff(&a, &b, &opts);
 
         assert_eq!(d.changes().len(), 8);
 
-        assert_eq!(d.changes()[0].path().to_string(), "$.pa");
+        assert_eq!(d.changes()[0].old_path().unwrap().to_string(), "$.pa");
         assert_eq!(d.changes()[0].kind(), ChangeKind::Removed);
 
-        assert_eq!(d.changes()[1].path().to_string(), "$.star");
+        assert_eq!(d.changes()[1].old_path().unwrap().to_string(), "$.star");
         assert_eq!(d.changes()[1].kind(), ChangeKind::Updated);
 
-        assert_eq!(d.changes()[2].path().to_string(), "$.pb");
+        assert_eq!(d.changes()[2].new_path().unwrap().to_string(), "$.pb");
         assert_eq!(d.changes()[2].kind(), ChangeKind::Added);
 
-        assert_eq!(d.changes()[3].path().to_string(), "$.p1.aa.dd[0]");
+        assert_eq!(d.changes()[3].new_path().unwrap().to_string(), "$.p1.aa.dd[0]");
         assert_eq!(d.changes()[3].kind(), ChangeKind::Updated);
 
-        assert_eq!(d.changes()[4].path().to_string(), "$.p1.aa.dd[1]");
+        assert_eq!(d.changes()[4].new_path().unwrap().to_string(), "$.p1.aa.dd[1]");
         assert_eq!(d.changes()[4].kind(), ChangeKind::Updated);
 
-        assert_eq!(d.changes()[5].path().to_string(), "$.p1.aa.dd[4]");
+        assert_eq!(d.changes()[5].old_path().unwrap().to_string(), "$.p1.aa.dd[4]");
         assert_eq!(d.changes()[5].kind(), ChangeKind::Removed);
 
-        assert_eq!(d.changes()[6].path().to_string(), "$.p1.aa.cc");
+        assert_eq!(d.changes()[6].new_path().unwrap().to_string(), "$.p1.aa.cc");
         assert_eq!(d.changes()[6].kind(), ChangeKind::Updated);
 
-        assert_eq!(d.changes()[7].path().to_string(), "$.p1.aa.cc.prop");
+        assert_eq!(d.changes()[7].new_path().unwrap().to_string(), "$.p1.aa.cc.prop");
         assert_eq!(d.changes()[7].kind(), ChangeKind::Added);
     }
 
@@ -831,7 +756,7 @@ mod tests {
         let b = NodeRef::from_json(jsonb).unwrap();
 
         let opts = NodeDiffOptions::default();
-        let d = NodeDiff::full(&a, &b, &opts);
+        let d = NodeDiff::diff(&a, &b, &opts);
 
         assert_eq!(d.changes().len(), 14);
     }
@@ -841,23 +766,24 @@ mod tests {
         let jsona = r#"
         {
             "star": "*",
-            "pb": { "aa": "test2", "b": false }
+            "pb": { "aa": "test2", "b": false },
+            "aaa": [11, {"aa": 1}]
         }"#;
         let jsonb = r#"
         {
             "star": "*",
-            "pc": { "aa": "test2", "b": false }
+            "aaa": [12, 11],
+            "bb": 12,
+            "pc": { "aa": "test2", "b": false, "dd":[12,11] }
         }"#;
 
         let a = NodeRef::from_json(jsona).unwrap();
         let b = NodeRef::from_json(jsonb).unwrap();
 
-        let mut cache = NodePathCache::new();
-        let opts = NodeDiffOptions::new(true, Some(1), Some(0.1));
+        let opts = NodeDiffOptions::new(true, Some(1), Some(0.5));
+        let d = NodeDiff::diff(&a, &b, &opts);
 
-        let d = diff(&a, &b, &opts, &mut cache);
+        println!("{}", &d);
 
-        assert_eq!(d.len(), 1);
-        assert_eq!(d[0].kind, ChangeKind::Moved);
     }
 }

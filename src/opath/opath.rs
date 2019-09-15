@@ -159,7 +159,7 @@ impl Opath {
             .expr
             .apply(Env::new(root, current, None), Context::Expr)?;
         let res = match res {
-            NodeSet::Empty => NodeRef::null(),
+            NodeSet::Empty => unimplemented!(),
             NodeSet::One(a) => a,
             NodeSet::Many(_) => unimplemented!(),
         };

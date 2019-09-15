@@ -340,6 +340,37 @@ impl NodeRef {
         self.data().is_parent()
     }
 
+    pub fn root(&self) -> NodeRef {
+        let mut r = self.clone();
+        loop {
+            let p = r.data().parent();
+            if let Some(p) = p {
+                r = p;
+            } else {
+                break;
+            }
+        }
+        r
+    }
+
+    pub fn is_ancestor(&self, other: &NodeRef) -> bool {
+        if self.is_parent() {
+            let mut r = other.clone();
+            loop {
+                let p = r.data().parent();
+                if let Some(p) = p {
+                    if self.is_ref_eq(&p) {
+                        return true;
+                    }
+                    r = p;
+                } else {
+                    break;
+                }
+            }
+        }
+        false
+    }
+
     pub fn get_child_index(&self, index: usize) -> Option<NodeRef> {
         match *self.data().value() {
             Value::Array(ref elems) => elems.get(index).cloned(),
