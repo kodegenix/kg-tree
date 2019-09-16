@@ -62,6 +62,7 @@ impl KindMask {
     pub fn null() -> KindMask {
         Self::none().with(Kind::Null)
     }
+
     pub fn boolean() -> KindMask {
         Self::none().with(Kind::Boolean)
     }

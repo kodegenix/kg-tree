@@ -594,6 +594,14 @@ impl NodeDiff {
     pub fn to_json(&self) -> String {
         serde_json::to_string(self).expect("Diff should be always serializable")
     }
+
+    pub fn find_old(n: &NodeRef, old_root: &NodeRef, new_root: &NodeRef) -> Option<NodeRef> {
+        unimplemented!(); //FIXME (jc)
+    }
+
+    pub fn find_new(n: &NodeRef, old_root: &NodeRef, new_root: &NodeRef) -> Option<NodeRef> {
+        unimplemented!(); //FIXME (jc)
+    }
 }
 
 impl std::fmt::Display for NodeDiff {

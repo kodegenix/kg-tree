@@ -1,4 +1,6 @@
 use super::*;
+use self::expr::*;
+use crate::diff::*;
 
 pub use self::cache::{NodePathCache, NodePathLruCache, OpathCache};
 pub use self::expr::func::{
@@ -6,7 +8,6 @@ pub use self::expr::func::{
     MethodId,
 };
 pub use self::expr::parse::{Error as OpathParseError, Parser};
-use self::expr::*;
 pub use self::expr::{
     Env, ExprErrorDetail, ExprResult, FuncCallErrorDetail, NodeBuf, NodeSet, Scope, ScopeMut,
 };

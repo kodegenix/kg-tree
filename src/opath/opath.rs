@@ -136,32 +136,36 @@ impl Opath {
         ))))
     }
 
-    pub fn apply(&self, root: &NodeRef, current: &NodeRef) -> ExprResult<NodeSet> {
-        let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
-        self.expr
-            .apply(Env::new(root, current, None), Context::Expr)
+    fn apply_env(&self, env: Env) -> ExprResult<NodeSet> {
+        let _r = env.root().clone(); //(jc) additional reference to mark root as non-consumable
+        self.expr.apply(env, Context::Expr)
     }
 
-    pub fn apply_ext(
+    pub fn apply(&self, root: &NodeRef, current: &NodeRef) -> ExprResult<NodeSet> {
+        self.apply_env(Env::new(root, current, None))
+    }
+
+    pub fn apply_ext(&self, root: &NodeRef, current: &NodeRef, scope: &Scope) -> ExprResult<NodeSet> {
+        self.apply_env(Env::new(root, current, Some(scope)))
+    }
+
+    pub fn apply_ext_diff(
         &self,
         root: &NodeRef,
         current: &NodeRef,
         scope: &Scope,
+        old_root: &NodeRef,
+        diff: &NodeDiff,
     ) -> ExprResult<NodeSet> {
-        let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
-        self.expr
-            .apply(Env::new(root, current, Some(scope)), Context::Expr)
+        self.apply_env(Env::new(root, current, Some(scope)).with_diff(old_root, diff))
     }
 
     pub fn apply_one(&self, root: &NodeRef, current: &NodeRef) -> ExprResult<NodeRef> {
-        let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
-        let res = self
-            .expr
-            .apply(Env::new(root, current, None), Context::Expr)?;
-        let res = match res {
-            NodeSet::Empty => unimplemented!(),
+        let ns = self.apply_env(Env::new(root, current, None))?;
+        let res = match ns {
+            NodeSet::Empty => unimplemented!(), //FIXME (jc) report error here
             NodeSet::One(a) => a,
-            NodeSet::Many(_) => unimplemented!(),
+            NodeSet::Many(_) => unimplemented!(), //FIXME (jc) report error here
         };
         Ok(res)
     }
@@ -172,14 +176,11 @@ impl Opath {
         current: &NodeRef,
         scope: &Scope,
     ) -> ExprResult<NodeRef> {
-        let _r = root.clone(); //(jc) additional reference to mark root as non-consumable
-        let res = self
-            .expr
-            .apply(Env::new(root, current, Some(scope)), Context::Expr)?;
-        let res = match res {
-            NodeSet::Empty => NodeRef::null(),
+        let ns = self.apply_env(Env::new(root, current, Some(scope)))?;
+        let res = match ns {
+            NodeSet::Empty => unimplemented!(), //FIXME (jc)
             NodeSet::One(a) => a,
-            NodeSet::Many(_) => unimplemented!(),
+            NodeSet::Many(_) => unimplemented!(), //FIXME (jc)
         };
         Ok(res)
     }
@@ -238,11 +239,7 @@ impl Default for Opath {
 
 impl std::fmt::Display for Opath {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if f.alternate() {
-            write!(f, "{:#}", self.expr)
-        } else {
-            write!(f, "{}", self.expr)
-        }
+        std::fmt::Display::fmt(&self.expr, f)
     }
 }
 

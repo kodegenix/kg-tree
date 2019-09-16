@@ -125,6 +125,8 @@ pub enum FuncId {
     Sqrt,
     Json,
     Stringify,
+    New,
+    Old,
     Custom(String),
 }
 
@@ -142,6 +144,8 @@ impl FuncId {
             "sqrt" => FuncId::Sqrt,
             "json" => FuncId::Json,
             "stringify" => FuncId::Stringify,
+            "new" => FuncId::New,
+            "old" => FuncId::Old,
             _ => FuncId::Custom(f.to_string()),
         }
     }
@@ -159,6 +163,8 @@ impl FuncId {
             FuncId::Sqrt => "sqrt",
             FuncId::Json => "json",
             FuncId::Stringify => "stringify",
+            FuncId::New => "new",
+            FuncId::Old => "old",
             FuncId::Custom(ref s) => s,
         }
     }
@@ -791,6 +797,12 @@ pub(super) fn apply_func_to(
                 out.add(NodeRef::float(n.as_float().sqrt()));
             }
             Ok(())
+        }
+        FuncId::New => {
+            unimplemented!(); //FIXME (jc)
+        }
+        FuncId::Old => {
+            unimplemented!(); //FIXME (jc)
         }
         FuncId::Custom(ref name) => {
             if let Some(e) = env.scope() {

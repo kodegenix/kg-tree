@@ -339,11 +339,36 @@ impl FuncCall {
     }
 }
 
+
+#[derive(Debug, Clone, Copy)]
+pub struct DiffEnv<'a> {
+    old_root: &'a NodeRef,
+    diff: &'a NodeDiff,
+}
+
+impl<'a> DiffEnv<'a> {
+    pub fn new(old_root: &'a NodeRef, diff: &'a NodeDiff) -> DiffEnv<'a> {
+        DiffEnv {
+            old_root,
+            diff,
+        }
+    }
+
+    pub fn old_root(&self) -> &NodeRef {
+        self.old_root
+    }
+
+    pub fn diff(&self) -> &NodeDiff {
+        self.diff
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Env<'a> {
     current: &'a NodeRef,
     root: &'a NodeRef,
     scope: Option<&'a Scope>,
+    diff: Option<DiffEnv<'a>>,
 }
 
 impl<'a> Env<'a> {
@@ -352,6 +377,7 @@ impl<'a> Env<'a> {
             current,
             root,
             scope,
+            diff: None,
         }
     }
 
@@ -363,8 +389,12 @@ impl<'a> Env<'a> {
         Env { root, ..*self }
     }
 
-    pub fn with_ext(&'a self, scope: Option<&'a Scope>) -> Env<'a> {
+    pub fn with_scope(&'a self, scope: Option<&'a Scope>) -> Env<'a> {
         Env { scope, ..*self }
+    }
+
+    pub fn with_diff(&'a self, old_root: &'a NodeRef, diff: &'a NodeDiff) -> Env<'a> {
+        Env { diff: Some(DiffEnv::new(old_root, diff)), ..*self }
     }
 
     pub fn current(&self) -> &NodeRef {
@@ -377,6 +407,10 @@ impl<'a> Env<'a> {
 
     pub fn scope(&self) -> Option<&Scope> {
         self.scope
+    }
+
+    pub fn diff(&self) -> Option<DiffEnv> {
+        self.diff
     }
 }
 
@@ -1721,6 +1755,15 @@ impl Hash for Expr {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod env {
+        use super::*;
+
+        #[test]
+        fn size_of_should_be_40() {
+            assert_eq!(std::mem::size_of::<Env>(), 40);
+        }
+    }
 
     mod expr {
         use super::*;
