@@ -55,7 +55,7 @@ assert!(node.get_child_key("array").unwrap().is_array());
 
 ## Type conversions
 
-[comment]: <> (TODO MC Code with example?)
+[comment]: <> (TODO MC More code with example?)
 
 Same as ECMAScript, integers promoted to floats when mixed operands (do rozwiniecia)
 
@@ -763,10 +763,8 @@ assert_eq!(res, expected);
 
 # Property / element access recursive descent operator `**`
 
-* `@.**`, `@[**]`, `@."**"`, `@['**']` - yields all properties of the **current** object, and recursively all of their properties in 
-  depth-first descending order.
-
-[comment]: <> (TODO MC Make proper example)
+`@.**`, `@[**]`, `@."**"`, `@['**']` - yields all properties of the **current** object, and recursively all of their properties in 
+depth-first descending order:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -798,9 +796,7 @@ assert_eq!(nodes[4].as_string(), "value21");
 ```
 
 `@.**{1,4}`, `@.**{,4}`, `@.**{2}`, `@.**{0,2}`- optionally depth level range can be specified. The depth level 
-is specified relative from the element being accessed (**current** in those examples).
-
-[comment]: <> (TODO MC Show order of elements in examples below)
+is specified relative from the element being accessed (**current** in those examples):
 
 ```
 use kg_tree::opath::{Opath, NodeSet};

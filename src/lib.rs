@@ -15,7 +15,7 @@
 //!  }
 //!}"#;
 //!
-//!let query = r#"@.**"#;
+//!let query = r#"@*[@.@key == 'key1']"#;
 //!
 //!let expr = Opath::parse(query).unwrap();
 //!let node = NodeRef::from_json(model).unwrap();
