@@ -1034,6 +1034,10 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 assert_eq!(res.len(), 1);
+let nodes = res.into_vec();
+assert!(nodes[0].is_object());
+assert_eq!(nodes[0].get_child_key("key0").unwrap().as_string(), "value0");
+assert_eq!(nodes[0].get_child_key("key1").unwrap().as_string(), "value1");
 ```
 
 `@^**{,2}`:
@@ -1057,6 +1061,13 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 assert_eq!(res.len(), 2);
+let nodes = res.into_vec();
+assert!(nodes[0].is_object());
+assert_eq!(nodes[0].get_child_key("key20").unwrap().as_string(), "value20");
+assert_eq!(nodes[0].get_child_key("key21").unwrap().as_string(), "value21");
+assert!(nodes[1].is_object());
+assert_eq!(nodes[1].get_child_key("key0").unwrap().as_string(), "value0");
+assert_eq!(nodes[1].get_child_key("key1").unwrap().as_string(), "value1");
 ```
 
 `@^**{1}`:
@@ -1080,6 +1091,13 @@ let expr = Opath::parse(query).unwrap();
 let node = NodeRef::from_json(model).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 assert_eq!(res.len(), 2);
+let nodes = res.into_vec();
+assert!(nodes[0].is_object());
+assert_eq!(nodes[0].get_child_key("key20").unwrap().as_string(), "value20");
+assert_eq!(nodes[0].get_child_key("key21").unwrap().as_string(), "value21");
+assert!(nodes[1].is_object());
+assert_eq!(nodes[1].get_child_key("key0").unwrap().as_string(), "value0");
+assert_eq!(nodes[1].get_child_key("key1").unwrap().as_string(), "value1");
 ```
 
 ## Mathematical operators
