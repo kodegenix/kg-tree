@@ -2,35 +2,6 @@
 
 #![doc(include = "../doc/doc.md")]
 
-//!```rust
-//!use kg_tree::opath::{Opath, NodeSet};
-//!use kg_tree::NodeRef;
-//!
-//!let model = r#"{
-//!  "key0": "value0",
-//!  "key1": "value1",
-//!  "key2": {
-//!    "key20": "value20",
-//!    "key21": "value21"
-//!  }
-//!}"#;
-//!
-//!let query = r#"@*[@.@key == 'key1']"#;
-//!
-//!let expr = Opath::parse(query).unwrap();
-//!let node = NodeRef::from_json(model).unwrap();
-//!let res = expr.apply(&node, &node).unwrap();
-//!assert_eq!(res.len(), 5);
-//!let nodes = res.into_vec();
-//!assert_eq!(nodes[0].as_string(), "value0");
-//!assert_eq!(nodes[1].as_string(), "value1");
-//!assert!(nodes[2].is_object());
-//!assert_eq!(nodes[2].get_child_key("key20").unwrap().as_string(), "value20");
-//!assert_eq!(nodes[2].get_child_key("key21").unwrap().as_string(), "value21");
-//!assert_eq!(nodes[3].as_string(), "value20");
-//!assert_eq!(nodes[4].as_string(), "value21");
-//!```
-
 #[macro_use]
 extern crate kg_diag_derive;
 #[macro_use]

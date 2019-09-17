@@ -15,7 +15,7 @@ All data types transferable through `json`, `yaml` and `toml` formats are suppor
 * *object* - object or map, can contain string-keyed properties
 * *array* - array or sequence of elements
 
-[comment]: <> (TODO MC How to do binary data?)
+[comment]: <> (TODO MC Issue "Fix serialization of binary data to json" and add binary data in example below)
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -28,8 +28,7 @@ let model = r#"{
   "boolean": true,
   "string": "apple",
   "object": { "key": "value" },
-  "array": [ 1, 2, 3, 4 ],
-  "binary": "RXhhbXBsZQ=="
+  "array": [ 1, 2, 3, 4 ]
 }"#;
 
 let node = NodeRef::from_json(model).unwrap();
@@ -45,19 +44,98 @@ assert!(node.get_child_key("array").unwrap().is_array());
 
 ## Literals
 
-[comment]: <> (TODO MC Code with example? Delete?)
+`123`, `-2` - 64-bit integer values
 
-* `123`, `-2` - 64-bit integer values
-* `1.13`, `.e10`, `-1E-2`, `.3` - 64-bit float values
-* `'id'`, `"id"` - string values
-* `true`, `false` - boolean values
-* `null` - null value
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let node = NodeRef::null();
+
+let query = r#"array(123, 0, -2)[*]"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let nodes = res.into_vec();
+assert!(nodes[0].is_integer());
+assert!(nodes[1].is_integer());
+assert!(nodes[2].is_integer());
+```
+
+`1.13`, `.e10`, `-1E-2`, `.3` - 64-bit float values
+
+[comment]: <> (TODO MC Examples with dot at the begining don't work)
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let node = NodeRef::null();
+
+let query = r#"array(1.13, -1E-2)[*]"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let nodes = res.into_vec();
+assert!(nodes[0].is_float());
+assert!(nodes[1].is_float());
+```
+
+`'id'`, `"id"` - string values
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let node = NodeRef::null();
+
+let query = r#"array('string', "string")[*]"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let nodes = res.into_vec();
+assert!(nodes[0].is_string());
+assert!(nodes[1].is_string());
+```
+
+`true`, `false` - boolean values
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let node = NodeRef::null();
+
+let query = r#"array(true, false)[*]"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let nodes = res.into_vec();
+assert!(nodes[0].is_boolean());
+assert!(nodes[1].is_boolean());
+```
+
+`null` - null value
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let node = NodeRef::null();
+
+let query = r#"null"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let nodes = res.into_vec();
+assert!(nodes[0].is_null());
+```
 
 ## Type conversions
 
-[comment]: <> (TODO MC More code with example?)
+[comment]: <> (TODO MC More code with examples?)
 
-Same as ECMAScript, integers promoted to floats when mixed operands (do rozwiniecia)
+Same as ECMAScript, integers promoted to floats when mixed operands. (do rozwiniecia)
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -83,8 +161,6 @@ assert!(expected.into_one().unwrap().is_float());
 ```
 
 ## Context
-
-[comment]: <> (TODO MC Better code with example?)
 
 Every `Opath` expression is executed in the context of **root** (denoted `$`) and **current** 
 (denoted `@`) elements. To access any element in the object tree, it's relation to 
@@ -159,6 +235,31 @@ let query = r#"$.foo"#;
 let result = r#"{
   "type": "one",
   "data": "bar"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+In the next example first `@` means **root** element, second `@` means **property** in **root** element:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": "value0",
+  "key1": "value1"
+}"#;
+
+let query = r#"@[@.@key == "key0"]"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "value0"
 }"#;
 
 let expr = Opath::parse(query).unwrap();
@@ -311,8 +412,6 @@ assert_eq!(res, expected);
 
 Accessing array with out-of-bounds index values yields empty result:
 
-[comment]: <> (TODO MC How to present result?)
-
 ```
 use kg_tree::opath::{Opath, NodeSet};
 use kg_tree::NodeRef;
@@ -329,8 +428,6 @@ assert_eq!(res, expected);
 ```
 
 Accessing array element on a non-array and non-object type yields empty result:
-
-[comment]: <> (TODO MC How to present result?)
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -375,7 +472,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-`@["name"]` and `@['name']` and `@."name"` - property names can be quoted, and if so, can contain
+`@["name"]`, `@['name']`, `@."name"` - property names can be quoted, and if so, can contain
 spaces and special characters:
 
 [comment]: <> (TODO MC What with @[name]?)
@@ -471,7 +568,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-`[name]` and `@[name]` - this is illegal!
+`[name]`, `@[name]` - this is illegal!
 
 `"name"` - this is string literal, not property access!
 
@@ -485,7 +582,7 @@ the object. For example if **current** object will be:
    "last_name": "Doe"
 }
 ```
-expression `@[1]` will yield string value `"Doe"` (value of the secod property). Objects have strictly defined 
+expression `@[1]` will yield string value `"Doe"` (value of the second property). Objects have strictly defined 
 and stable insertion order of properties:
 
 ```
@@ -761,7 +858,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-# Property / element access recursive descent operator `**`
+## Property / element access recursive descent operator `**`
 
 `@.**`, `@[**]`, `@."**"`, `@['**']` - yields all properties of the **current** object, and recursively all of their properties in 
 depth-first descending order:
@@ -920,7 +1017,7 @@ assert_eq!(nodes[4].as_string(), "value20");
 assert_eq!(nodes[5].as_string(), "value21");
 ```
 
-# Parent access operator `^`
+## Parent access operator `^`
 
 `@^` - this yields parent element of the **current** element:
 
@@ -973,7 +1070,7 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-# Ascendant access recursive operator `^**`
+## Ascendant access recursive operator `^**`
 
 `@^**` - yields all ascendants of the **current** element, in order of decreasing depth. The last element will 
 be **root**:
