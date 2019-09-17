@@ -296,9 +296,9 @@ impl Parser {
             1 => match expr.pop().unwrap() {
                 Expr::String(s) => Interpolation::Simple(s),
                 Expr::StringEnc(s) => Interpolation::Simple(s),
-                e @ _ => Interpolation::Expr(Opath::new(e)),
+                e @ _ => Interpolation::Expr(Opath::new(e, self.expr_parser.path_flag())),
             },
-            _ => Interpolation::Expr(Opath::new(Expr::Concat(expr))),
+            _ => Interpolation::Expr(Opath::new(Expr::Concat(expr), false)),
         })
     }
 

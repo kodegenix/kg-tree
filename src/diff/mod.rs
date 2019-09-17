@@ -595,12 +595,28 @@ impl NodeDiff {
         serde_json::to_string(self).expect("Diff should be always serializable")
     }
 
-    pub fn find_old(n: &NodeRef, old_root: &NodeRef, new_root: &NodeRef) -> Option<NodeRef> {
-        unimplemented!(); //FIXME (jc)
+    pub fn find_old(&self, n: &NodeRef, old_root: &NodeRef, new_root: &NodeRef) -> Option<NodeRef> {
+        if !n.root().is_ref_eq(new_root) {
+            None
+        } else {
+            let path = n.path();
+            for c in self.changes.iter().rev() {
+                if let Some(ref p) = c.new_path {
+                    if p.is_ancestor_path(&path) == Some(true) {
+
+                    }
+                }
+            }
+            None
+        }
     }
 
-    pub fn find_new(n: &NodeRef, old_root: &NodeRef, new_root: &NodeRef) -> Option<NodeRef> {
-        unimplemented!(); //FIXME (jc)
+    pub fn find_new(&self, n: &NodeRef, old_root: &NodeRef, new_root: &NodeRef) -> Option<NodeRef> {
+        if !n.root().is_ref_eq(old_root) {
+            None
+        } else {
+            None
+        }
     }
 }
 

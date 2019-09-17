@@ -7,6 +7,7 @@ use super::*;
 #[derive(Debug)]
 pub struct Opath {
     expr: Expr,
+    path: bool,
 }
 
 fn expr_string<S: AsRef<str>>(value: S) -> Expr {
@@ -29,8 +30,8 @@ fn expr_string<S: AsRef<str>>(value: S) -> Expr {
 }
 
 impl Opath {
-    pub(super) fn new(e: Expr) -> Opath {
-        Opath { expr: e }
+    pub(super) fn new(expr: Expr, path: bool) -> Opath {
+        Opath { expr, path }
     }
 
     pub(super) fn expr(&self) -> &Expr {
@@ -77,11 +78,11 @@ impl Opath {
                 }
                 n = p;
             } else {
-                return Opath::new(Expr::Sequence(Vec::new()));
+                return Opath::new(Expr::Sequence(Vec::new()), true);
             }
         }
         seq.reverse();
-        Opath::new(Expr::Sequence(seq))
+        Opath::new(Expr::Sequence(seq), true)
     }
 
     pub fn from<'a>(node: &NodeRef) -> Opath {
@@ -106,34 +107,34 @@ impl Opath {
         }
         seq.push(Expr::Root);
         seq.reverse();
-        Opath::new(Expr::Sequence(seq))
+        Opath::new(Expr::Sequence(seq), true)
     }
 
     pub fn string(value: String) -> Opath {
-        Opath::new(Expr::StringEnc(value))
+        Opath::new(Expr::StringEnc(value), false)
     }
 
     pub fn boolean(value: bool) -> Opath {
-        Opath::new(Expr::Boolean(value))
+        Opath::new(Expr::Boolean(value), false)
     }
 
     pub fn null() -> Opath {
-        Opath::new(Expr::Null)
+        Opath::new(Expr::Null, false)
     }
 
     pub fn root() -> Opath {
-        Opath::new(Expr::Root)
+        Opath::new(Expr::Root, true)
     }
 
     pub fn current() -> Opath {
-        Opath::new(Expr::Current)
+        Opath::new(Expr::Current, false)
     }
 
     pub fn json(json: String) -> Opath {
         Opath::new(Expr::FuncCall(Box::new(FuncCall::new(
             FuncId::Json,
             vec![Expr::StringEnc(json)],
-        ))))
+        ))), false)
     }
 
     fn apply_env(&self, env: Env) -> ExprResult<NodeSet> {
@@ -186,35 +187,49 @@ impl Opath {
     }
 
     pub fn parent_path(&self) -> Option<Opath> {
+        if !self.path {
+            return None;
+        }
         match self.expr {
             Expr::Sequence(ref seq) => {
                 if seq.len() < 2 {
                     None
                 } else {
                     let mut pseq = Vec::with_capacity(seq.len() - 1);
-                    let mut it = seq.iter().take(seq.len() - 1);
-                    if let Some(&Expr::Root) = it.next() {
-                        pseq.push(Expr::Root);
-                    } else {
-                        return None;
-                    }
+                    let mut it = seq.iter().skip(1).take(seq.len() - 2);
+                    pseq.push(Expr::Root);
+
                     while let Some(e) = it.next() {
-                        match *e {
-                            Expr::Property(ref expr) => match **expr {
-                                Expr::String(_) | Expr::StringEnc(_) => pseq.push(e.clone()),
-                                _ => return None,
-                            },
-                            Expr::Index(ref expr) => match **expr {
-                                Expr::Integer(_) => pseq.push(e.clone()),
-                                _ => return None,
-                            },
-                            _ => return None,
-                        }
+                        pseq.push(e.clone())
                     }
-                    Some(Opath::new(Expr::Sequence(pseq)))
+                    Some(Opath::new(Expr::Sequence(pseq), true))
                 }
             }
-            _ => None,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn is_ancestor_path(&self, other: &Opath) -> Option<bool> {
+        if !self.path || !other.path {
+            return None;
+        }
+        if let (&Expr::Sequence(ref a), &Expr::Sequence(ref b)) = (&self.expr, &other.expr) {
+            let mut ai = a.iter();
+            let mut bi = b.iter();
+            ai.next();
+            bi.next();
+            if a.len() >= b.len() {
+                Some(false)
+            } else {
+                for (a, b) in ai.zip(bi) {
+                    if a != b {
+                        return Some(false);
+                    }
+                }
+                Some(true)
+            }
+        } else {
+            unreachable!();
         }
     }
 }
@@ -223,17 +238,19 @@ impl Clone for Opath {
     fn clone(&self) -> Self {
         Opath {
             expr: self.expr.clone(),
+            path: self.path,
         }
     }
 
     fn clone_from(&mut self, source: &Self) {
         self.expr = source.expr.clone();
+        self.path = source.path;
     }
 }
 
 impl Default for Opath {
     fn default() -> Self {
-        Opath::new(Expr::Null)
+        Opath::new(Expr::Null, false)
     }
 }
 

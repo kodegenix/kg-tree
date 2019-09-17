@@ -330,6 +330,7 @@ pub struct Parser {
     prev_pos: Position,
     next_pos: Position,
     token_queue: VecDeque<Token>,
+    path_flag: Option<bool>,
 }
 
 impl Parser {
@@ -352,6 +353,7 @@ impl Parser {
             prev_pos: Position::default(),
             next_pos: Position::default(),
             token_queue: VecDeque::new(),
+            path_flag: None,
         }
     }
 
@@ -740,6 +742,7 @@ impl Parser {
         let p = r.position();
         self.token_queue.clear();
         self.next_pos = p;
+        self.path_flag = None;
 
         let e = self.parse_expr(r, Context::Expr);
 
@@ -748,7 +751,7 @@ impl Parser {
                 if self.partial {
                     r.seek(self.next_pos)?;
                 }
-                Ok(Opath::new(e))
+                Ok(Opath::new(e, self.path_flag()))
             }
             Err(err) => {
                 if self.partial {
@@ -759,11 +762,36 @@ impl Parser {
         }
     }
 
+    #[inline]
+    fn set_path_flag(&mut self, value: bool) {
+        if self.path_flag.is_some() {
+            self.path_flag = Some(value);
+        }
+    }
+
+    #[inline]
+    fn init_path_flag(&mut self, value: bool) {
+        if self.path_flag.is_none() {
+            self.path_flag = Some(value);
+        }
+    }
+
+    pub fn path_flag(&self) -> bool {
+        self.path_flag.unwrap_or(false)
+    }
+
     fn parse_expr(&mut self, r: &mut dyn CharReader, ctx: Context) -> Result<Expr, Error> {
+        self.set_path_flag(false);
+
         let t = self.next_token(r)?;
 
         let mut e = match t.term() {
-            Terminal::Root | Terminal::Current => {
+            Terminal::Root => {
+                self.init_path_flag(true);
+                self.push_token(t);
+                self.parse_sequence(r, ctx)?
+            }
+            Terminal::Current => {
                 self.push_token(t);
                 self.parse_sequence(r, ctx)?
             }
@@ -893,6 +921,12 @@ impl Parser {
 
         loop {
             let t = self.next_token(r)?;
+
+            if t.term() == Terminal::End {
+                return Ok(e);
+            } else {
+                self.set_path_flag(false);
+            }
 
             match t.term() {
                 Terminal::Plus => {
@@ -1155,8 +1189,8 @@ impl Parser {
 
         let t = self.next_token(r)?;
         match t.term() {
-            Terminal::Literal => elems.push(self.parse_literal(t, r)?),
             Terminal::Root => elems.push(Expr::Root),
+            Terminal::Literal => elems.push(self.parse_literal(t, r)?),
             Terminal::Current => elems.push(Expr::Current),
             Terminal::BracketLeft => {
                 self.push_token(t);
@@ -1207,6 +1241,7 @@ impl Parser {
                             elems.push(Expr::Parent);
                         }
                     }
+                    self.set_path_flag(false);
                 }
                 Terminal::Dot => {
                     let t = self.next_token(r)?;
@@ -1220,6 +1255,7 @@ impl Parser {
                                 self.push_token(t);
                                 self.push_token(tn);
                                 elems.push(self.parse_method(r, ctx)?);
+                                self.set_path_flag(false);
                             } else {
                                 self.push_token(tn);
                                 let n = r.slice_pos(t.from(), t.to())?;
@@ -1229,15 +1265,18 @@ impl Parser {
                         }
                         Terminal::Star => {
                             elems.push(Expr::Property(Box::new(Expr::All)));
+                            self.set_path_flag(false);
                         }
                         Terminal::DoubleStar => {
                             let l = self.parse_level_range(r)?.unwrap_or_default();
                             elems.push(Expr::Descendants(Box::new(l)));
+                            self.set_path_flag(false);
                         }
                         Terminal::ParenLeft => {
                             self.push_token(t);
                             let g = self.parse_group(r, Context::Property)?;
                             elems.push(Expr::Property(Box::new(g)));
+                            self.set_path_flag(false);
                         }
                         _ => {
                             let expected = vec![
@@ -1254,9 +1293,16 @@ impl Parser {
                 }
                 Terminal::BracketLeft => {
                     self.push_token(t);
-                    elems.push(Expr::Index(Box::new(self.parse_group(r, Context::Index)?)));
+                    let idx = self.parse_group(r, Context::Index)?;
+                    if let Expr::Integer(_) = idx {
+                        elems.push(Expr::Index(Box::new(idx)));
+                    } else {
+                        elems.push(Expr::Index(Box::new(idx)));
+                        self.set_path_flag(false);
+                    }
                 }
                 _ => {
+                    self.set_path_flag(false);
                     self.push_token(t);
                     break;
                 }
