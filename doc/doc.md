@@ -15,7 +15,7 @@ All data types transferable through `json`, `yaml` and `toml` formats are suppor
 * *object* - object or map, can contain string-keyed properties
 * *array* - array or sequence of elements
 
-[comment]: <> (TODO MC Issue "Fix serialization of binary data to json" and add binary data in example below)
+[comment]: <> (TODO Issue "Fix serialization of binary data to json" and add binary data in example below)
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -43,6 +43,8 @@ assert!(node.get_child_key("array").unwrap().is_array());
 ```
 
 ## Literals
+
+Function `array()` is used in examples below. Functions are described in subsection **Functions** below.
 
 `123`, `-2` - 64-bit integer values
 
@@ -133,7 +135,7 @@ assert!(nodes[0].is_null());
 
 ## Type conversions
 
-[comment]: <> (TODO MC More code with examples?)
+[comment]: <> (TODO MC Add all of the conversions. Information about conversions is in functions as_float, as_integer...)
 
 Same as ECMAScript, integers promoted to floats when mixed operands. (do rozwiniecia)
 
@@ -689,8 +691,8 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-`@.@kind` - string value of **current** element's kind, either one of `"null"`, `"boolean"`, `"integer"`, `"float"`, `"string"`, 
-`"binary"`, `"object"`, `"array"`:
+`@.@kind` - string value of **current** element's kind, either one of `"null"`, `"boolean"`, `"integer"`, `"float"`,
+`"string"`, `"binary"`, `"object"`, `"array"`:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -714,36 +716,318 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-`@.@file` - string describing the file or file structure, **current** element was read from (if any), for instance 
+`@.@type` - string value of **current** element's type, either one of `"null"`, `"boolean"`, `"number"`, `"string"`, 
+`"binary"`, `"object"`, `"array"`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let model = r#"{
+  "key0": 0.1
+}"#;
+
+let query = r#"key0.@type"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "number"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@.@file` - string describing the file or file structure with relative path, **current** element was read from (if any), for instance 
 `"file<yaml>:./data.yml"`:
 
-[comment]: <> (TODO MC Add example)
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/abs/path/directive/data.yml", FileType::File, FileFormat::Yaml)));
+set_base_path("/abs/path");
+
+let query = r#"@.@file"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "file<yaml>:directive/data.yml"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@.@file_abs` - string describing the file or file structure with absolute path, **current** element was read from (if any), for instance 
+`"file<yaml>:./data.yml"`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/abs/path/directive/data.yml", FileType::File, FileFormat::Yaml)));
+set_base_path("/abs/path");
+
+let query = r#"@.@file_abs"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "file<yaml>:/abs/path/directive/data.yml"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
 
 `@.@file_type`- string with file type (if any), either `"file"` or `"dir"`:
 
-[comment]: <> (TODO MC Add example)
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/directive/data.yml", FileType::File, FileFormat::Yaml)));
+
+let query = r#"@.@file_type"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "file"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
 
 `@.@file_format`- string with file format (if any), supported values are: `"json"`, `"yaml"`, `"toml"`, `"text"`, 
 `"binary"`: 
 
-[comment]: <> (TODO MC Add example)
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_diag::FileType;
 
-`@.@file_path`- string with file path (if any), for instance `"./data.yml"`:
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/directive/data.yml", FileType::File, FileFormat::Yaml)));
 
-[comment]: <> (TODO MC Add example)
+let query = r#"@.@file_format"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "yaml"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@.@file_path`- string with relative file path (if any), for instance `"./data.yml"`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/abs/path/directive/data.yml", FileType::File, FileFormat::Yaml)));
+set_base_path("/abs/path");
+
+let query = r#"@.@file_path"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "directive/data.yml"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@.@file_path_abs`- string with absolute file path (if any), for instance `"./data.yml"`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/abs/path/directive/data.yml", FileType::File, FileFormat::Yaml)));
+set_base_path("/abs/path");
+
+let query = r#"@.@file_path_abs"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "/abs/path/directive/data.yml"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
 
 `@.@file_name`- string with file name (if any), for instance `"data.yml"`:
 
-[comment]: <> (TODO MC Add example)
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/directive/data.yml", FileType::File, FileFormat::Yaml)));
+
+let query = r#"@.@file_name"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "data.yml"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
 
 `@.@file_stem`- string with file stem (if any), for instance `"data"`. For file names starting with `"."`, 
 like `".data.yml"` stem will be `".data"`:
 
-[comment]: <> (TODO MC Add example)
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/directive/data.yml", FileType::File, FileFormat::Yaml)));
+
+let query = r#"@.@file_stem"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "data"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
 
 `@.@file_ext`- string with file extension (if any), for instance `"yml"`:
 
-[comment]: <> (TODO MC Add example)
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/directive/data.yml", FileType::File, FileFormat::Yaml)));
+
+let query = r#"@.@file_ext"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "yml"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@file_path_components`:
+
+[comment]: <> (TODO MC Add description)
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/abs/path/directive/data.yml", FileType::File, FileFormat::Yaml)));
+
+let query = r#"@.@file_path_components"#;
+
+let result = r#"{
+  "type": "one",
+  "data": ["/", "abs", "path", "directive", "data.yml"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap().into_one().unwrap();
+let expected = NodeSet::from_json(result).unwrap().into_one().unwrap();
+assert!(res.is_identical_deep(&expected));
+```
+
+`@dir`- string with relative file path without file in it (if any), for instance `"./data.yml"`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/abs/path/directive/data.yml", FileType::File, FileFormat::Yaml)));
+set_base_path("/abs/path");
+
+let query = r#"@.@dir"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "directive"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`@dir_abs`- string with absolute file path without file in it (if any), for instance `"./data.yml"`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_diag::FileType;
+
+let node = NodeRef::null();
+node.data_mut().set_file(Some(&FileInfo::new("/abs/path/directive/data.yml", FileType::File, FileFormat::Yaml)));
+set_base_path("/abs/path");
+
+let query = r#"@.@dir_abs"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "/abs/path/directive"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
 
 `@.@path` - path to the **current** element from the **root**, for instance `"$.nested.array[3]"`:
 
@@ -1193,6 +1477,117 @@ assert_eq!(nodes[1].get_child_key("key0").unwrap().as_string(), "value0");
 assert_eq!(nodes[1].get_child_key("key1").unwrap().as_string(), "value1");
 ```
 
+## Functions
+
+`array()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let node = NodeRef::null();
+
+let query = r#"array("one", "two", "three")"#;
+
+let result = r#"{
+  "type": "one",
+  "data": ["one", "two", "three"]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap().into_one().unwrap();
+let expected = NodeSet::from_json(result).unwrap().into_one().unwrap();
+assert!(res.is_identical_deep(&expected));
+```
+
+`map()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::NodeRef;
+
+let node = NodeRef::null();
+
+let query = r#"map()"#;
+
+let result = r#"{
+  "type": "one",
+  "data": {}
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let res = expr.apply(&node, &node).unwrap().into_one().unwrap();
+let expected = NodeSet::from_json(result).unwrap().into_one().unwrap();
+assert!(res.is_identical_deep(&expected));
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef, Properties};
+use kg_symbol::Symbol;
+
+let model = r#"{
+  "obj": {
+    "key1": "value1",
+    "key2": "value2"
+  },
+  "obj2": {
+    "key3": "value3",
+    "key4": "value4"
+  }
+}"#;
+
+let query = r#"map($.*)"#;
+
+let result = r#"{
+  "type": "one",
+  "data": {
+    "key1": "value1",
+    "key2": "value2",
+    "key3": "value3",
+    "key4": "value4"
+  }
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap().into_one().unwrap();
+let expected = NodeSet::from_json(result).unwrap().into_one().unwrap();
+assert!(res.is_identical_deep(&expected));
+```
+
+[comment]: <> (TODO MC)
+
+ReadFile,
+Parse,
+ParseInt,
+ParseFloat,
+ParseBinary,
+IsNaN,
+Sqrt,
+Json,
+Stringify,
+Custom(String),
+
+## Method
+
+[comment]: <> (TODO MC)
+
+Length,
+ToString,
+Find,
+Set,
+Delete,
+Extend,
+Push,
+Pop,
+Shift,
+Unshift,
+Join,
+Replace,
+Split,
+Custom(String),
+    
 ## Mathematical operators
 
 Typical mathematical operators and parentheses are supported.
