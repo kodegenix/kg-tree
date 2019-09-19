@@ -28,7 +28,7 @@ fn key_ends_with() {
                                     Current,
                                     Property(box String("@key".into()))
                                 ]),
-                                box StringEnc("name".into())
+                                box String("name".into())
                             )
                         )
                 ]))
@@ -46,7 +46,7 @@ fn key_ends_with_or_index() {
                                             Current,
                                             Property(box String("@key".into()))
                                         ]),
-                                        box StringEnc("name".into())
+                                        box String("name".into())
                                     ),
                                     box Ge(
                                         box Sequence(vec![

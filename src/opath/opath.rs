@@ -7,7 +7,6 @@ use super::*;
 #[derive(Debug)]
 pub struct Opath {
     expr: Expr,
-    path: bool,
 }
 
 fn expr_string<S: AsRef<str>>(value: S) -> Expr {
@@ -29,9 +28,28 @@ fn expr_string<S: AsRef<str>>(value: S) -> Expr {
     }
 }
 
+fn path_segment_key<S: AsRef<str>>(value: S) -> PathSegment {
+    let v = value.as_ref();
+    if v.is_empty() {
+        PathSegment::Key(String::new())
+    } else {
+        let mut first = true;
+        for c in v.chars() {
+            if first && c.is_digit(10) {
+                return PathSegment::KeyEnc(v.to_string());
+            }
+            if !c.is_alphanumeric() && c != '_' {
+                return PathSegment::KeyEnc(v.to_string());
+            }
+            first = false;
+        }
+        PathSegment::Key(v.to_string())
+    }
+}
+
 impl Opath {
-    pub(super) fn new(expr: Expr, path: bool) -> Opath {
-        Opath { expr, path }
+    pub(super) fn new(expr: Expr) -> Opath {
+        Opath { expr }
     }
 
     pub(super) fn expr(&self) -> &Expr {
@@ -63,41 +81,33 @@ impl Opath {
 
     pub fn between<'a>(from: &NodeRef, to: &NodeRef) -> Opath {
         let mut n = to.clone();
-        let mut seq = Vec::new();
+        let mut seg = Vec::new();
         while !n.is_ref_eq(from) {
             let p = n.data().parent();
             if let Some(p) = p {
                 match *p.data().value() {
-                    Value::Array(_) => seq.push(Expr::Index(Box::new(Expr::Integer(
-                        n.data().index() as i64,
-                    )))),
-                    Value::Object(_) => {
-                        seq.push(Expr::Property(Box::new(expr_string(n.data().key()))))
-                    }
+                    Value::Array(_) => seg.push(PathSegment::Index(n.data().index())),
+                    Value::Object(_) => seg.push(path_segment_key(n.data().key())),
                     _ => unreachable!(),
                 }
                 n = p;
             } else {
-                return Opath::new(Expr::Sequence(Vec::new()), true);
+                return Opath::new(Expr::Sequence(Vec::new()));
             }
         }
-        seq.reverse();
-        Opath::new(Expr::Sequence(seq), true)
+        seg.reverse();
+        Opath::new(Expr::Path(seg))
     }
 
     pub fn from<'a>(node: &NodeRef) -> Opath {
-        let mut seq = Vec::new();
+        let mut seg = Vec::new();
         let mut n = node.clone();
         loop {
             let p = n.data().parent();
             if let Some(p) = p {
                 match *p.data().value() {
-                    Value::Array(_) => seq.push(Expr::Index(Box::new(Expr::Integer(
-                        n.data().index() as i64,
-                    )))),
-                    Value::Object(_) => {
-                        seq.push(Expr::Property(Box::new(expr_string(n.data().key()))))
-                    }
+                    Value::Array(_) => seg.push(PathSegment::Index(n.data().index())),
+                    Value::Object(_) => seg.push(path_segment_key(n.data().key())),
                     _ => unreachable!(),
                 }
                 n = p;
@@ -105,36 +115,35 @@ impl Opath {
                 break;
             }
         }
-        seq.push(Expr::Root);
-        seq.reverse();
-        Opath::new(Expr::Sequence(seq), true)
+        seg.reverse();
+        Opath::new(Expr::Path(seg))
     }
 
     pub fn string(value: String) -> Opath {
-        Opath::new(Expr::StringEnc(value), false)
+        Opath::new(Expr::StringEnc(value))
     }
 
     pub fn boolean(value: bool) -> Opath {
-        Opath::new(Expr::Boolean(value), false)
+        Opath::new(Expr::Boolean(value))
     }
 
     pub fn null() -> Opath {
-        Opath::new(Expr::Null, false)
+        Opath::new(Expr::Null)
     }
 
     pub fn root() -> Opath {
-        Opath::new(Expr::Root, true)
+        Opath::new(Expr::Root)
     }
 
     pub fn current() -> Opath {
-        Opath::new(Expr::Current, false)
+        Opath::new(Expr::Current)
     }
 
     pub fn json(json: String) -> Opath {
         Opath::new(Expr::FuncCall(Box::new(FuncCall::new(
             FuncId::Json,
             vec![Expr::StringEnc(json)],
-        ))), false)
+        ))))
     }
 
     fn apply_env(&self, env: Env) -> ExprResult<NodeSet> {
@@ -186,50 +195,38 @@ impl Opath {
         Ok(res)
     }
 
-    pub fn parent_path(&self) -> Option<Opath> {
-        if !self.path {
-            return None;
-        }
+    pub fn is_path(&self) -> bool {
         match self.expr {
-            Expr::Sequence(ref seq) => {
-                if seq.len() < 2 {
-                    None
-                } else {
-                    let mut pseq = Vec::with_capacity(seq.len() - 1);
-                    let mut it = seq.iter().skip(1).take(seq.len() - 2);
-                    pseq.push(Expr::Root);
+            Expr::Root | Expr::Path(_) => true,
+            _ => false,
+        }
+    }
 
-                    while let Some(e) = it.next() {
-                        pseq.push(e.clone())
-                    }
-                    Some(Opath::new(Expr::Sequence(pseq), true))
-                }
-            }
-            _ => unreachable!(),
+    pub fn parent_path(&self) -> Option<Opath> {
+        match self.expr {
+            Expr::Path(ref seg) => Some(Opath::new(
+                Expr::Path(seg.iter().cloned().take(seg.len() - 1).collect()))),
+            _ => None,
         }
     }
 
     pub fn is_ancestor_path(&self, other: &Opath) -> Option<bool> {
-        if !self.path || !other.path {
-            return None;
-        }
-        if let (&Expr::Sequence(ref a), &Expr::Sequence(ref b)) = (&self.expr, &other.expr) {
-            let mut ai = a.iter();
-            let mut bi = b.iter();
-            ai.next();
-            bi.next();
-            if a.len() >= b.len() {
-                Some(false)
-            } else {
-                for (a, b) in ai.zip(bi) {
-                    if a != b {
-                        return Some(false);
+        match (&self.expr, &other.expr) {
+            (&Expr::Root, &Expr::Root) => Some(false),
+            (&Expr::Root, &Expr::Path(_)) => Some(true),
+            (&Expr::Path(ref a), &Expr::Path(ref b)) => {
+                if a.len() >= b.len() {
+                    Some(false)
+                } else {
+                    for (a, b) in a.iter().zip(b.iter()) {
+                        if a != b {
+                            return Some(false);
+                        }
                     }
+                    Some(true)
                 }
-                Some(true)
             }
-        } else {
-            unreachable!();
+            _ => None,
         }
     }
 }
@@ -238,19 +235,17 @@ impl Clone for Opath {
     fn clone(&self) -> Self {
         Opath {
             expr: self.expr.clone(),
-            path: self.path,
         }
     }
 
     fn clone_from(&mut self, source: &Self) {
         self.expr = source.expr.clone();
-        self.path = source.path;
     }
 }
 
 impl Default for Opath {
     fn default() -> Self {
-        Opath::new(Expr::Null, false)
+        Opath::new(Expr::Null)
     }
 }
 
@@ -364,6 +359,7 @@ mod tests {
         #[test]
         fn array_element_parent() {
             let o = Opath::parse("$.prop1.arr[3]").unwrap();
+            println!("{:?}", o);
             let p = o.parent_path().unwrap();
 
             assert_eq!(p.to_string(), "$.prop1.arr");

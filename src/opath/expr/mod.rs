@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::ops::Deref;
+use std::str::FromStr;
 
 use super::*;
 
@@ -502,10 +504,162 @@ impl NodeBuf {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(super) enum IdKind {
+    Plain,
+    Quoted,
+    Encoded,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(super) struct Id {
+    name: String,
+    kind: IdKind,
+}
+
+impl Id {
+    pub fn new<S: Into<String>>(s: S) -> Self {
+        let s = s.into();
+        debug_assert!(!s.is_empty());
+
+        let mut kind = IdKind::Plain;
+        let mut first = true;
+        for c in s.chars() {
+            if first {
+                first = false;
+                if c.is_digit(10) {
+                    kind = IdKind::Quoted;
+                }
+            }
+            if c < ' ' {
+                kind = IdKind::Encoded;
+            } else if kind == IdKind::Plain && !c.is_alphanumeric() && c != '_' && c != '$' && c != '@' {
+                kind = IdKind::Quoted;
+            }
+        }
+        Id {
+            name: s,
+            kind,
+        }
+    }
+
+    pub fn kind(&self) -> IdKind {
+        self.kind
+    }
+}
+
+impl std::fmt::Display for Id {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.kind {
+            IdKind::Plain => write!(f, "{}", self.name),
+            IdKind::Quoted => write!(f, "\"{}\"", self.name),
+            IdKind::Encoded => write!(f, "{}", self.name.escape_debug()),
+        }
+    }
+}
+
+impl Deref for Id {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.name.as_str()
+    }
+}
+
+
+#[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash)]
+pub(super) enum Attr {
+    #[display(fmt = "@key")]
+    Key,
+    #[display(fmt = "@index")]
+    Index,
+    #[display(fmt = "@level")]
+    Level,
+    #[display(fmt = "@type")]
+    Type,
+    #[display(fmt = "@kind")]
+    Kind,
+    #[display(fmt = "@file")]
+    File,
+    #[display(fmt = "@file_abs")]
+    FileAbs,
+    #[display(fmt = "@file_type")]
+    FileType,
+    #[display(fmt = "@file_format")]
+    FileFormat,
+    #[display(fmt = "@file_path")]
+    FilePath,
+    #[display(fmt = "@file_path_abs")]
+    FilePathAbs,
+    #[display(fmt = "@file_name")]
+    FileName,
+    #[display(fmt = "@file_stem")]
+    FileStem,
+    #[display(fmt = "@file_ext")]
+    FileExt,
+    #[display(fmt = "@file_path_components")]
+    FilePathComponents,
+    #[display(fmt = "@dir")]
+    Dir,
+    #[display(fmt = "@dir_abs")]
+    DirAbs,
+    #[display(fmt = "@path")]
+    Path,
+}
+
+impl FromStr for Attr {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "@key" => Attr::Key,
+            "@index" => Attr::Index,
+            "@level" => Attr::Level,
+            "@type" => Attr::Type,
+            "@kind" => Attr::Kind,
+            "@file" => Attr::File,
+            "@file_abs" => Attr::FileAbs,
+            "@file_type" => Attr::FileType,
+            "@file_format" => Attr::FileFormat,
+            "@file_path" => Attr::FilePath,
+            "@file_path_abs" => Attr::FilePathAbs,
+            "@file_name" => Attr::FileName,
+            "@file_stem" => Attr::FileStem,
+            "@file_ext" => Attr::FileExt,
+            "@file_path_components" => Attr::FilePathComponents,
+            "@dir" => Attr::Dir,
+            "@dir_abs" => Attr::DirAbs,
+            "@path" => Attr::Path,
+            _ => return Err(()),
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) enum PathSegment {
+    Key(Id),
+    Index(usize),
+}
+
+impl std::fmt::Display for PathSegment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            PathSegment::Key(ref id) => {
+                if id.kind() == IdKind::Plain {
+                    write!(f, ".{}", id)
+                } else {
+                    write!(f, "[{}]", id)
+                }
+            }
+            PathSegment::Index(index) => write!(f, "[{}]", index),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(super) enum Expr {
+    Path(Vec<PathSegment>),
     String(String),
-    StringEnc(String),
     Integer(i64),
     Float(f64),
     Boolean(bool),
@@ -534,15 +688,20 @@ pub(super) enum Expr {
     All,
     Ancestors(Box<LevelRange>),
     Descendants(Box<LevelRange>),
-    Property(Box<Expr>),
-    Index(Box<Expr>),
+    Property(Id),
+    PropertyExpr(Box<Expr>),
+    Index(i64),
+    IndexExpr(Box<Expr>),
+    Attribute(Attr),
     Range(Box<NumberRange>),
     Group(Vec<Expr>),
     Sequence(Vec<Expr>),
     MethodCall(Box<MethodCall>),
     FuncCall(Box<FuncCall>),
-    Var(Box<Expr>),
-    Env(Box<Expr>),
+    Var(Id),
+    VarExpr(Box<Expr>),
+    Env(Id),
+    EnvExpr(Box<Expr>),
 }
 
 impl Expr {
@@ -1203,8 +1362,30 @@ impl Expr {
         }
 
         match *self {
+            Expr::Path(ref segments) => {
+                let mut n = env.root().clone();
+                for s in segments {
+                    match *s {
+                        PathSegment::Key(ref key) => {
+                            if let Some(c) = n.get_child_key(key) {
+                                n = c;
+                            } else {
+                                return Ok(());
+                            }
+                        }
+                        PathSegment::Index(index) => {
+                            if let Some(c) = n.get_child_index(index) {
+                                n = c;
+                            } else {
+                                return Ok(());
+                            }
+                        }
+                    }
+                }
+                out.add(n);
+                Ok(())
+            }
             Expr::String(ref s) => apply_string(env.current(), ctx, s.as_str().into(), out),
-            Expr::StringEnc(ref s) => apply_string(env.current(), ctx, s.as_str().into(), out),
             Expr::Integer(n) => apply_integer(env.current(), ctx, n, out),
             Expr::Float(n) => apply_float(env.current(), ctx, n, out),
             Expr::Boolean(b) => apply_boolean(env.current(), ctx, b, out),
@@ -1345,8 +1526,10 @@ impl Expr {
                 }
                 _ => unreachable!(),
             },
-            Expr::Property(ref e) => e.apply_to(env, Context::Property, out),
-            Expr::Index(ref e) => e.apply_to(env, Context::Index, out),
+            Expr::Property(ref s) => {unimplemented!()},
+            Expr::PropertyExpr(ref e) => e.apply_to(env, Context::Property, out),
+            Expr::Index(index) => {unimplemented!()},
+            Expr::IndexExpr(ref e) => e.apply_to(env, Context::Index, out),
             Expr::Range(ref r) => {
                 fn get_opt_float(env: Env<'_>, e: Option<&Expr>) -> ExprResult<Option<f64>> {
                     match e {
@@ -1448,7 +1631,10 @@ impl Expr {
                 func::apply_method_to(call.id(), call.args(), env, ctx, out)
             }
             Expr::FuncCall(ref call) => func::apply_func_to(call.id(), call.args(), env, ctx, out),
-            Expr::Var(ref e) => {
+            Expr::Var(ref s) => {
+                unimplemented!()
+            }
+            Expr::VarExpr(ref e) => {
                 if let Some(scope) = env.scope() {
                     let res = e.apply(env, Context::Expr)?;
                     match res {
@@ -1465,7 +1651,10 @@ impl Expr {
                     Ok(())
                 }
             }
-            Expr::Env(ref e) => {
+            Expr::Env(ref s) => {
+                unimplemented!()
+            }
+            Expr::EnvExpr(ref e) => {
                 let res = e.apply(env, Context::Expr)?;
                 match res {
                     NodeSet::Empty => unimplemented!(), //FIXME (jc) probably report error?
@@ -1526,8 +1715,14 @@ impl std::fmt::Display for Expr {
         }
 
         match *self {
+            Expr::Path(ref segments) => {
+                write!(f, "$")?;
+                for s in segments {
+                    write!(f, "{}", s)?
+                }
+                Ok(())
+            }
             Expr::String(ref s) => write!(f, "{}", s),
-            Expr::StringEnc(ref s) => write!(f, "'{}'", s.escape_default()),
             Expr::Integer(n) => write!(f, "{}", n),
             Expr::Float(n) => write!(f, "{}", n),
             Expr::Boolean(b) => write!(f, "{}", b),
@@ -1588,15 +1783,10 @@ impl std::fmt::Display for Expr {
                 write!(f, ")")?;
                 Ok(())
             }
-            Expr::Var(ref e) => match **e {
-                Expr::String(ref s) => write!(f, "${}", s),
-                _ => write!(f, "${{{}}}", e),
-            },
-            Expr::Env(ref e) => {
-                write!(f, "env:(")?;
-                write!(f, "{})", e)?;
-                Ok(())
-            }
+            Expr::Var(ref s) => write!(f, "${}", s),
+            Expr::VarExpr(ref e) => write!(f, "${{{}}}", e),
+            Expr::Var(ref s) => write!(f, "env:{}", s),
+            Expr::EnvExpr(ref e) => write!(f, "env:({})", e),
         }
     }
 }
@@ -1608,7 +1798,6 @@ impl PartialEq for Expr {
         } else {
             match (self, other) {
                 (&Expr::String(ref s1), &Expr::String(ref s2)) => s1 == s2,
-                (&Expr::StringEnc(ref s1), &Expr::StringEnc(ref s2)) => s1 == s2,
                 (&Expr::Integer(n1), &Expr::Integer(n2)) => n1 == n2,
                 (&Expr::Float(n1), &Expr::Float(n2)) => n1.to_bits() == n2.to_bits(),
                 (&Expr::Boolean(b1), &Expr::Boolean(b2)) => b1 == b2,
@@ -1664,8 +1853,8 @@ impl Hash for Expr {
         state.write_u8(self.tag());
 
         match *self {
+            Expr::Path(ref segments) => segments.hash(state),
             Expr::String(ref s) => s.hash(state),
-            Expr::StringEnc(ref s) => s.hash(state),
             Expr::Integer(n) => n.hash(state),
             Expr::Float(n) => n.to_bits().hash(state),
             Expr::Boolean(b) => b.hash(state),
@@ -1771,54 +1960,6 @@ mod tests {
         #[test]
         fn size_of_should_be_32() {
             assert_eq!(std::mem::size_of::<Expr>(), 32);
-        }
-
-        #[test]
-        fn tag() {
-            assert_eq!(0, Expr::String("test".to_string()).tag());
-            assert_eq!(1, Expr::StringEnc("\"test\"".to_string()).tag());
-            assert_eq!(2, Expr::Integer(std::i64::MIN).tag());
-            assert_eq!(3, Expr::Float(std::f64::INFINITY).tag());
-            assert_eq!(4, Expr::Boolean(true).tag());
-            assert_eq!(5, Expr::Null.tag());
-            assert_eq!(6, Expr::Concat(Vec::new()).tag());
-            assert_eq!(7, Expr::Neg(box Expr::Null).tag());
-            assert_eq!(8, Expr::Add(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(9, Expr::Sub(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(10, Expr::Mul(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(11, Expr::Div(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(12, Expr::Not(box Expr::Null).tag());
-            assert_eq!(13, Expr::And(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(14, Expr::Or(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(15, Expr::StartsWith(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(16, Expr::EndsWith(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(17, Expr::Contains(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(18, Expr::Eq(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(19, Expr::Ne(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(20, Expr::Gt(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(21, Expr::Ge(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(22, Expr::Lt(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(23, Expr::Le(box Expr::Null, box Expr::Null).tag());
-            assert_eq!(24, Expr::Root.tag());
-            assert_eq!(25, Expr::Current.tag());
-            assert_eq!(26, Expr::Parent.tag());
-            assert_eq!(27, Expr::All.tag());
-            assert_eq!(28, Expr::Ancestors(box LevelRange::default()).tag());
-            assert_eq!(29, Expr::Descendants(box LevelRange::default()).tag());
-            assert_eq!(30, Expr::Property(box Expr::Null).tag());
-            assert_eq!(31, Expr::Index(box Expr::Null).tag());
-            assert_eq!(32, Expr::Range(box NumberRange::default()).tag());
-            assert_eq!(33, Expr::Group(Vec::new()).tag());
-            assert_eq!(34, Expr::Sequence(Vec::new()).tag());
-            assert_eq!(
-                35,
-                Expr::MethodCall(box MethodCall::new(MethodId::ToString, Vec::new())).tag()
-            );
-            assert_eq!(
-                36,
-                Expr::FuncCall(box FuncCall::new(FuncId::Sqrt, Vec::new())).tag()
-            );
-            assert_eq!(37, Expr::Var(box Expr::String("var1".to_string())).tag());
         }
 
         #[test]

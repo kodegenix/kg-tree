@@ -46,7 +46,7 @@ mod simple {
         Sequence(
             vec![
                 Current,
-                Property(Box::new(StringEnc(string::String::from("name"))))
+                Property(Box::new(String(string::String::from("name"))))
                 ]))
     }
 
@@ -56,7 +56,7 @@ mod simple {
         Sequence(
             vec![
                 Current,
-                Property(Box::new(StringEnc(string::String::from("name"))))
+                Property(Box::new(String(string::String::from("name"))))
                 ]))
     }
 
@@ -65,7 +65,7 @@ mod simple {
         assert_expr!("@[\"name\"]",
         Sequence(vec![
                 Current,
-                Index(Box::new(StringEnc(string::String::from("name"))))
+                Index(Box::new(String(string::String::from("name"))))
         ]))
     }
 
@@ -111,7 +111,7 @@ mod simple {
         Sequence(
             vec![
                 Root,
-                Property(Box::new(StringEnc(string::String::from("name"))))
+                Property(Box::new(String(string::String::from("name"))))
                 ]))
     }
 
@@ -121,7 +121,7 @@ mod simple {
         Sequence(
             vec![
                 Root,
-                Property(Box::new(StringEnc(string::String::from("some name"))))
+                Property(Box::new(String(string::String::from("some name"))))
                 ]))
     }
 
@@ -131,7 +131,7 @@ mod simple {
         Sequence(
             vec![
                 Root,
-                Property(Box::new(StringEnc(string::String::from("name"))))
+                Property(Box::new(String(string::String::from("name"))))
                 ]))
     }
 
@@ -140,7 +140,7 @@ mod simple {
         assert_expr!("$[\"name\"]",
         Sequence(vec![
                 Root,
-                Index(Box::new(StringEnc(string::String::from("name"))))
+                Index(Box::new(String(string::String::from("name"))))
         ]))
     }
 
@@ -161,7 +161,7 @@ mod simple {
 
     #[test]
     fn var_expr() {
-        assert_expr!("${'var' + 1}", Var(box Add(box StringEnc("var".to_string()), box Integer(1))));
+        assert_expr!("${'var' + 1}", Var(box Add(box String("var".to_string()), box Integer(1))));
     }
 }
 
@@ -207,7 +207,7 @@ mod wildcards {
                 Sequence(
                     vec![
                         Current,
-                        Property(Box::new(StringEnc(string::String::from("**"))))
+                        Property(Box::new(String(string::String::from("**"))))
                         ]))
     }
 
@@ -229,7 +229,7 @@ mod wildcards {
                 Sequence(
                     vec![
                         Current,
-                        Index(Box::new(StringEnc(string::String::from("**"))))
+                        Index(Box::new(String(string::String::from("**"))))
                         ]))
     }
 

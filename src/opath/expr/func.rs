@@ -733,8 +733,6 @@ pub(super) fn apply_func_to(
             Ok(())
         }
         FuncId::ParseFloat => {
-            use std::str::FromStr;
-
             args.check_count_func(id, 1, 1)?;
 
             let strs = args.resolve_column(false, 0, env)?;
