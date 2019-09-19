@@ -46,7 +46,7 @@ assert!(node.get_child_key("array").unwrap().is_array());
 
 Function `array()` is used in examples below. Functions are described in subsection **Functions** below.
 
-`123`, `-2` - 64-bit integer values
+`123`, `0` `-2` - 64-bit integer values:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -64,9 +64,9 @@ assert!(nodes[1].is_integer());
 assert!(nodes[2].is_integer());
 ```
 
-`1.13`, `.e10`, `-1E-2`, `.3` - 64-bit float values
+`0.78`, `-0.12`, `-2.54e+3`, `4.74E-4`, `7.34e2`, `-3.1E6` - 64-bit float values:
 
-[comment]: <> (TODO MC Examples with dot at the begining don't work)
+[comment]: <> (TODO Examples with dot at the begining don't work, examples with dot at the end don't work)
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -74,16 +74,20 @@ use kg_tree::NodeRef;
 
 let node = NodeRef::null();
 
-let query = r#"array(1.13, -1E-2)[*]"#;
+let query = r#"array(0.78, -0.12, -2.54e+3, 4.74E-4, 7.34e2, -3.1E6)[*]"#;
 
 let expr = Opath::parse(query).unwrap();
 let res = expr.apply(&node, &node).unwrap();
 let nodes = res.into_vec();
 assert!(nodes[0].is_float());
 assert!(nodes[1].is_float());
+assert!(nodes[2].is_float());
+assert!(nodes[3].is_float());
+assert!(nodes[4].is_float());
+assert!(nodes[5].is_float());
 ```
 
-`'id'`, `"id"` - string values
+`'id'`, `"id"` - string values:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -100,7 +104,7 @@ assert!(nodes[0].is_string());
 assert!(nodes[1].is_string());
 ```
 
-`true`, `false` - boolean values
+`true`, `false` - boolean values:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -117,7 +121,7 @@ assert!(nodes[0].is_boolean());
 assert!(nodes[1].is_boolean());
 ```
 
-`null` - null value
+`null` - null value:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -137,7 +141,7 @@ assert!(nodes[0].is_null());
 
 [comment]: <> (TODO MC Add all of the conversions. Information about conversions is in functions as_float, as_integer...)
 
-Same as ECMAScript, integers promoted to floats when mixed operands. (do rozwiniecia)
+Similar to ECMAScript, with small differences. For example integers promoted to floats when mixed operands.
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
@@ -746,7 +750,7 @@ assert_eq!(res, expected);
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_tree::{NodeRef, FileInfo, FileFormat, set_base_path};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -771,7 +775,7 @@ assert_eq!(res, expected);
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_tree::{NodeRef, FileInfo, FileFormat, set_base_path};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -795,7 +799,7 @@ assert_eq!(res, expected);
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_tree::{NodeRef, FileInfo, FileFormat};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -819,7 +823,7 @@ assert_eq!(res, expected);
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_tree::{NodeRef, FileInfo, FileFormat};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -842,7 +846,7 @@ assert_eq!(res, expected);
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_tree::{NodeRef, FileInfo, FileFormat, set_base_path};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -866,7 +870,7 @@ assert_eq!(res, expected);
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_tree::{NodeRef, FileInfo, FileFormat, set_base_path};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -890,7 +894,7 @@ assert_eq!(res, expected);
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_tree::{NodeRef, FileInfo, FileFormat};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -914,7 +918,7 @@ like `".data.yml"` stem will be `".data"`:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_tree::{NodeRef, FileInfo, FileFormat};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -937,7 +941,7 @@ assert_eq!(res, expected);
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_tree::{NodeRef, FileInfo, FileFormat};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -956,23 +960,24 @@ let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-`@file_path_components`:
-
-[comment]: <> (TODO MC Add description)
+`@file_path_components` - array with file path components. This array contains names of directories.
+Last element of the array is the name of the file. If there is a prefix, then the first element
+of the array is prefix:
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat};
+use kg_tree::{NodeRef, FileInfo, FileFormat, set_base_path};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
 node.data_mut().set_file(Some(&FileInfo::new("/abs/path/directive/data.yml", FileType::File, FileFormat::Yaml)));
+set_base_path("/abs/path");
 
 let query = r#"@.@file_path_components"#;
 
 let result = r#"{
   "type": "one",
-  "data": ["/", "abs", "path", "directive", "data.yml"]
+  "data": ["directive", "data.yml"]
 }"#;
 
 let expr = Opath::parse(query).unwrap();
@@ -985,7 +990,7 @@ assert!(res.is_identical_deep(&expected));
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_tree::{NodeRef, FileInfo, FileFormat, set_base_path};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -1009,7 +1014,7 @@ assert_eq!(res, expected);
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties, FileInfo, FileFormat, set_base_path};
+use kg_tree::{NodeRef, FileInfo, FileFormat, set_base_path};
 use kg_diag::FileType;
 
 let node = NodeRef::null();
@@ -1523,8 +1528,7 @@ assert!(res.is_identical_deep(&expected));
 
 ```
 use kg_tree::opath::{Opath, NodeSet};
-use kg_tree::{NodeRef, Properties};
-use kg_symbol::Symbol;
+use kg_tree::{NodeRef};
 
 let model = r#"{
   "obj": {
@@ -1556,16 +1560,195 @@ let expected = NodeSet::from_json(result).unwrap().into_one().unwrap();
 assert!(res.is_identical_deep(&expected));
 ```
 
+`parse()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"null"#;
+
+let query = r#"parse("true", "json")"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`parseInt()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+    "key": ["1", "2"]
+}"#;
+
+let query = r#"parseInt(key.*)"#;
+
+let result = r#"{
+  "type": "many",
+  "data": [1, 2]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+    "key": ["010", "01"]
+}"#;
+
+let query = r#"parseInt(key.*, 2)"#;
+
+let result = r#"{
+  "type": "many",
+  "data": [2, 1]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`parseFloat()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+    "key": ["0.12", "-1.3", "+4.214", "-2.43e+21", "+4.3E3"]
+}"#;
+
+let query = r#"parseFloat(key.*)"#;
+
+let result = r#"{
+  "type": "many",
+  "data": [0.12, -1.3, 4.214, -2.43e+21, 4.3E3]
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`isNaN()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"null"#;
+
+let query = r#"isNaN("string")"#;
+
+let result = r#"{
+  "type": "one",
+  "data": true
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`sqrt()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"null"#;
+
+let query = r#"sqrt(4)"#;
+
+let result = r#"{
+  "type": "one",
+  "data": 2.0
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`json()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"null"#;
+
+let query = r#"json("1")"#;
+
+let result = r#"{
+  "type": "one",
+  "data": 1
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`stringify()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+  "key0": {
+    "key01": "value01",
+    "key02": "value02"
+  }
+}"#;
+
+let query = r#"stringify(key0)"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "{\"key01\":\"value01\",\"key02\":\"value02\"}"
+}"#;
+
+let expr = Opath::parse(query).expect("1");
+let node = NodeRef::from_json(model).expect("2");
+let res = expr.apply(&node, &node).expect("3");
+let expected = NodeSet::from_json(result).expect("3");
+assert_eq!(res, expected);
+```
+
 [comment]: <> (TODO MC)
 
 ReadFile,
-Parse,
-ParseInt,
-ParseFloat,
 ParseBinary,
-IsNaN,
-Sqrt,
-Json,
 Stringify,
 Custom(String),
 
