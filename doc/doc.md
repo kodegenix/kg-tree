@@ -1738,38 +1738,269 @@ let result = r#"{
   "data": "{\"key01\":\"value01\",\"key02\":\"value02\"}"
 }"#;
 
-let expr = Opath::parse(query).expect("1");
-let node = NodeRef::from_json(model).expect("2");
-let res = expr.apply(&node, &node).expect("3");
-let expected = NodeSet::from_json(result).expect("3");
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
 assert_eq!(res, expected);
 ```
 
-[comment]: <> (TODO MC)
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
 
-ReadFile,
-ParseBinary,
-Stringify,
-Custom(String),
+let model = r#"{
+  "key0": {
+    "key01": "value01",
+    "key02": "value02"
+  }
+}"#;
 
-## Method
+let query = r#"stringify(key0, "toml")"#;
 
-[comment]: <> (TODO MC)
+let result = r#"{
+  "type": "one",
+  "data": "key01 = \"value01\"\nkey02 = \"value02\"\n"
+}"#;
 
-Length,
-ToString,
-Find,
-Set,
-Delete,
-Extend,
-Push,
-Pop,
-Shift,
-Unshift,
-Join,
-Replace,
-Split,
-Custom(String),
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+- third argument set to true determines pretty format of the output:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+  "key0": {
+    "key01": "value01",
+    "key02": "value02"
+  }
+}"#;
+
+let query = r#"stringify(key0, "json", true)"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "{\n  \"key01\": \"value01\",\n  \"key02\": \"value02\"\n}"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+[comment]: <> (TODO ReadFile, ParseBinary, CustomString)
+
+## Methods
+
+`length()`:
+
+[comment]: <> (TODO Add example with binary)
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+  "key0": "value0"
+}"#;
+
+let query = r#"key0.length()"#;
+
+let result = r#"{
+  "type": "one",
+  "data": 6
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+  "key0": [1, 2, 3, 4, 5]
+}"#;
+
+let query = r#"key0.length()"#;
+
+let result = r#"{
+  "type": "one",
+  "data": 5
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+  "key0": {
+    "key01": "value01",
+    "key02": "value02"
+  }
+}"#;
+
+let query = r#"key0.length()"#;
+
+let result = r#"{
+  "type": "one",
+  "data": 2
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`toString()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+  "key0": {
+    "key01": "value01",
+    "key02": "value02"
+  }
+}"#;
+
+let query = r#"key0.toString()"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "[object]"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`find()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+  "key0": {
+    "key01": "value01",
+    "key02": "value02"
+  }
+}"#;
+
+let query = r#"key0.find("")"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "[object]"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+  "key0": {
+    "key01": "value01",
+    "key02": "value02"
+  }
+}"#;
+
+let query = r#"key0.find("@.key01")"#;
+
+let result = r#"{
+  "type": "one",
+  "data": "value01"
+}"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node).unwrap();
+let expected = NodeSet::from_json(result).unwrap();
+assert_eq!(res, expected);
+```
+
+`set()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+  "key0": {
+    "key01": "value01",
+    "key02": "value02"
+  },
+  "key1": {}
+}"#;
+
+let query = r#"key1.set($.key0.*.@key, $.key0.*)"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node);
+let node_key_1 = node.get_child_key("key1").unwrap();
+assert_eq!(node_key_1.get_child_key("key01").expect("cos1").as_string(), "value01");
+assert_eq!(node_key_1.get_child_key("key02").unwrap().as_string(), "value02");
+```
+
+`delete()`:
+
+```
+use kg_tree::opath::{Opath, NodeSet};
+use kg_tree::{NodeRef};
+
+let model = r#"{
+  "key0": {
+    "key01": "value01",
+    "key02": "value02"
+  }
+}"#;
+
+let query = r#"key0.delete(key02.@key)"#;
+
+let expr = Opath::parse(query).unwrap();
+let node = NodeRef::from_json(model).unwrap();
+let res = expr.apply(&node, &node);
+let node_key_1 = node.get_child_key("key0").unwrap();
+assert_eq!(node_key_1.get_child_key("key01").expect("cos1").as_string(), "value01");
+assert_eq!(node_key_1.get_child_key("key02"), None);
+```
+
+[comment]: <> (TODO MC Extend, Push, Pop, Shift, Unshift, Join, Replace, Split, CustomString)
     
 ## Mathematical operators
 
