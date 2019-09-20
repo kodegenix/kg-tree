@@ -43,17 +43,17 @@ fn negative_float_e() {
 
 #[test]
 fn string_quot() {
-    assert_expr!("'string'", Expr::StringEnc(String::from("string")))
+    assert_expr!("'string'", Expr::String(String::from("string")))
 }
 
 #[test]
 fn string_quot_utf8() {
-    assert_expr!("'ąćźę'", Expr::StringEnc(String::from("ąćźę")))
+    assert_expr!("'ąćźę'", Expr::String(String::from("ąćźę")))
 }
 
 #[test]
 fn string_double_quot() {
-    assert_expr!("\"string\"", Expr::StringEnc(String::from("string")))
+    assert_expr!("\"string\"", Expr::String(String::from("string")))
 }
 
 #[test]

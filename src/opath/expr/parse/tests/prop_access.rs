@@ -1,6 +1,5 @@
 use crate::opath::*;
 use crate::opath::Expr::*;
-use std::string;
 
 mod simple {
     use super::*;
@@ -11,7 +10,7 @@ mod simple {
         Sequence(
             vec![
                 Current,
-                Property(Box::new(String(string::String::from("name"))))
+                Property(box Id::new("name"))
                 ]))
     }
 
@@ -21,7 +20,7 @@ mod simple {
         Sequence(
             vec![
                 Current,
-                Property(Box::new(String(string::String::from("name"))))
+                Property(Box::new(Id::new("name")))
                 ]))
     }
 
@@ -31,10 +30,10 @@ mod simple {
         assert_expr!("@[name]",
         Sequence(vec![
                 Current,
-                Index(Box::new(
+                IndexExpr(Box::new(
                         Sequence(vec![
                             Current,
-                            Property(Box::new(String(string::String::from("name"))))
+                            Property(Box::new(Id::new("name")))
                         ])
                 ))
         ]))
@@ -46,7 +45,7 @@ mod simple {
         Sequence(
             vec![
                 Current,
-                Property(Box::new(String(string::String::from("name"))))
+                Property(Box::new(Id::new("name")))
                 ]))
     }
 
@@ -56,7 +55,7 @@ mod simple {
         Sequence(
             vec![
                 Current,
-                Property(Box::new(String(string::String::from("name"))))
+                Property(Box::new(Id::new("name")))
                 ]))
     }
 
@@ -65,7 +64,7 @@ mod simple {
         assert_expr!("@[\"name\"]",
         Sequence(vec![
                 Current,
-                Index(Box::new(String(string::String::from("name"))))
+                Property(Box::new(Id::new("name")))
         ]))
     }
 
@@ -75,7 +74,7 @@ mod simple {
         Sequence(
             vec![
                 Current,
-                Index(Box::new(Integer(1)))
+                Index(1)
                 ]))
     }
 
@@ -83,85 +82,54 @@ mod simple {
     #[test]
     fn root() {
         assert_expr!("$.name",
-        Sequence(
-            vec![
-                Root,
-                Property(Box::new(String(string::String::from("name"))))
-                ]))
+        Path(vec![PathSegment::Key(Id::new("name"))]))
     }
 
 
     #[test]
     fn root_bracket() {
         assert_expr!("$[name]",
-        Sequence(vec![
-                Root,
-                Index(Box::new(
-                        Sequence(vec![
-                            Current,
-                            Property(Box::new(String(string::String::from("name"))))
-                        ])
-                ))
-        ]))
+                     Sequence(vec![Root, IndexExpr(box Sequence(vec![Current, Property(box Id::new("name"))]))]));
     }
 
     #[test]
     fn root_quot() {
         assert_expr!("$.'name'",
-        Sequence(
-            vec![
-                Root,
-                Property(Box::new(String(string::String::from("name"))))
-                ]))
+        Path(vec![PathSegment::Key(Id::new("name"))]))
     }
 
     #[test]
     fn root_quot_whitespace() {
         assert_expr!("$.'some name'",
-        Sequence(
-            vec![
-                Root,
-                Property(Box::new(String(string::String::from("some name"))))
-                ]))
+        Path(vec![PathSegment::Key(Id::new("some name"))]))
     }
 
     #[test]
     fn root_double_quot() {
         assert_expr!("$.\"name\"",
-        Sequence(
-            vec![
-                Root,
-                Property(Box::new(String(string::String::from("name"))))
-                ]))
+        Path(vec![PathSegment::Key(Id::new("name"))]))
     }
 
     #[test]
     fn root_bracket_double_quot() {
         assert_expr!("$[\"name\"]",
-        Sequence(vec![
-                Root,
-                Index(Box::new(String(string::String::from("name"))))
-        ]))
+        Path(vec![PathSegment::Key(Id::new("name"))]))
     }
 
     #[test]
     fn root_prop_index() {
         assert_expr!("$[1]",
-        Sequence(
-            vec![
-                Root,
-                Index(Box::new(Integer(1)))
-                ]))
+        Path(vec![PathSegment::Index(1)]))
     }
 
     #[test]
     fn var() {
-        assert_expr!("$var1", Var(box String("var1".to_string())));
+        assert_expr!("$var1", Var(box Id::new("var1")));
     }
 
     #[test]
     fn var_expr() {
-        assert_expr!("${'var' + 1}", Var(box Add(box String("var".to_string()), box Integer(1))));
+        assert_expr!("${'var' + 1}", VarExpr(box Add(box String("var".to_string()), box Integer(1))));
     }
 }
 
@@ -176,7 +144,7 @@ mod wildcards {
                 Sequence(
                     vec![
                         Current,
-                        Property(Box::new(All))
+                        All
                         ]))
     }
 
@@ -186,7 +154,7 @@ mod wildcards {
                 Sequence(
                     vec![
                         Current,
-                        Index(Box::new(All))
+                        IndexExpr(Box::new(All))
                         ]))
     }
 
@@ -207,7 +175,7 @@ mod wildcards {
                 Sequence(
                     vec![
                         Current,
-                        Property(Box::new(String(string::String::from("**"))))
+                        Property(Box::new(Id::new("**")))
                         ]))
     }
 
@@ -217,7 +185,7 @@ mod wildcards {
                 Sequence(
                     vec![
                         Current,
-                        Index(
+                        IndexExpr(
                             box Descendants(box LevelRange::default())
                         )
                         ]))
@@ -229,7 +197,7 @@ mod wildcards {
                 Sequence(
                     vec![
                         Current,
-                        Index(Box::new(String(string::String::from("**"))))
+                        Property(Box::new(Id::new("**")))
                         ]))
     }
 
@@ -289,7 +257,7 @@ mod wildcards {
         assert_expr!("@.prop^",
                 Sequence(vec![
                         Current,
-                        Property(Box::new(String(string::String::from("prop")))),
+                        Property(Box::new(Id::new("prop"))),
                         Parent
                 ]))
     }
@@ -299,8 +267,8 @@ mod wildcards {
         assert_expr!("@.nested.prop^",
                 Sequence(vec![
                         Current,
-                        Property(Box::new(String(string::String::from("nested")))),
-                        Property(Box::new(String(string::String::from("prop")))),
+                        Property(Box::new(Id::new("nested"))),
+                        Property(Box::new(Id::new("prop"))),
                         Parent
                 ]))
     }

@@ -599,14 +599,18 @@ impl NodeDiff {
         if !n.root().is_ref_eq(new_root) {
             None
         } else {
-            let path = n.path();
+            /*let path = n.path();
             for c in self.changes.iter().rev() {
-                if let Some(ref p) = c.new_path {
-                    if p.is_ancestor_path(&path) == Some(true) {
-
+                if let Some(new_path) = c.new_path() {
+                    if new_path == &path || path.is_ancestor_path(new_path) {
+                        match c.kind {
+                            ChangeKind::Updated => {}
+                            ChangeKind::Moved => {}
+                            _ => {}
+                        }
                     }
                 }
-            }
+            }*/
             None
         }
     }
@@ -690,7 +694,7 @@ mod tests {
     }
 
     #[test]
-    fn minimal_diff() {
+    fn simple_diff() {
         let jsona = r#"
         {
             "pa": {"test1":12,"bb":"aaaa"},
@@ -722,67 +726,51 @@ mod tests {
         let opts = NodeDiffOptions::default();
         let d = NodeDiff::diff(&a, &b, &opts);
 
-        assert_eq!(d.changes().len(), 8);
+        assert_eq!(d.changes().len(), 11);
 
         assert_eq!(d.changes()[0].old_path().unwrap().to_string(), "$.pa");
+        assert_eq!(d.changes()[0].new_path(), None);
         assert_eq!(d.changes()[0].kind(), ChangeKind::Removed);
 
-        assert_eq!(d.changes()[1].old_path().unwrap().to_string(), "$.star");
-        assert_eq!(d.changes()[1].kind(), ChangeKind::Updated);
+        assert_eq!(d.changes()[1].old_path().unwrap().to_string(), "$.pa.test1");
+        assert_eq!(d.changes()[1].new_path(), None);
+        assert_eq!(d.changes()[1].kind(), ChangeKind::Removed);
 
-        assert_eq!(d.changes()[2].new_path().unwrap().to_string(), "$.pb");
-        assert_eq!(d.changes()[2].kind(), ChangeKind::Added);
+        assert_eq!(d.changes()[2].old_path().unwrap().to_string(), "$.pa.bb");
+        assert_eq!(d.changes()[2].new_path(), None);
+        assert_eq!(d.changes()[2].kind(), ChangeKind::Removed);
 
-        assert_eq!(d.changes()[3].new_path().unwrap().to_string(), "$.p1.aa.dd[0]");
+        assert_eq!(d.changes()[3].old_path().unwrap().to_string(), "$.star");
+        assert_eq!(d.changes()[3].new_path().unwrap().to_string(), "$.star");
         assert_eq!(d.changes()[3].kind(), ChangeKind::Updated);
 
-        assert_eq!(d.changes()[4].new_path().unwrap().to_string(), "$.p1.aa.dd[1]");
-        assert_eq!(d.changes()[4].kind(), ChangeKind::Updated);
+        assert_eq!(d.changes()[4].old_path(), None);
+        assert_eq!(d.changes()[4].new_path().unwrap().to_string(), "$.pb");
+        assert_eq!(d.changes()[4].kind(), ChangeKind::Added);
 
-        assert_eq!(d.changes()[5].old_path().unwrap().to_string(), "$.p1.aa.dd[4]");
-        assert_eq!(d.changes()[5].kind(), ChangeKind::Removed);
+        assert_eq!(d.changes()[5].old_path().unwrap().to_string(), "$.p1.aa.dd[0]");
+        assert_eq!(d.changes()[5].new_path().unwrap().to_string(), "$.p1.aa.dd[0]");
+        assert_eq!(d.changes()[5].kind(), ChangeKind::Updated);
 
-        assert_eq!(d.changes()[6].new_path().unwrap().to_string(), "$.p1.aa.cc");
+        assert_eq!(d.changes()[6].old_path().unwrap().to_string(), "$.p1.aa.dd[1]");
+        assert_eq!(d.changes()[6].new_path().unwrap().to_string(), "$.p1.aa.dd[1]");
         assert_eq!(d.changes()[6].kind(), ChangeKind::Updated);
 
-        assert_eq!(d.changes()[7].new_path().unwrap().to_string(), "$.p1.aa.cc.prop");
-        assert_eq!(d.changes()[7].kind(), ChangeKind::Added);
-    }
+        assert_eq!(d.changes()[7].old_path().unwrap().to_string(), "$.p1.aa.dd[4]");
+        assert_eq!(d.changes()[7].new_path(), None);
+        assert_eq!(d.changes()[7].kind(), ChangeKind::Removed);
 
-    #[test]
-    fn full_diff() {
-        let jsona = r#"
-        {
-            "pa": {"test1":12,"bb":"aaaa"},
-            "star": "*",
-            "p1": {
-                "aa": {
-                    "bb": "aaaa",
-                    "dd": [12,13,14,20,34],
-                    "cc": false
-                }
-            }
-        }"#;
-        let jsonb = r#"
-        {
-            "star": "**",
-            "pb": "test2",
-            "p1": {
-                "aa": {
-                    "bb": "aaaa",
-                    "dd": [13,12,14,20],
-                    "cc": {"prop":12}
-                }
-            }
-        }"#;
+        assert_eq!(d.changes()[8].old_path().unwrap().to_string(), "$.p1.aa.cc");
+        assert_eq!(d.changes()[8].new_path(), None);
+        assert_eq!(d.changes()[8].kind(), ChangeKind::Removed);
 
-        let a = NodeRef::from_json(jsona).unwrap();
-        let b = NodeRef::from_json(jsonb).unwrap();
+        assert_eq!(d.changes()[9].old_path(), None);
+        assert_eq!(d.changes()[9].new_path().unwrap().to_string(), "$.p1.aa.cc");
+        assert_eq!(d.changes()[9].kind(), ChangeKind::Added);
 
-        let opts = NodeDiffOptions::default();
-        let d = NodeDiff::diff(&a, &b, &opts);
-
-        assert_eq!(d.changes().len(), 14);
+        assert_eq!(d.changes()[10].old_path(), None);
+        assert_eq!(d.changes()[10].new_path().unwrap().to_string(), "$.p1.aa.cc.prop");
+        assert_eq!(d.changes()[10].kind(), ChangeKind::Added);
     }
 
     #[test]
@@ -807,7 +795,42 @@ mod tests {
         let opts = NodeDiffOptions::new(true, Some(1), Some(0.5));
         let d = NodeDiff::diff(&a, &b, &opts);
 
-        println!("{}", &d);
+        assert_eq!(d.changes().len(), 9);
 
+        assert_eq!(d.changes()[0].old_path().unwrap().to_string(), "$.pb");
+        assert_eq!(d.changes()[0].new_path().unwrap().to_string(), "$.pc");
+        assert_eq!(d.changes()[0].kind(), ChangeKind::Moved);
+
+        assert_eq!(d.changes()[1].old_path(), None);
+        assert_eq!(d.changes()[1].new_path().unwrap().to_string(), "$.pc.dd");
+        assert_eq!(d.changes()[1].kind(), ChangeKind::Added);
+
+        assert_eq!(d.changes()[2].old_path(), None);
+        assert_eq!(d.changes()[2].new_path().unwrap().to_string(), "$.pc.dd[0]");
+        assert_eq!(d.changes()[2].kind(), ChangeKind::Added);
+
+        assert_eq!(d.changes()[3].old_path(), None);
+        assert_eq!(d.changes()[3].new_path().unwrap().to_string(), "$.pc.dd[1]");
+        assert_eq!(d.changes()[3].kind(), ChangeKind::Added);
+
+        assert_eq!(d.changes()[4].old_path().unwrap().to_string(), "$.aaa[0]");
+        assert_eq!(d.changes()[4].new_path().unwrap().to_string(), "$.aaa[0]");
+        assert_eq!(d.changes()[4].kind(), ChangeKind::Updated);
+
+        assert_eq!(d.changes()[5].old_path().unwrap().to_string(), "$.aaa[1]");
+        assert_eq!(d.changes()[5].new_path(), None);
+        assert_eq!(d.changes()[5].kind(), ChangeKind::Removed);
+
+        assert_eq!(d.changes()[6].old_path().unwrap().to_string(), "$.aaa[1].aa");
+        assert_eq!(d.changes()[6].new_path(), None);
+        assert_eq!(d.changes()[6].kind(), ChangeKind::Removed);
+
+        assert_eq!(d.changes()[7].old_path(), None);
+        assert_eq!(d.changes()[7].new_path().unwrap().to_string(), "$.aaa[1]");
+        assert_eq!(d.changes()[7].kind(), ChangeKind::Added);
+
+        assert_eq!(d.changes()[8].old_path(), None);
+        assert_eq!(d.changes()[8].new_path().unwrap().to_string(), "$.bb");
+        assert_eq!(d.changes()[8].kind(), ChangeKind::Added);
     }
 }

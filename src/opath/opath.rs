@@ -9,43 +9,6 @@ pub struct Opath {
     expr: Expr,
 }
 
-fn expr_string<S: AsRef<str>>(value: S) -> Expr {
-    let v = value.as_ref();
-    if v.is_empty() {
-        Expr::String(String::new())
-    } else {
-        let mut first = true;
-        for c in v.chars() {
-            if first && c.is_digit(10) {
-                return Expr::StringEnc(v.to_string());
-            }
-            if !c.is_alphanumeric() && c != '_' {
-                return Expr::StringEnc(v.to_string());
-            }
-            first = false;
-        }
-        Expr::String(v.to_string())
-    }
-}
-
-fn path_segment_key<S: AsRef<str>>(value: S) -> PathSegment {
-    let v = value.as_ref();
-    if v.is_empty() {
-        PathSegment::Key(String::new())
-    } else {
-        let mut first = true;
-        for c in v.chars() {
-            if first && c.is_digit(10) {
-                return PathSegment::KeyEnc(v.to_string());
-            }
-            if !c.is_alphanumeric() && c != '_' {
-                return PathSegment::KeyEnc(v.to_string());
-            }
-            first = false;
-        }
-        PathSegment::Key(v.to_string())
-    }
-}
 
 impl Opath {
     pub(super) fn new(expr: Expr) -> Opath {
@@ -87,7 +50,7 @@ impl Opath {
             if let Some(p) = p {
                 match *p.data().value() {
                     Value::Array(_) => seg.push(PathSegment::Index(n.data().index())),
-                    Value::Object(_) => seg.push(path_segment_key(n.data().key())),
+                    Value::Object(_) => seg.push(PathSegment::Key(Id::new(n.data().key()))),
                     _ => unreachable!(),
                 }
                 n = p;
@@ -107,7 +70,7 @@ impl Opath {
             if let Some(p) = p {
                 match *p.data().value() {
                     Value::Array(_) => seg.push(PathSegment::Index(n.data().index())),
-                    Value::Object(_) => seg.push(path_segment_key(n.data().key())),
+                    Value::Object(_) => seg.push(PathSegment::Key(Id::new(n.data().key()))),
                     _ => unreachable!(),
                 }
                 n = p;
@@ -120,7 +83,7 @@ impl Opath {
     }
 
     pub fn string(value: String) -> Opath {
-        Opath::new(Expr::StringEnc(value))
+        Opath::new(Expr::String(value))
     }
 
     pub fn boolean(value: bool) -> Opath {
@@ -142,7 +105,7 @@ impl Opath {
     pub fn json(json: String) -> Opath {
         Opath::new(Expr::FuncCall(Box::new(FuncCall::new(
             FuncId::Json,
-            vec![Expr::StringEnc(json)],
+            vec![Expr::String(json)],
         ))))
     }
 
@@ -204,29 +167,33 @@ impl Opath {
 
     pub fn parent_path(&self) -> Option<Opath> {
         match self.expr {
-            Expr::Path(ref seg) => Some(Opath::new(
-                Expr::Path(seg.iter().cloned().take(seg.len() - 1).collect()))),
+            Expr::Path(ref seg) => {
+                if seg.len() > 1 {
+                    Some(Opath::new(Expr::Path(seg.iter().cloned().take(seg.len() - 1).collect())))
+                } else {
+                    Some(Opath::new(Expr::Root))
+                }
+            },
             _ => None,
         }
     }
 
-    pub fn is_ancestor_path(&self, other: &Opath) -> Option<bool> {
+    pub fn is_ancestor_path(&self, other: &Opath) -> bool {
         match (&self.expr, &other.expr) {
-            (&Expr::Root, &Expr::Root) => Some(false),
-            (&Expr::Root, &Expr::Path(_)) => Some(true),
+            (&Expr::Root, &Expr::Path(_)) => true,
             (&Expr::Path(ref a), &Expr::Path(ref b)) => {
                 if a.len() >= b.len() {
-                    Some(false)
+                    false
                 } else {
                     for (a, b) in a.iter().zip(b.iter()) {
                         if a != b {
-                            return Some(false);
+                            return false;
                         }
                     }
-                    Some(true)
+                    true
                 }
             }
-            _ => None,
+            _ => false,
         }
     }
 }
@@ -346,20 +313,23 @@ mod tests {
         }
 
         #[test]
-        fn paths_can_only_contain_property_and_integer_index_accessors() {
+        fn paths_can_only_contain_simple_property_and_index_accessors() {
             let o = Opath::parse("$.*.arr[3]").unwrap();
+            let p = o.parent_path();
+            assert!(p.is_none());
+
+            let o = Opath::parse("$[\"prop1\"]^.arr[3]").unwrap();
             let p = o.parent_path();
             assert!(p.is_none());
 
             let o = Opath::parse("$[\"prop1\"].arr[3]").unwrap();
             let p = o.parent_path();
-            assert!(p.is_none());
+            assert!(p.is_some());
         }
 
         #[test]
         fn array_element_parent() {
             let o = Opath::parse("$.prop1.arr[3]").unwrap();
-            println!("{:?}", o);
             let p = o.parent_path().unwrap();
 
             assert_eq!(p.to_string(), "$.prop1.arr");

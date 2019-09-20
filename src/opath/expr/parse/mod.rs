@@ -332,7 +332,6 @@ pub struct Parser {
     prev_pos: Position,
     next_pos: Position,
     token_queue: VecDeque<Token>,
-    path_flag: Option<bool>,
 }
 
 impl Parser {
@@ -355,7 +354,6 @@ impl Parser {
             prev_pos: Position::default(),
             next_pos: Position::default(),
             token_queue: VecDeque::new(),
-            path_flag: None,
         }
     }
 
@@ -753,7 +751,6 @@ impl Parser {
         let p = r.position();
         self.token_queue.clear();
         self.next_pos = p;
-        self.path_flag = None;
 
         let e = self.parse_expr(r, Context::Expr);
 
@@ -762,25 +759,7 @@ impl Parser {
                 if self.partial {
                     r.seek(self.next_pos)?;
                 }
-                if self.path_flag() {
-                    match e {
-                        Expr::Root => Ok(Opath::new(e)),
-                        Expr::Sequence(seq) => {
-                            let mut segments = Vec::with_capacity(seq.len() - 1);
-                            for e in seq.into_iter().skip(1) {
-                                match e {
-                                    Expr::Property(s) => segments.push(PathSegment::Key(s)),
-                                    Expr::Index(index) => segments.push(PathSegment::Index(index as usize)),
-                                    _ => unreachable!(),
-                                }
-                            }
-                            Ok(Opath::new(Expr::Path(segments)))
-                        }
-                        _ => unreachable!(),
-                    }
-                } else {
-                    Ok(Opath::new(e))
-                }
+                Ok(Opath::new(e))
             }
             Err(err) => {
                 if self.partial {
@@ -791,32 +770,11 @@ impl Parser {
         }
     }
 
-    #[inline]
-    fn set_path_flag(&mut self, value: bool) {
-        if self.path_flag.is_some() {
-            self.path_flag = Some(value);
-        }
-    }
-
-    #[inline]
-    fn init_path_flag(&mut self, value: bool) {
-        if self.path_flag.is_none() {
-            self.path_flag = Some(value);
-        }
-    }
-
-    pub fn path_flag(&self) -> bool {
-        self.path_flag.unwrap_or(false)
-    }
-
     fn parse_expr(&mut self, r: &mut dyn CharReader, ctx: Context) -> Result<Expr, Error> {
-        self.set_path_flag(false);
-
         let t = self.next_token(r)?;
 
         let mut e = match t.term() {
             Terminal::Root => {
-                self.init_path_flag(true);
                 self.push_token(t);
                 self.parse_sequence(r, ctx)?
             }
@@ -945,8 +903,6 @@ impl Parser {
 
             if t.term() == Terminal::End {
                 return Ok(e);
-            } else {
-                self.set_path_flag(false);
             }
 
             match t.term() {
@@ -1203,20 +1159,26 @@ impl Parser {
         match t.term() {
             Terminal::Root => elems.push(Expr::Root),
             Terminal::Current => {
-                self.set_path_flag(false);
                 elems.push(Expr::Current);
             }
             Terminal::String => {
-                self.set_path_flag(false);
                 elems.push(self.parse_string_literal(t, r)?);
             }
             Terminal::Var => {
-                self.set_path_flag(false);
                 let n = r.slice_pos(t.from(), t.to())?;
-                elems.push(Expr::Var(Id::new(n)));
+                elems.push(Expr::Var(box Id::new(&n[1..])));
+            }
+            Terminal::Attr => {
+                let n = r.slice_pos(t.from(), t.to())?;
+                if let Ok(attr) = Attr::from_str(&n) {
+                    elems.push(Expr::Current);
+                    elems.push(Expr::Attribute(attr));
+                } else {
+                    elems.push(Expr::Current);
+                    elems.push(Expr::Property(box Id::new(n)));
+                }
             }
             Terminal::Id => {
-                self.set_path_flag(false);
                 if ctx == Context::Property || ctx == Context::Env {
                     let n = r.slice_pos(t.from(), t.to())?;
                     elems.push(Expr::String(n.to_string()));
@@ -1230,12 +1192,11 @@ impl Parser {
                         self.push_token(tn);
                         let n = r.slice_pos(t.from(), t.to())?;
                         elems.push(Expr::Current);
-                        elems.push(Expr::Property(Id::new(n)));
+                        elems.push(Expr::Property(box Id::new(n)));
                     }
                 }
             }
             Terminal::BracketLeft => {
-                self.set_path_flag(false);
                 self.push_token(t);
                 elems.push(Expr::Current);
             }
@@ -1248,7 +1209,6 @@ impl Parser {
             let t = self.next_token(r)?;
             match t.term() {
                 Terminal::Caret => {
-                    self.set_path_flag(false);
                     let t = self.next_token(r)?;
                     match t.term() {
                         Terminal::DoubleStar => {
@@ -1268,58 +1228,53 @@ impl Parser {
                     let t = self.next_token(r)?;
                     match t.term() {
                         Terminal::String => {
-                            let s = if let Expr::String(s) = self.parse_string_literal(t, r)? {
-                                s
+                            if let Expr::String(s) = self.parse_string_literal(t, r)? {
+                                let id = box Id::new(s);
+                                elems.push(Expr::Property(id));
                             } else {
                                 unreachable!();
-                            };
-                            let id = Id::new(s);
-                            elems.push(Expr::Property(id));
+                            }
                         }
-                        Terminal::Id => {
+                        Terminal::Id | Terminal::Var => {
                             let tn = self.next_token(r)?;
                             if tn.term() == Terminal::ParenLeft {
                                 self.push_token(t);
                                 self.push_token(tn);
                                 elems.push(self.parse_method(r, ctx)?);
-                                self.set_path_flag(false);
                             } else {
                                 self.push_token(tn);
                                 let n = r.slice_pos(t.from(), t.to())?;
-                                if n.starts_with('@') {
-                                    // Paths cannot contain attributes (like @key)
-                                    self.set_path_flag(false);
-                                }
-                                let s = Expr::String(n.to_string());
-                                elems.push(Expr::Property(Box::new(s)));
+                                let id = box Id::new(n);
+                                elems.push(Expr::Property(id));
                             }
                         }
-                        // properties after '.' can start with '$'
-                        Terminal::Var => {
+                        Terminal::Attr => {
                             let n = r.slice_pos(t.from(), t.to())?;
-                            let s = Expr::String(n.to_string());
-                            elems.push(Expr::Property(Box::new(s)));
+                            if let Ok(attr) = Attr::from_str(&n) {
+                                elems.push(Expr::Attribute(attr));
+                            } else {
+                                let id = box Id::new(n);
+                                elems.push(Expr::Property(id));
+                            }
                         }
                         Terminal::Star => {
-                            elems.push(Expr::Property(Box::new(Expr::All)));
-                            self.set_path_flag(false);
+                            elems.push(Expr::All);
                         }
                         Terminal::DoubleStar => {
                             let l = self.parse_level_range(r)?.unwrap_or_default();
                             elems.push(Expr::Descendants(Box::new(l)));
-                            self.set_path_flag(false);
                         }
                         Terminal::ParenLeft => {
                             self.push_token(t);
                             let g = self.parse_group(r, Context::Property)?;
-                            elems.push(Expr::Property(Box::new(g)));
-                            self.set_path_flag(false);
+                            elems.push(Expr::PropertyExpr(Box::new(g)));
                         }
                         _ => {
                             let expected = vec![
                                 Terminal::String,
                                 Terminal::Id,
                                 Terminal::Var,
+                                Terminal::Attr,
                                 Terminal::Star,
                                 Terminal::DoubleStar,
                                 Terminal::ParenLeft,
@@ -1332,20 +1287,15 @@ impl Parser {
                     self.push_token(t);
                     let idx = self.parse_group(r, Context::Index)?;
                     match idx {
-                        Expr::Integer(_) => elems.push(Expr::Index(Box::new(idx))),
-                        Expr::String(_) => elems.push(Expr::Property(Box::new(idx))),
-                        _ => {
-                            elems.push(Expr::Index(Box::new(idx)));
-                            self.set_path_flag(false);
-                        }
+                        Expr::Integer(index) => elems.push(Expr::Index(index)),
+                        Expr::String(s) => elems.push(Expr::Property(box Id::new(s))),
+                        _ => elems.push(Expr::IndexExpr(Box::new(idx))),
                     }
                 }
                 Terminal::End => {
-                    self.push_token(t);
                     break;
                 }
                 _ => {
-                    self.set_path_flag(false);
                     self.push_token(t);
                     break;
                 }
@@ -1355,7 +1305,42 @@ impl Parser {
         Ok(if elems.len() == 1 {
             elems.pop().unwrap()
         } else {
-            Expr::Sequence(elems)
+            let mut segments = Vec::new();
+            let mut root = false;
+            for e in elems.iter() {
+                match *e {
+                    Expr::Root => {
+                        if root {
+                            segments.clear();
+                            break;
+                        }
+                        root = true;
+                    }
+                    Expr::Property(ref id) => {
+                        if !root {
+                            break;
+                        } else {
+                            segments.push(PathSegment::Key(*id.clone()));
+                        }
+                    }
+                    Expr::Index(index) => {
+                        if !root {
+                            break;
+                        } else {
+                            segments.push(PathSegment::Index(index as usize));
+                        }
+                    }
+                    _ => {
+                        segments.clear();
+                        break;
+                    }
+                }
+            }
+            if !segments.is_empty() {
+                Expr::Path(segments)
+            } else {
+                Expr::Sequence(elems)
+            }
         })
     }
 
@@ -1407,13 +1392,13 @@ impl Parser {
         self.expect_token(r, Terminal::VarBegin)?;
         let e = self.parse_expr(r, Context::Expr)?;
         let _t = self.expect_token(r, Terminal::BraceRight)?;
-        Ok(Expr::Var(Box::new(e)))
+        Ok(Expr::VarExpr(Box::new(e)))
     }
 
     fn parse_env_expr(&mut self, r: &mut dyn CharReader, _ctx: Context) -> Result<Expr, Error> {
         self.expect_token(r, Terminal::Env)?;
         let e = self.parse_expr(r, Context::Env)?;
-        Ok(Expr::Env(Box::new(e)))
+        Ok(Expr::EnvExpr(Box::new(e)))
     }
 
     fn parse_level_range(&mut self, r: &mut dyn CharReader) -> Result<Option<LevelRange>, Error> {

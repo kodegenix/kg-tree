@@ -688,19 +688,19 @@ pub(super) enum Expr {
     All,
     Ancestors(Box<LevelRange>),
     Descendants(Box<LevelRange>),
-    Property(Id),
+    Attribute(Attr),
+    Property(Box<Id>),
     PropertyExpr(Box<Expr>),
     Index(i64),
     IndexExpr(Box<Expr>),
-    Attribute(Attr),
     Range(Box<NumberRange>),
     Group(Vec<Expr>),
     Sequence(Vec<Expr>),
     MethodCall(Box<MethodCall>),
     FuncCall(Box<FuncCall>),
-    Var(Id),
+    Var(Box<Id>),
     VarExpr(Box<Expr>),
-    Env(Id),
+    Env(Box<Id>),
     EnvExpr(Box<Expr>),
 }
 
@@ -753,22 +753,46 @@ impl Expr {
         }
 
         fn get_child_key(current: &NodeRef, key: &str, out: &mut NodeBuf) {
-            match key {
-                "@key" => out.add(NodeRef::string(current.data().key())),
-                "@index" => out.add(NodeRef::integer(current.data().index() as i64)),
-                "@level" => out.add(NodeRef::integer(current.data().level() as i64)),
-                "@type" => out.add(NodeRef::string(current.data().kind().as_type_str())),
-                "@kind" => out.add(NodeRef::string(current.data().kind().as_str())),
-                "@file" => out.add(NodeRef::string(current.data().file_string())),
-                "@file_abs" => out.add(NodeRef::string(current.data().file_string_abs())),
-                "@file_type" => out.add(NodeRef::string(current.data().file_type())),
-                "@file_format" => out.add(NodeRef::string(current.data().file_format())),
-                "@file_path" => out.add(NodeRef::string(current.data().file_path())),
-                "@file_path_abs" => out.add(NodeRef::string(current.data().file_path_abs())),
-                "@file_name" => out.add(NodeRef::string(current.data().file_name())),
-                "@file_stem" => out.add(NodeRef::string(current.data().file_stem())),
-                "@file_ext" => out.add(NodeRef::string(current.data().file_ext())),
-                "@file_path_components" => {
+            match *current.data().value() {
+                Value::Array(ref elems) => {
+                    if let Ok(index) = key.parse::<f64>() {
+                        let index = to_abs_index(index as i64, elems.len());
+                        if let Some(e) = elems.get(index) {
+                            out.add(e.clone());
+                        }
+                    }
+                }
+                Value::Object(ref props) => {
+                    if let Some(e) = props.get(key) {
+                        out.add(e.clone());
+                    } else if let Ok(index) = key.parse::<f64>() {
+                        let index = to_abs_index(index as i64, props.len());
+                        if let Some(e) = props.values().nth(index) {
+                            out.add(e.clone());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        fn get_attr(current: &NodeRef, attr: Attr, out: &mut NodeBuf) {
+            match attr {
+                Attr::Key => out.add(NodeRef::string(current.data().key())),
+                Attr::Index => out.add(NodeRef::integer(current.data().index() as i64)),
+                Attr::Level => out.add(NodeRef::integer(current.data().level() as i64)),
+                Attr::Type => out.add(NodeRef::string(current.data().kind().as_type_str())),
+                Attr::Kind => out.add(NodeRef::string(current.data().kind().as_str())),
+                Attr::File => out.add(NodeRef::string(current.data().file_string())),
+                Attr::FileAbs => out.add(NodeRef::string(current.data().file_string_abs())),
+                Attr::FileType => out.add(NodeRef::string(current.data().file_type())),
+                Attr::FileFormat => out.add(NodeRef::string(current.data().file_format())),
+                Attr::FilePath => out.add(NodeRef::string(current.data().file_path())),
+                Attr::FilePathAbs => out.add(NodeRef::string(current.data().file_path_abs())),
+                Attr::FileName => out.add(NodeRef::string(current.data().file_name())),
+                Attr::FileStem => out.add(NodeRef::string(current.data().file_stem())),
+                Attr::FileExt => out.add(NodeRef::string(current.data().file_ext())),
+                Attr::FilePathComponents => {
                     let d = current.data();
                     let array: Vec<NodeRef> = d
                         .file_path_components()
@@ -776,31 +800,20 @@ impl Expr {
                         .collect();
                     out.add(NodeRef::array(array));
                 }
-                "@dir" => out.add(NodeRef::string(current.data().dir())),
-                "@dir_abs" => out.add(NodeRef::string(current.data().dir_abs())),
-                "@path" => out.add(NodeRef::string(Opath::from(current).to_string())),
-                _ => match *current.data().value() {
-                    Value::Array(ref elems) => {
-                        if let Ok(index) = key.parse::<f64>() {
-                            let index = to_abs_index(index as i64, elems.len());
-                            if let Some(e) = elems.get(index) {
-                                out.add(e.clone());
-                            }
-                        }
-                    }
-                    Value::Object(ref props) => {
-                        if let Some(e) = props.get(key) {
-                            out.add(e.clone());
-                        } else if let Ok(index) = key.parse::<f64>() {
-                            let index = to_abs_index(index as i64, props.len());
-                            if let Some(e) = props.values().nth(index) {
-                                out.add(e.clone());
-                            }
-                        }
-                    }
-                    _ => {}
-                },
+                Attr::Dir => out.add(NodeRef::string(current.data().dir())),
+                Attr::DirAbs => out.add(NodeRef::string(current.data().dir_abs())),
+                Attr::Path => out.add(NodeRef::string(Opath::from(current).to_string())),
             }
+        }
+
+        fn get_prop(current: &NodeRef, id: &str, out: &mut NodeBuf) {
+            if id.starts_with('@') {
+                if let Ok(attr) = Attr::from_str(id) {
+                    get_attr(current, attr, out);
+                    return;
+                }
+            }
+            get_child_key(current, id, out);
         }
 
         fn add_descendants(
@@ -1086,7 +1099,7 @@ impl Expr {
             out: &mut NodeBuf,
         ) -> ApplyResult {
             match ctx {
-                Context::Property | Context::Index => get_child_key(current, &s, out),
+                Context::Property | Context::Index => get_prop(current, &s, out),
                 _ => out.add(NodeRef::string(s)),
             };
             Ok(())
@@ -1159,7 +1172,7 @@ impl Expr {
                     }
                     Value::Integer(n) => get_child_index(current, n, out),
                     Value::Float(n) => get_child_index(current, n as i64, out),
-                    Value::String(ref s) => get_child_key(current, s, out),
+                    Value::String(ref s) => get_prop(current, s, out),
                     Value::Binary(_) | Value::Array(_) | Value::Object(_) => {
                         if n.as_boolean() {
                             out.add(current.clone());
@@ -1518,17 +1531,24 @@ impl Expr {
                 }
                 Ok(())
             }
-            Expr::All => match ctx {
-                Context::Property | Context::Index => {
-                    out.multiple = true;
-                    get_child_all(env.current(), out);
-                    Ok(())
-                }
-                _ => unreachable!(),
+            Expr::All => {
+                out.multiple = true;
+                get_child_all(env.current(), out);
+                Ok(())
+            }
+            Expr::Attribute(attr) => {
+                get_attr(env.current(), attr, out);
+                Ok(())
             },
-            Expr::Property(ref s) => {unimplemented!()},
+            Expr::Property(ref id) => {
+                get_child_key(env.current(), id, out);
+                Ok(())
+            },
             Expr::PropertyExpr(ref e) => e.apply_to(env, Context::Property, out),
-            Expr::Index(index) => {unimplemented!()},
+            Expr::Index(index) => {
+                get_child_index(env.current(), index, out);
+                Ok(())
+            }
             Expr::IndexExpr(ref e) => e.apply_to(env, Context::Index, out),
             Expr::Range(ref r) => {
                 fn get_opt_float(env: Env<'_>, e: Option<&Expr>) -> ExprResult<Option<f64>> {
@@ -1631,28 +1651,40 @@ impl Expr {
                 func::apply_method_to(call.id(), call.args(), env, ctx, out)
             }
             Expr::FuncCall(ref call) => func::apply_func_to(call.id(), call.args(), env, ctx, out),
-            Expr::Var(ref s) => {
-                unimplemented!()
+            Expr::Var(ref id) => {
+                if let Some(scope) = env.scope() {
+                    if let Some(var) = scope.get_var(&id) {
+                        out.add_all(&var);
+                    }
+                }
+                Ok(())
             }
             Expr::VarExpr(ref e) => {
                 if let Some(scope) = env.scope() {
                     let res = e.apply(env, Context::Expr)?;
                     match res {
-                        NodeSet::Empty => Ok(()),
+                        NodeSet::Empty => {},
                         NodeSet::One(n) => {
                             if let Some(var) = scope.get_var(&n.data().as_string()) {
                                 out.add_all(&var);
                             }
-                            Ok(())
                         }
-                        _ => unimplemented!(), //FIXME (jc) probably report error?
+                        NodeSet::Many(nodes) => {
+                            for n in nodes {
+                                if let Some(var) = scope.get_var(&n.data().as_string()) {
+                                    out.add_all(&var);
+                                }
+                            }
+                        }
                     }
-                } else {
-                    Ok(())
                 }
+                Ok(())
             }
-            Expr::Env(ref s) => {
-                unimplemented!()
+            Expr::Env(ref id) => {
+                let var_name: &str = &*id;
+                let res = std::env::var(var_name).unwrap_or(String::new());
+                out.add(NodeRef::string(res));
+                Ok(())
             }
             Expr::EnvExpr(ref e) => {
                 let res = e.apply(env, Context::Expr)?;
@@ -1722,7 +1754,7 @@ impl std::fmt::Display for Expr {
                 }
                 Ok(())
             }
-            Expr::String(ref s) => write!(f, "{}", s),
+            Expr::String(ref s) => write!(f, "{:?}", s),
             Expr::Integer(n) => write!(f, "{}", n),
             Expr::Float(n) => write!(f, "{}", n),
             Expr::Boolean(b) => write!(f, "{}", b),
@@ -1753,11 +1785,26 @@ impl std::fmt::Display for Expr {
             Expr::Root => write!(f, "$"),
             Expr::Current => write!(f, "@"),
             Expr::Parent => write!(f, "^"),
-            Expr::All => write!(f, "*"),
+            Expr::All => {
+                if f.alternate() {
+                    write!(f, "*")
+                } else {
+                    write!(f, ".*")
+                }
+            }
             Expr::Ancestors(ref l) => write!(f, "^**{}", l),
             Expr::Descendants(ref l) => write!(f, ".**{}", l),
-            Expr::Property(ref e) => write!(f, ".{:#}", e),
-            Expr::Index(ref e) => write!(f, "[{}]", e),
+            Expr::Attribute(attr) => write!(f, ".{}", attr),
+            Expr::Property(ref id) => {
+                if id.kind() == IdKind::Plain {
+                    write!(f, ".{}", id)
+                } else {
+                    write!(f, "[{}]", id)
+                }
+            }
+            Expr::PropertyExpr(ref e) => write!(f, ".{:#}", e),
+            Expr::Index(index) => write!(f, "[{}]", index),
+            Expr::IndexExpr(ref e) => write!(f, "[{:#}]", e),
             Expr::Range(ref r) => write!(f, "{}", r),
             Expr::Group(ref elems) => {
                 write!(f, "(")?;
@@ -1783,10 +1830,10 @@ impl std::fmt::Display for Expr {
                 write!(f, ")")?;
                 Ok(())
             }
-            Expr::Var(ref s) => write!(f, "${}", s),
-            Expr::VarExpr(ref e) => write!(f, "${{{}}}", e),
-            Expr::Var(ref s) => write!(f, "env:{}", s),
-            Expr::EnvExpr(ref e) => write!(f, "env:({})", e),
+            Expr::Var(ref id) => write!(f, "${}", id),
+            Expr::VarExpr(ref e) => write!(f, "${{{:#}}}", e),
+            Expr::Env(ref id) => write!(f, "env:{}", id),
+            Expr::EnvExpr(ref e) => write!(f, "env:({:#})", e),
         }
     }
 }
@@ -1797,6 +1844,7 @@ impl PartialEq for Expr {
             true
         } else {
             match (self, other) {
+                (&Expr::Path(ref seg1), &Expr::Path(ref seg2)) => seg1 == seg2,
                 (&Expr::String(ref s1), &Expr::String(ref s2)) => s1 == s2,
                 (&Expr::Integer(n1), &Expr::Integer(n2)) => n1 == n2,
                 (&Expr::Float(n1), &Expr::Float(n2)) => n1.to_bits() == n2.to_bits(),
@@ -1832,14 +1880,20 @@ impl PartialEq for Expr {
                 (&Expr::All, &Expr::All) => true,
                 (&Expr::Ancestors(ref l1), &Expr::Ancestors(ref l2)) => l1 == l2,
                 (&Expr::Descendants(ref l1), &Expr::Descendants(ref l2)) => l1 == l2,
-                (&Expr::Property(ref e1), &Expr::Property(ref e2)) => e1 == e2,
-                (&Expr::Index(ref e1), &Expr::Index(ref e2)) => e1 == e2,
+                (&Expr::Attribute(a1), &Expr::Attribute(a2)) => a1 == a2,
+                (&Expr::Property(ref id1), &Expr::Property(ref id2)) => id1 == id2,
+                (&Expr::PropertyExpr(ref e1), &Expr::PropertyExpr(ref e2)) => e1 == e2,
+                (&Expr::Index(i1), &Expr::Index(i2)) => i1 == i2,
+                (&Expr::IndexExpr(ref e1), &Expr::IndexExpr(ref e2)) => e1 == e2,
                 (&Expr::Range(ref r1), &Expr::Range(ref r2)) => r1 == r2,
                 (&Expr::Group(ref elems1), &Expr::Group(ref elems2)) => elems1 == elems2,
                 (&Expr::Sequence(ref elems1), &Expr::Sequence(ref elems2)) => elems1 == elems2,
                 (&Expr::MethodCall(ref call1), &Expr::MethodCall(ref call2)) => call1 == call2,
                 (&Expr::FuncCall(ref call1), &Expr::FuncCall(ref call2)) => call1 == call2,
-                (&Expr::Var(ref e1), &Expr::Var(ref e2)) => e1 == e2,
+                (&Expr::Var(ref id1), &Expr::Var(ref id2)) => id1 == id2,
+                (&Expr::VarExpr(ref e1), &Expr::VarExpr(ref e2)) => e1 == e2,
+                (&Expr::Env(ref id1), &Expr::Env(ref id2)) => id1 == id2,
+                (&Expr::EnvExpr(ref e1), &Expr::EnvExpr(ref e2)) => e1 == e2,
                 (_, _) => false,
             }
         }
@@ -1928,15 +1982,20 @@ impl Hash for Expr {
             Expr::All => {}
             Expr::Ancestors(ref l) => l.hash(state),
             Expr::Descendants(ref l) => l.hash(state),
-            Expr::Property(ref e) => e.hash(state),
-            Expr::Index(ref e) => e.hash(state),
+            Expr::Attribute(attr) => attr.hash(state),
+            Expr::Property(ref id) => id.hash(state),
+            Expr::PropertyExpr(ref e) => e.hash(state),
+            Expr::Index(index) => index.hash(state),
+            Expr::IndexExpr(ref e) => e.hash(state),
             Expr::Range(ref r) => r.hash(state),
             Expr::Group(ref elems) => elems.hash(state),
             Expr::Sequence(ref elems) => elems.hash(state),
             Expr::MethodCall(ref call) => call.hash(state),
             Expr::FuncCall(ref call) => call.hash(state),
-            Expr::Var(ref e) => e.hash(state),
-            Expr::Env(ref e) => e.hash(state),
+            Expr::Var(ref id) => id.hash(state),
+            Expr::VarExpr(ref e) => e.hash(state),
+            Expr::Env(ref id) => id.hash(state),
+            Expr::EnvExpr(ref e) => e.hash(state),
         }
     }
 }

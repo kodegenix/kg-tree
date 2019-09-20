@@ -114,7 +114,8 @@ mod tests {
         let expr = Opath::parse("$.*").unwrap();
         m.resolve(&expr, &n, &n).unwrap();
 
-        assert!(m.matches(&Opath::parse("$.pa").unwrap()));
+        let path = Opath::parse("$.pa").unwrap();
+        assert!(m.matches(&path));
     }
 
     #[test]
@@ -127,7 +128,8 @@ mod tests {
         let expr = Opath::parse("$.*").unwrap();
         m.resolve_cache(&expr, &n, &n, &mut cache).unwrap();
 
-        assert!(m.matches(&Opath::parse("$.pa").unwrap()));
+        let path = Opath::parse("$.pa").unwrap();
+        assert!(m.matches(&path));
         assert_eq!(cache.len(), 3);
     }
 }
