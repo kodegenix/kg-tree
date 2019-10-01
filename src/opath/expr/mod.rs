@@ -196,25 +196,25 @@ impl From<Vec<NodeRef>> for NodeSet {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(super) struct LevelRange {
+pub(crate) struct LevelRange {
     min: Expr,
     max: Expr,
 }
 
 impl LevelRange {
-    pub(super) fn min(&self) -> &Expr {
+    pub fn min(&self) -> &Expr {
         &self.min
     }
 
-    pub(super) fn set_min(&mut self, min: Expr) {
+    pub fn set_min(&mut self, min: Expr) {
         self.min = min;
     }
 
-    pub(super) fn max(&self) -> &Expr {
+    pub fn max(&self) -> &Expr {
         &self.max
     }
 
-    pub(super) fn set_max(&mut self, max: Expr) {
+    pub fn set_max(&mut self, max: Expr) {
         self.max = max;
     }
 }
@@ -242,34 +242,34 @@ impl std::fmt::Display for LevelRange {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(super) struct NumberRange {
+pub(crate) struct NumberRange {
     start: Option<Expr>,
     step: Option<Expr>,
     stop: Option<Expr>,
 }
 
 impl NumberRange {
-    pub(super) fn start(&self) -> Option<&Expr> {
+    pub fn start(&self) -> Option<&Expr> {
         self.start.as_ref()
     }
 
-    pub(super) fn set_start(&mut self, start: Option<Expr>) {
+    pub fn set_start(&mut self, start: Option<Expr>) {
         self.start = start;
     }
 
-    pub(super) fn step(&self) -> Option<&Expr> {
+    pub fn step(&self) -> Option<&Expr> {
         self.step.as_ref()
     }
 
-    pub(super) fn set_step(&mut self, step: Option<Expr>) {
+    pub fn set_step(&mut self, step: Option<Expr>) {
         self.step = step;
     }
 
-    pub(super) fn stop(&self) -> Option<&Expr> {
+    pub fn stop(&self) -> Option<&Expr> {
         self.stop.as_ref()
     }
 
-    pub(super) fn set_stop(&mut self, stop: Option<Expr>) {
+    pub fn set_stop(&mut self, stop: Option<Expr>) {
         self.stop = stop;
     }
 }
@@ -302,41 +302,41 @@ impl std::fmt::Display for NumberRange {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(super) struct MethodCall {
+pub(crate) struct MethodCall {
     id: MethodId,
     args: Vec<Expr>,
 }
 
 impl MethodCall {
-    pub(super) fn new(id: MethodId, args: Vec<Expr>) -> MethodCall {
+    pub fn new(id: MethodId, args: Vec<Expr>) -> MethodCall {
         MethodCall { id, args }
     }
 
-    pub(super) fn id(&self) -> &MethodId {
+    pub fn id(&self) -> &MethodId {
         &self.id
     }
 
-    pub(super) fn args(&self) -> Args {
+    pub fn args(&self) -> Args {
         Args::new(&self.args)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(super) struct FuncCall {
+pub(crate) struct FuncCall {
     id: FuncId,
     args: Vec<Expr>,
 }
 
 impl FuncCall {
-    pub(super) fn new(id: FuncId, args: Vec<Expr>) -> FuncCall {
+    pub fn new(id: FuncId, args: Vec<Expr>) -> FuncCall {
         FuncCall { id, args }
     }
 
-    pub(super) fn id(&self) -> &FuncId {
+    pub fn id(&self) -> &FuncId {
         &self.id
     }
 
-    pub(super) fn args(&self) -> Args {
+    pub fn args(&self) -> Args {
         Args::new(&self.args)
     }
 }
@@ -505,14 +505,14 @@ impl NodeBuf {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(super) enum IdKind {
+pub(crate) enum IdKind {
     Plain,
     Quoted,
     Encoded,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(super) struct Id {
+pub(crate) struct Id {
     name: String,
     kind: IdKind,
 }
@@ -568,7 +568,7 @@ impl Deref for Id {
 
 
 #[derive(Debug, Display, Clone, Copy, PartialEq, Eq, Hash)]
-pub(super) enum Attr {
+pub(crate) enum Attr {
     #[display(fmt = "@key")]
     Key,
     #[display(fmt = "@index")]
@@ -636,7 +636,7 @@ impl FromStr for Attr {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(super) enum PathSegment {
+pub(crate) enum PathSegment {
     Key(Id),
     Index(usize),
 }
@@ -657,7 +657,7 @@ impl std::fmt::Display for PathSegment {
 }
 
 #[derive(Debug, Clone)]
-pub(super) enum Expr {
+pub(crate) enum Expr {
     Path(Vec<PathSegment>),
     String(String),
     Integer(i64),

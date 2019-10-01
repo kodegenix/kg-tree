@@ -165,6 +165,14 @@ impl Opath {
         }
     }
 
+    pub fn path_len(&self) -> usize {
+        match self.expr {
+            Expr::Root => 0,
+            Expr::Path(ref segments) => segments.len(),
+            _ => panic!("not a path"),
+        }
+    }
+
     pub fn parent_path(&self) -> Option<Opath> {
         match self.expr {
             Expr::Path(ref seg) => {
@@ -235,6 +243,26 @@ impl PartialEq for Opath {
 }
 
 impl Eq for Opath {}
+
+impl From<Vec<PathSegment>> for Opath {
+    fn from(segments: Vec<PathSegment>) -> Self {
+        if segments.is_empty() {
+            Opath::new(Expr::Root)
+        } else {
+            Opath::new(Expr::Path(segments))
+        }
+    }
+}
+
+impl Into<Vec<PathSegment>> for Opath {
+    fn into(self) -> Vec<PathSegment> {
+        match self.expr {
+            Expr::Root => Vec::new(),
+            Expr::Path(segments) => segments,
+            _ => panic!("not a path"),
+        }
+    }
+}
 
 impl ser::Serialize for Opath {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

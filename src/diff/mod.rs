@@ -599,19 +599,23 @@ impl NodeDiff {
         if !n.root().is_ref_eq(new_root) {
             None
         } else {
-            /*let path = n.path();
+            let path = n.path();
             for c in self.changes.iter().rev() {
                 if let Some(new_path) = c.new_path() {
-                    if new_path == &path || path.is_ancestor_path(new_path) {
-                        match c.kind {
-                            ChangeKind::Updated => {}
-                            ChangeKind::Moved => {}
-                            _ => {}
+                    if let Some(old_path) = c.old_path() {
+                        if new_path == &path {
+                            return old_path.apply_one(old_root, old_root).ok();
+                        } else if new_path.is_ancestor_path(&path) {
+                            let mut segments: Vec<_> = old_path.clone().into();
+                            let seg: Vec<_> = path.into();
+                            segments.extend_from_slice(&seg[new_path.path_len()..]);
+                            let p: Opath = segments.into();
+                            return p.apply_one(old_root, old_root).ok();
                         }
                     }
                 }
-            }*/
-            None
+            }
+            path.apply_one(old_root, old_root).ok()
         }
     }
 
@@ -619,7 +623,23 @@ impl NodeDiff {
         if !n.root().is_ref_eq(old_root) {
             None
         } else {
-            None
+            let path = n.path();
+            for c in self.changes.iter().rev() {
+                if let Some(new_path) = c.new_path() {
+                    if let Some(old_path) = c.old_path() {
+                        if old_path == &path {
+                            return new_path.apply_one(new_root, new_root).ok();
+                        } else if old_path.is_ancestor_path(&path) {
+                            let mut segments: Vec<_> = new_path.clone().into();
+                            let seg: Vec<_> = path.into();
+                            segments.extend_from_slice(&seg[old_path.path_len()..]);
+                            let p: Opath = segments.into();
+                            return p.apply_one(new_root, new_root).ok();
+                        }
+                    }
+                }
+            }
+            path.apply_one(new_root, new_root).ok()
         }
     }
 }
@@ -794,6 +814,11 @@ mod tests {
 
         let opts = NodeDiffOptions::new(true, Some(1), Some(0.5));
         let d = NodeDiff::diff(&a, &b, &opts);
+
+        let new_n = b.get_child_key("pc").unwrap().get_child_key("aa").unwrap();
+        let old_n = d.find_old(&new_n, &a, &b).unwrap();
+        println!("new: {} {}", new_n.path(), new_n);
+        println!("old: {} {}", old_n.path(), old_n);
 
         assert_eq!(d.changes().len(), 9);
 
