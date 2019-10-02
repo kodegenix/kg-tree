@@ -797,10 +797,32 @@ pub(super) fn apply_func_to(
             Ok(())
         }
         FuncId::New => {
-            unimplemented!(); //FIXME (jc)
+            if let Some(diff_env) = env.diff {
+                args.check_count_func(id, 1, 1)?;
+                let res = args.resolve_flat(false, env)?;
+                for n in res.into_iter() {
+                    out.add(diff_env.diff().find_new(&n, diff_env.old_root, env.root).unwrap_or_else(|| NodeRef::null()));
+                }
+                Ok(())
+            } else {
+                Err(basic_diag!(FuncCallErrorDetail::UnknownFunc {
+                    name: id.to_string()
+                }))
+            }
         }
         FuncId::Old => {
-            unimplemented!(); //FIXME (jc)
+            if let Some(diff_env) = env.diff {
+                args.check_count_func(id, 1, 1)?;
+                let res = args.resolve_flat(false, env)?;
+                for n in res.into_iter() {
+                    out.add(diff_env.diff().find_old(&n, diff_env.old_root, env.root).unwrap_or_else(|| NodeRef::null()));
+                }
+                Ok(())
+            } else {
+                Err(basic_diag!(FuncCallErrorDetail::UnknownFunc {
+                    name: id.to_string()
+                }))
+            }
         }
         FuncId::Custom(ref name) => {
             if let Some(e) = env.scope() {
@@ -1184,6 +1206,7 @@ mod tests {
             }
         }
     "#;
+
     fn test_node<'a>() -> NodeRef {
         NodeRef::from_json(TEST_JSON).unwrap()
     }
@@ -1357,6 +1380,22 @@ mod tests {
             let ref o = res.into_vec()[0];
             assert!(o.is_object());
             assert_eq!(o.data().children_count(), Some(6));
+        }
+
+        mod diff_env {
+            use super::*;
+
+            #[test]
+            fn new() {
+                //FIXME (jc)
+                unimplemented!()
+            }
+
+            #[test]
+            fn old() {
+                //FIXME (jc)
+                unimplemented!()
+            }
         }
 
         mod parse_int {
