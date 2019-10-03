@@ -4,7 +4,7 @@ pub type FuncCallError = BasicDiag;
 
 pub type FuncCallResult = Result<(), FuncCallError>;
 
-#[derive(Debug, Display, Detail)]
+#[derive(Debug, Display, Detail, PartialEq)]
 #[diag(code_offset = 100)]
 #[allow(dead_code)]
 pub enum FuncCallErrorDetail {
@@ -125,8 +125,8 @@ pub enum FuncId {
     Sqrt,
     Json,
     Stringify,
-    New,
-    Old,
+    FindNew,
+    FindOld,
     Custom(String),
 }
 
@@ -144,8 +144,8 @@ impl FuncId {
             "sqrt" => FuncId::Sqrt,
             "json" => FuncId::Json,
             "stringify" => FuncId::Stringify,
-            "new" => FuncId::New,
-            "old" => FuncId::Old,
+            "findNew" => FuncId::FindNew,
+            "findOld" => FuncId::FindOld,
             _ => FuncId::Custom(f.to_string()),
         }
     }
@@ -163,8 +163,8 @@ impl FuncId {
             FuncId::Sqrt => "sqrt",
             FuncId::Json => "json",
             FuncId::Stringify => "stringify",
-            FuncId::New => "new",
-            FuncId::Old => "old",
+            FuncId::FindNew => "findNew",
+            FuncId::FindOld => "findOld",
             FuncId::Custom(ref s) => s,
         }
     }
@@ -796,7 +796,7 @@ pub(super) fn apply_func_to(
             }
             Ok(())
         }
-        FuncId::New => {
+        FuncId::FindNew => {
             if let Some(diff_env) = env.diff {
                 args.check_count_func(id, 1, 1)?;
                 let res = args.resolve_flat(false, env)?;
@@ -810,7 +810,7 @@ pub(super) fn apply_func_to(
                 }))
             }
         }
-        FuncId::Old => {
+        FuncId::FindOld => {
             if let Some(diff_env) = env.diff {
                 args.check_count_func(id, 1, 1)?;
                 let res = args.resolve_flat(false, env)?;
@@ -1382,20 +1382,34 @@ mod tests {
             assert_eq!(o.data().children_count(), Some(6));
         }
 
-        mod diff_env {
+        mod find_new {
             use super::*;
 
             #[test]
-            fn new() {
-                //FIXME (jc)
-                unimplemented!()
+            fn should_return_error_without_diff_env() {
+                let expr = Opath::parse("findNew($.some)").unwrap();
+                let root = NodeRef::object(Properties::new());
+                let err = expr.apply(&root, &root).unwrap_err();
+                let detail: &FuncCallErrorDetail = err.detail().downcast_ref().unwrap();
+                assert_eq!(detail, &FuncCallErrorDetail::UnknownFunc { name: "findNew".into() });
             }
 
+            //FIXME (jc) add further tests
+        }
+
+        mod find_old {
+            use super::*;
+
             #[test]
-            fn old() {
-                //FIXME (jc)
-                unimplemented!()
+            fn should_return_error_without_diff_env() {
+                let expr = Opath::parse("findOld($.some)").unwrap();
+                let root = NodeRef::object(Properties::new());
+                let err = expr.apply(&root, &root).unwrap_err();
+                let detail: &FuncCallErrorDetail = err.detail().downcast_ref().unwrap();
+                assert_eq!(detail, &FuncCallErrorDetail::UnknownFunc { name: "findOld".into() });
             }
+
+            //FIXME (jc) add further tests
         }
 
         mod parse_int {
