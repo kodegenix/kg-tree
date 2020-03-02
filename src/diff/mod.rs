@@ -122,7 +122,7 @@ impl<'de> Deserialize<'de> for ChangeKind {
     {
         use serde::de::{Error, Unexpected};
 
-        let s = <(&str)>::deserialize(deserializer)?;
+        let s = <&str>::deserialize(deserializer)?;
         match ChangeKind::from_mark_str(s) {
             Some(k) => Ok(k),
             None => Err(D::Error::invalid_value(
@@ -238,7 +238,7 @@ impl<'de> Deserialize<'de> for ChangeKindMask {
     where
         D: Deserializer<'de>,
     {
-        let s = <(&str)>::deserialize(deserializer)?;
+        let s = <&str>::deserialize(deserializer)?;
         Ok(ChangeKindMask::parse(s))
     }
 }

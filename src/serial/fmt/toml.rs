@@ -366,7 +366,7 @@ fn is_hex_char(ch: char) -> bool {
 }
 
 fn is_oct_char(ch: char) -> bool {
-    ('0' <= ch && ch <= '7')
+    '0' <= ch && ch <= '7'
 }
 
 fn is_bin_char(ch: char) -> bool {
