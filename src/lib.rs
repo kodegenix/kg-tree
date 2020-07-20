@@ -1,4 +1,4 @@
-#![feature(specialization, integer_atomics, box_syntax, box_patterns, clamp)]
+#![feature(min_specialization, integer_atomics, box_syntax, box_patterns, clamp)]
 
 #[macro_use]
 extern crate kg_diag_derive;
