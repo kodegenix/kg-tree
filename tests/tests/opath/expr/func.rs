@@ -2,13 +2,14 @@ use super::*;
 use kg_diag::Diag;
 use kg_tree::opath::FuncCallErrorDetail;
 use kg_tree::opath::NodeSet;
+
 macro_rules! eval_opath {
     ($opath:expr) => {{
         let opath = match kg_tree::opath::Opath::parse($opath) {
             Ok(op) => op,
             Err(err) => panic!("Error parsing opath!: {}", err),
         };
-        let root = NodeRef::object(kg_utils::collections::LinkedHashMap::new());
+        let root = NodeRef::object(Properties::new());
 
         opath.apply(&root, &root)
     }};

@@ -798,7 +798,7 @@ impl Parser {
 
     pub fn parse(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
         self.token_queue.clear();
-        let mut root = NodeRef::object(LinkedHashMap::new());
+        let mut root = NodeRef::object(Properties::new());
         self.parse_inner(r, &mut root)?;
         Ok(root)
     }
@@ -926,7 +926,7 @@ impl Parser {
                             );
                         }
                     } else {
-                        let new = NodeRef::object(LinkedHashMap::new()).with_span(token.span());
+                        let new = NodeRef::object(Properties::new()).with_span(token.span());
                         current
                             .add_child(None, Some(key.into()), new.clone())
                             .unwrap();
@@ -1041,7 +1041,7 @@ impl Parser {
         if let Some(existing) = node.get_child_key(&key) {
             return Ok(existing);
         } else {
-            let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
+            let table = NodeRef::object(Properties::new()).with_span(Span::with_pos(from, to));
             node.add_child(None, Some(key.into()), table.clone())
                 .unwrap();
             Ok(table)
@@ -1051,7 +1051,7 @@ impl Parser {
     fn parse_inline_table(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
         let from = self.expect_token(r, Terminal::BraceLeft)?.from();
 
-        let mut table = NodeRef::object(LinkedHashMap::new());
+        let mut table = NodeRef::object(Properties::new());
         loop {
             let (mut node, key) = self.parse_key(r, &mut table)?;
             self.expect_token(r, Terminal::Equals)?;
@@ -1092,7 +1092,7 @@ impl Parser {
         self.expect_token(r, Terminal::BracketRight)?;
         let to = self.expect_token(r, Terminal::BracketRight)?.to();
 
-        let table = NodeRef::object(LinkedHashMap::new()).with_span(Span::with_pos(from, to));
+        let table = NodeRef::object(Properties::new()).with_span(Span::with_pos(from, to));
 
         if node.is_array() {
             if self.is_static_array(&node) {

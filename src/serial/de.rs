@@ -498,7 +498,7 @@ impl<'a, 'de> serde::de::SeqAccess<'de> for Array<'a> {
 }
 
 struct Object<'a> {
-    iter: kg_utils::collections::linked_hash_map::Iter<'a, Symbol, NodeRef>,
+    iter: kg_symbol::Iter<'a, NodeRef>,
     value: Option<&'a NodeRef>,
 }
 

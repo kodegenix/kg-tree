@@ -578,7 +578,7 @@ pub(super) fn apply_func_to(
                 out.add(NodeRef::object(Properties::new()));
             } else if args.count() == 1 {
                 let values = args.resolve_column(false, 0, env)?;
-                let mut map = LinkedHashMap::with_capacity(values.len());
+                let mut map = Properties::with_capacity(values.len());
                 for value in values.into_iter() {
                     if let Value::Object(ref props) = value.data().value() {
                         for (k, v) in props.iter() {
@@ -591,7 +591,7 @@ pub(super) fn apply_func_to(
                 args.check_count_func(id, 2, 2)?;
                 let keys = args.resolve_column(false, 0, env)?;
                 let values = args.resolve_column(true, 1, env)?;
-                let mut map = LinkedHashMap::with_capacity(std::cmp::min(keys.len(), values.len()));
+                let mut map = Properties::with_capacity(std::cmp::min(keys.len(), values.len()));
                 for (k, v) in keys.into_iter().zip(values.into_iter()) {
                     map.insert(k.as_string().to_string().into(), v);
                 }

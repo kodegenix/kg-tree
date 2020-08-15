@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use heapsize::HeapSizeOf;
 use kg_diag::io::fs;
 use kg_diag::*;
-use kg_symbol::Symbol;
+use kg_symbol::{Symbol, SymbolMap};
 use kg_utils::collections::LinkedHashMap;
 
 pub use tree::convert::Primitive;
@@ -26,7 +26,7 @@ pub use tree::{NodeRef, TreeErrorDetail};
 
 mod tree;
 
-pub type Properties = LinkedHashMap<Symbol, NodeRef>;
+pub type Properties = SymbolMap<NodeRef>;
 pub type Elements = Vec<NodeRef>;
 
 pub mod diff;
