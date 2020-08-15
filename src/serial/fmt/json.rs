@@ -533,7 +533,6 @@ impl Parser {
                         Some('b') => self.buf.push('\u{0008}'),
                         Some('f') => self.buf.push('\u{000c}'),
                         Some('u') => {
-                            let p1 = r.position();
                             let mut val = String::new();
                             for _i in 0..4 {
                                 if let Some(c) = r.next_char()? {
