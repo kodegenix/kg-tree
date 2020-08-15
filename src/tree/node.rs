@@ -137,7 +137,7 @@ impl Value {
             Value::Object(ref props) => {
                 let mut p = Properties::with_capacity(props.len());
                 for (k, v) in props.iter() {
-                    p.insert(k.to_string().into(), v.deep_copy());
+                    p.insert(k.clone(), v.deep_copy());
                 }
                 Value::Object(p)
             }
