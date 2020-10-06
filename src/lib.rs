@@ -13,10 +13,10 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use heapsize::HeapSizeOf;
+
 use kg_diag::io::fs;
 use kg_diag::*;
 use kg_symbol::{Symbol, SymbolMap};
-use kg_utils::collections::LinkedHashMap;
 
 pub use tree::convert::Primitive;
 use tree::metadata::Metadata;

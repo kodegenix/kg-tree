@@ -348,14 +348,14 @@ fn diff_node(a: &NodeRef, b: &NodeRef, changes: &mut Vec<NodeChange>, cache: &mu
                 }
             }
             (&Value::Object(ref propsa), &Value::Object(ref propsb)) => {
-                let mut keys: LinkedHashMap<&str, ()> = LinkedHashMap::with_capacity(propsa.len());
+                let mut keys: SymbolMap<()> = SymbolMap::with_capacity(propsa.len());
                 for k in propsa.keys() {
-                    keys.insert(k.as_ref(), ());
+                    keys.insert(k.clone(), ());
                 }
                 for k in propsb.keys() {
-                    keys.insert(k.as_ref(), ());
+                    keys.insert(k.clone(), ());
                 }
-                for &k in keys.keys() {
+                for k in keys.keys() {
                     match (propsa.get(k), propsb.get(k)) {
                         (Some(a), Some(b)) => diff_node(a, b, changes, cache),
                         (Some(a), None) => {
