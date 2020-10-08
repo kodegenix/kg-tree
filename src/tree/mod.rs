@@ -2,6 +2,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::path::Path;
 use std::rc::Rc;
+use std::any::Any;
 
 use serde::de;
 use serde::ser;
@@ -51,6 +52,32 @@ pub enum TreeErrorDetail {
     #[display(fmt = "Error in line '{a0}'")]
     Undef(u32),
 }
+
+#[derive(Debug)]
+pub struct Context {
+    base_path: PathBuf,
+    params: HashMap<Symbol, Box<dyn Any>>,
+}
+
+impl Context {
+    pub fn get<T: Any>(&self, key: &Symbol) -> Option<&T> {
+        self.params.get(key).map(|v| v.downcast_ref().expect("invalid parameter type"))
+    }
+
+    pub fn set<T: Any>(&mut self, key: Symbol, value: T) {
+        self.params.insert(key, Box::new(value));
+    }
+}
+
+impl Default for Context {
+    fn default() -> Self {
+        Context {
+            base_path: PathBuf::new(),
+            params: HashMap::new(),
+        }
+    }
+}
+
 
 #[derive(Debug)]
 pub struct NodeRef(Rc<RefCell<Node>>);
@@ -1097,6 +1124,16 @@ impl<'a> HeapSizeOf for NodeRef {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn context() {
+        let mut c = Context::default();
+        c.set("param1".into(), String::from("value1"));
+        c.set("param2".into(), 1.23f64);
+
+        assert_eq!(c.get::<String>(&"param1".into()), Some(&String::from("value1")));
+        assert_eq!(c.get::<f64>(&"param2".into()), Some(&1.23f64));
+    }
 
     #[test]
     fn node_visit_recursive() {
