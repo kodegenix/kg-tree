@@ -2,9 +2,9 @@ use kg_diag::Severity;
 //FIXME (jc)
 #[derive(Debug, Display, Detail)]
 pub enum Error {
-    #[display(fmt = "SerializationError : {a0}")]
+    #[display(fmt = "SerializationError : {_0}")]
     SerializationError(u32),
-    #[display(fmt = "DeserializationError : {a0}")]
+    #[display(fmt = "DeserializationError : {_0}")]
     DeserializationError(u32),
 }
 

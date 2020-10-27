@@ -66,7 +66,7 @@ pub enum ParseErrorDetail {
         token: Token,
         expected: Vec<Terminal>,
     },
-    #[display(fmt = "unclosed {a0}")]
+    #[display(fmt = "unclosed {_0}")]
     UnclosedGroup(Terminal),
     #[display(fmt = "key '{key}' defined multiple times")]
     RedefinedKey { key: String },
@@ -187,7 +187,7 @@ impl ParseErrorDetail {
 
     pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErrorDetail::UnexpectedToken { token }, r, {
-            token.from(), token.to() => "unexpected token"
+            token.start(), token.end() => "unexpected token"
         }))
     }
 
@@ -198,7 +198,7 @@ impl ParseErrorDetail {
     ) -> Result<T, Error> {
         Err(
             parse_diag!(ParseErrorDetail::UnexpectedTokenOne { token, expected }, r, {
-                token.from(), token.to() => "unexpected token"
+                token.start(), token.end() => "unexpected token"
             }),
         )
     }
@@ -210,7 +210,7 @@ impl ParseErrorDetail {
     ) -> Result<T, Error> {
         Err(
             parse_diag!(ParseErrorDetail::UnexpectedTokenMany { token, expected }, r, {
-                token.from(), token.to() => "unexpected token"
+                token.start(), token.end() => "unexpected token"
             }),
         )
     }
@@ -223,8 +223,8 @@ impl ParseErrorDetail {
     ) -> Result<T, Error> {
         Err(
             parse_diag!(ParseErrorDetail::RedefinedKey{key: key.to_string()}, r, {
-                redefined.from, redefined.to => "key redefined here",
-                prev.from, prev.to => "previously defined here",
+                redefined.start, redefined.end => "key redefined here",
+                prev.start, prev.end => "previously defined here",
             }),
         )
     }
@@ -310,7 +310,7 @@ impl Parser {
 
         if self.num_parser.is_at_start(r)? {
             let n = self.num_parser.parse_number(r)?;
-            Ok(Token::new(Terminal::Number(n.term()), n.from(), n.to()))
+            Ok(Token::new(Terminal::Number(n.term()), n.start(), n.end()))
         } else {
             match r.peek_char(0)? {
                 None => Ok(Token::new(Terminal::End, r.position(), r.position())),
@@ -433,7 +433,7 @@ impl Parser {
     }
 
     fn parse_object(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
-        let p1 = self.expect_token(r, Terminal::BraceLeft)?.from();
+        let p1 = self.expect_token(r, Terminal::BraceLeft)?.start();
         let mut props = Properties::new();
         let mut comma = false;
         let mut literal = true;
@@ -442,8 +442,8 @@ impl Parser {
             match t.term() {
                 Terminal::BraceRight if (comma || literal) => {
                     let span = Span {
-                        from: p1,
-                        to: t.to(),
+                        start: p1,
+                        end: t.end(),
                     };
                     return Ok(NodeRef::object(props).with_span(span));
                 }
@@ -481,7 +481,7 @@ impl Parser {
     }
 
     fn parse_array(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
-        let p1 = self.expect_token(r, Terminal::BracketLeft)?.from();
+        let p1 = self.expect_token(r, Terminal::BracketLeft)?.start();
         let mut elems = Elements::new();
         let mut comma = false;
         let mut bracket_right = true;
@@ -490,8 +490,8 @@ impl Parser {
             match t.term() {
                 Terminal::BracketRight if bracket_right => {
                     let span = Span {
-                        from: p1,
-                        to: t.to(),
+                        start: p1,
+                        end: t.end(),
                     };
                     return Ok(NodeRef::array(elems).with_span(span));
                 }
@@ -512,8 +512,8 @@ impl Parser {
     }
 
     fn parse_literal<'a>(&mut self, t: Token, r: &'a mut dyn CharReader) -> Result<(), Error> {
-        r.seek(t.from())?;
-        let end_offset = t.to().offset;
+        r.seek(t.start())?;
+        let end_offset = t.end().offset;
         r.skip_chars(1)?;
         let start_offset = r.position().offset;
         self.buf.clear();
@@ -569,7 +569,7 @@ impl Parser {
             }
         }
         self.buf.pop();
-        r.seek(t.to())?;
+        r.seek(t.end())?;
         Ok(())
     }
 }

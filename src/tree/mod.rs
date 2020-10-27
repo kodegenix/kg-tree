@@ -49,7 +49,7 @@ pub enum TreeErrorDetail {
     },
 
     //FIXME ws to be removed
-    #[display(fmt = "Error in line '{a0}'")]
+    #[display(fmt = "Error in line '{_0}'")]
     Undef(u32),
 }
 

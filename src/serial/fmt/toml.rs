@@ -80,7 +80,7 @@ pub enum ParseErrDetail {
     MixedArrayType { expected: String },
     #[display(fmt = "key '{key}' defined multiple times")]
     RedefinedKey { key: String },
-    #[display(fmt = "unclosed {a0}")]
+    #[display(fmt = "unclosed {_0}")]
     UnclosedGroup(Terminal),
 }
 
@@ -179,13 +179,13 @@ impl ParseErrDetail {
 
     pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErrDetail::UnexpectedToken { token }, r, {
-            token.from(), token.to() => "unexpected token"
+            token.start(), token.end() => "unexpected token"
         }))
     }
 
     pub fn multiline_key<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErrDetail::MultilineKey, r, {
-            token.from(), token.to() => "invalid multiline string usage"
+            token.start(), token.end() => "invalid multiline string usage"
         }))
     }
 
@@ -196,7 +196,7 @@ impl ParseErrDetail {
     ) -> Result<T, Error> {
         Err(
             parse_diag!(ParseErrDetail::UnexpectedTokenOne { token, expected }, r, {
-                token.from(), token.to() => "unexpected token"
+                token.start(), token.end() => "unexpected token"
             }),
         )
     }
@@ -208,7 +208,7 @@ impl ParseErrDetail {
     ) -> Result<T, Error> {
         Err(
             parse_diag!(ParseErrDetail::UnexpectedTokenMany { token, expected }, r, {
-                token.from(), token.to() => "unexpected token"
+                token.start(), token.end() => "unexpected token"
             }),
         )
     }
@@ -218,8 +218,8 @@ impl ParseErrDetail {
         node: NodeRef,
         expected: Kind,
     ) -> Result<T, Error> {
-        let from = node.data().metadata().span().unwrap().from;
-        let to = node.data().metadata().span().unwrap().to;
+        let from = node.data().metadata().span().unwrap().start;
+        let to = node.data().metadata().span().unwrap().end;
 
         let expected = match expected {
             Kind::Boolean => "boolean",
@@ -254,8 +254,8 @@ impl ParseErrDetail {
     ) -> Result<T, Error> {
         Err(
             parse_diag!(ParseErrDetail::RedefinedKey{key: key.to_string()}, r, {
-                redefined.from, redefined.to => "key redefined here",
-                prev.from, prev.to => "previously defined here",
+                redefined.start, redefined.end => "key redefined here",
+                prev.start, prev.end => "previously defined here",
             }),
         )
     }
@@ -396,8 +396,8 @@ fn parse_integer(t: Token, value: Cow<str>) -> Result<i64, Error> {
     let num: i64 =
         i64::from_str_radix(val, radix).map_err(|err| ParseErrDetail::InvalidIntegerLiteral {
             err,
-            from: t.from(),
-            to: t.to(),
+            from: t.start(),
+            to: t.end(),
         })?;
     Ok(num)
 }
@@ -419,8 +419,8 @@ fn parse_float(t: Token, value: Cow<str>) -> Result<f64, Error> {
         .parse()
         .map_err(|err| ParseErrDetail::InvalidFloatLiteral {
             err,
-            from: t.from(),
-            to: t.to(),
+            from: t.start(),
+            to: t.end(),
         })?;
     Ok(num)
 }
@@ -872,16 +872,16 @@ impl Parser {
                     self.parse_string(token, r)?;
                     self.buf.clone()
                 }
-                Terminal::BareKey => r.slice_pos(token.from(), token.to())?.into_owned(),
+                Terminal::BareKey => r.slice_pos(token.start(), token.end())?.into_owned(),
                 Terminal::Integer => {
-                    let value = r.slice_pos(token.from(), token.to())?;
+                    let value = r.slice_pos(token.start(), token.end())?;
                     value.into()
                 }
                 Terminal::Float => {
                     // FIXME handle floats as keys.
                     // for example: `3.14159 = "pi"`
                     // should be parsed to: { "3": { "14159": "pi" } }
-                    let value = r.slice_pos(token.from(), token.to())?;
+                    let value = r.slice_pos(token.start(), token.end())?;
                     value.into()
                 }
                 _ => {
@@ -990,12 +990,12 @@ impl Parser {
                 self.parse_array(r, parent)
             }
             Terminal::Float => {
-                let value = r.slice_pos(t.from(), t.to())?;
+                let value = r.slice_pos(t.start(), t.end())?;
                 let num = parse_float(t, value)?;
                 Ok(NodeRef::float(num).with_span(t.span()))
             }
             Terminal::Integer => {
-                let value = r.slice_pos(t.from(), t.to())?;
+                let value = r.slice_pos(t.start(), t.end())?;
                 let num = parse_integer(t, value)?;
                 Ok(NodeRef::integer(num).with_span(t.span()))
             }
@@ -1025,9 +1025,9 @@ impl Parser {
         r: &mut dyn CharReader,
         parent: &mut NodeRef,
     ) -> Result<NodeRef, Error> {
-        let from = self.expect_token(r, Terminal::BracketLeft)?.from();
+        let from = self.expect_token(r, Terminal::BracketLeft)?.start();
         let (node, key) = self.parse_key(r, parent)?;
-        let to = self.expect_token(r, Terminal::BracketRight)?.to();
+        let to = self.expect_token(r, Terminal::BracketRight)?.end();
 
         if node.is_array() {
             // attempt to override existing array by table
@@ -1049,7 +1049,7 @@ impl Parser {
     }
 
     fn parse_inline_table(&mut self, r: &mut dyn CharReader) -> Result<NodeRef, Error> {
-        let from = self.expect_token(r, Terminal::BraceLeft)?.from();
+        let from = self.expect_token(r, Terminal::BraceLeft)?.start();
 
         let mut table = NodeRef::object(Properties::new());
         loop {
@@ -1063,7 +1063,7 @@ impl Parser {
             match next.term() {
                 Terminal::Comma => {}
                 Terminal::BraceRight => {
-                    table = table.with_span(Span::with_pos(from, next.to()));
+                    table = table.with_span(Span::with_pos(from, next.end()));
                     break;
                 }
                 _ => {
@@ -1084,13 +1084,13 @@ impl Parser {
         r: &mut dyn CharReader,
         parent: &mut NodeRef,
     ) -> Result<NodeRef, Error> {
-        let from = self.expect_token(r, Terminal::BracketLeft)?.from();
+        let from = self.expect_token(r, Terminal::BracketLeft)?.start();
         self.expect_token(r, Terminal::BracketLeft)?;
 
         let (node, key) = self.parse_key(r, parent)?;
 
         self.expect_token(r, Terminal::BracketRight)?;
-        let to = self.expect_token(r, Terminal::BracketRight)?.to();
+        let to = self.expect_token(r, Terminal::BracketRight)?.end();
 
         let table = NodeRef::object(Properties::new()).with_span(Span::with_pos(from, to));
 
@@ -1112,7 +1112,7 @@ impl Parser {
         r: &mut dyn CharReader,
         parent: &mut NodeRef,
     ) -> Result<NodeRef, Error> {
-        let p1 = self.expect_token(r, Terminal::BracketLeft)?.from();
+        let p1 = self.expect_token(r, Terminal::BracketLeft)?.start();
         let mut elems = Elements::new();
         let mut comma = false;
         loop {
@@ -1120,8 +1120,8 @@ impl Parser {
             match t.term() {
                 Terminal::BracketRight => {
                     let span = Span {
-                        from: p1,
-                        to: t.to(),
+                        start: p1,
+                        end: t.end(),
                     };
                     let array = NodeRef::array(elems).with_span(span);
                     self.static_arrays.push(array.clone());
@@ -1166,11 +1166,11 @@ impl Parser {
             }
             Ok(())
         }
-        r.seek(t.from())?;
+        r.seek(t.start())?;
 
         let (literal, multiline) = t.term().unwrap_string();
 
-        let end_offset = t.to().offset;
+        let end_offset = t.end().offset;
 
         if multiline {
             prepare_multiline(r)?
@@ -1185,7 +1185,7 @@ impl Parser {
         self.buf.reserve(end_offset - start_offset);
         if literal {
             r.next_char()?;
-            let val = r.slice_pos(r.position(), t.to())?;
+            let val = r.slice_pos(r.position(), t.end())?;
             self.buf.push_str(&val);
         } else {
             while r.position().offset < end_offset - 1 {
@@ -1264,7 +1264,7 @@ impl Parser {
             self.buf.pop();
         }
 
-        r.seek(t.to())?;
+        r.seek(t.end())?;
         Ok(())
     }
 
@@ -1314,8 +1314,8 @@ mod tests {
             };
 
             assert_eq!(token.term(), Terminal::Newline);
-            assert_eq!(token.from(), p1);
-            assert_eq!(token.to(), p2);
+            assert_eq!(token.start(), p1);
+            assert_eq!(token.end(), p2);
         }
 
         #[test]
@@ -1335,8 +1335,8 @@ mod tests {
             };
 
             assert_eq!(token.term(), Terminal::Newline);
-            assert_eq!(token.from(), p1);
-            assert_eq!(token.to(), p2);
+            assert_eq!(token.start(), p1);
+            assert_eq!(token.end(), p2);
         }
 
         #[test]

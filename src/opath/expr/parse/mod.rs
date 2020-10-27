@@ -59,7 +59,7 @@ pub enum ParseErrorDetail {
         token: Token,
         expected: Vec<Terminal>,
     },
-    #[display(fmt = "unclosed {a0}")]
+    #[display(fmt = "unclosed {_0}")]
     UnclosedGroup(Terminal),
 }
 
@@ -169,7 +169,7 @@ impl ParseErrorDetail {
     #[inline]
     pub fn unexpected_token<T>(token: Token, r: &mut dyn CharReader) -> Result<T, Error> {
         Err(parse_diag!(ParseErrorDetail::UnexpectedToken { token }, r, {
-            token.from(), token.to() => "unexpected token"
+            token.start(), token.end() => "unexpected token"
         }))
     }
 
@@ -181,7 +181,7 @@ impl ParseErrorDetail {
     ) -> Result<T, Error> {
         Err(
             parse_diag!(ParseErrorDetail::UnexpectedTokenOne { token, expected }, r, {
-                token.from(), token.to() => "unexpected token"
+                token.start(), token.end() => "unexpected token"
             }),
         )
     }
@@ -194,7 +194,7 @@ impl ParseErrorDetail {
     ) -> Result<T, Error> {
         Err(
             parse_diag!(ParseErrorDetail::UnexpectedTokenMany { token, expected }, r, {
-                token.from(), token.to() => "unexpected token"
+                token.start(), token.end() => "unexpected token"
             }),
         )
     }
@@ -400,11 +400,11 @@ impl Parser {
         if self.num_parser.is_at_start(r)? {
             let n = self.num_parser.parse_number(r)?;
             match n.term().notation() {
-                Notation::Decimal => Ok(Token::new(Terminal::IntDecimal, n.from(), n.to())),
-                Notation::Hex => Ok(Token::new(Terminal::IntHex, n.from(), n.to())),
-                Notation::Octal => Ok(Token::new(Terminal::IntOctal, n.from(), n.to())),
-                Notation::Binary => Ok(Token::new(Terminal::IntBinary, n.from(), n.to())),
-                Notation::Float | Notation::Exponent => Ok(Token::new(Terminal::Float, n.from(), n.to())),
+                Notation::Decimal => Ok(Token::new(Terminal::IntDecimal, n.start(), n.end())),
+                Notation::Hex => Ok(Token::new(Terminal::IntHex, n.start(), n.end())),
+                Notation::Octal => Ok(Token::new(Terminal::IntOctal, n.start(), n.end())),
+                Notation::Binary => Ok(Token::new(Terminal::IntBinary, n.start(), n.end())),
+                Notation::Float | Notation::Exponent => Ok(Token::new(Terminal::Float, n.start(), n.end())),
             }
         } else {
             match r.peek_char(0)? {
@@ -715,11 +715,11 @@ impl Parser {
         if self.token_queue.is_empty() {
             let t = self.lex(r)?;
             self.prev_pos = self.next_pos;
-            self.next_pos = t.to();
+            self.next_pos = t.end();
             Ok(t)
         } else {
             let t = self.token_queue.pop_front().unwrap();
-            self.next_pos = t.to();
+            self.next_pos = t.end();
             Ok(t)
         }
     }
@@ -1075,8 +1075,8 @@ impl Parser {
 
     fn parse_string_literal(&mut self, t: Token, r: &mut dyn CharReader) -> Result<Expr, Error> {
         let p = r.position();
-        r.seek(t.from())?;
-        let mut s = String::with_capacity(t.to().offset - t.from().offset);
+        r.seek(t.start())?;
+        let mut s = String::with_capacity(t.end().offset - t.start().offset);
         let sep = match r.peek_char(0)? {
             Some(c) if c == '\'' || c == '\"' => {
                 r.next_char()?;
@@ -1113,7 +1113,7 @@ impl Parser {
     fn parse_func(&mut self, r: &mut dyn CharReader, _ctx: Context) -> Result<Expr, Error> {
         let mut args = Vec::new();
         let tname = self.expect_token(r, Terminal::Id)?;
-        let id = func::FuncId::from(r.slice_pos(tname.from(), tname.to())?.as_ref());
+        let id = func::FuncId::from(r.slice_pos(tname.start(), tname.end())?.as_ref());
         self.expect_token(r, Terminal::ParenLeft)?;
         loop {
             let t = self.next_token(r)?;
@@ -1134,7 +1134,7 @@ impl Parser {
     fn parse_method(&mut self, r: &mut dyn CharReader, _ctx: Context) -> Result<Expr, Error> {
         let mut args = Vec::new();
         let tname = self.expect_token(r, Terminal::Id)?;
-        let id = func::MethodId::from(r.slice_pos(tname.from(), tname.to())?.as_ref());
+        let id = func::MethodId::from(r.slice_pos(tname.start(), tname.end())?.as_ref());
         self.expect_token(r, Terminal::ParenLeft)?;
         loop {
             let t = self.next_token(r)?;
@@ -1165,11 +1165,11 @@ impl Parser {
                 elems.push(self.parse_string_literal(t, r)?);
             }
             Terminal::Var => {
-                let n = r.slice_pos(t.from(), t.to())?;
+                let n = r.slice_pos(t.start(), t.end())?;
                 elems.push(Expr::Var(box Id::new(&n[1..])));
             }
             Terminal::Attr => {
-                let n = r.slice_pos(t.from(), t.to())?;
+                let n = r.slice_pos(t.start(), t.end())?;
                 if let Ok(attr) = Attr::from_str(&n) {
                     elems.push(Expr::Current);
                     elems.push(Expr::Attribute(attr));
@@ -1180,7 +1180,7 @@ impl Parser {
             }
             Terminal::Id => {
                 if ctx == Context::Property || ctx == Context::Env {
-                    let n = r.slice_pos(t.from(), t.to())?;
+                    let n = r.slice_pos(t.start(), t.end())?;
                     elems.push(Expr::String(n.to_string()));
                 } else {
                     let tn = self.next_token(r)?;
@@ -1190,7 +1190,7 @@ impl Parser {
                         elems.push(self.parse_func(r, ctx)?);
                     } else {
                         self.push_token(tn);
-                        let n = r.slice_pos(t.from(), t.to())?;
+                        let n = r.slice_pos(t.start(), t.end())?;
                         elems.push(Expr::Current);
                         elems.push(Expr::Property(box Id::new(n)));
                     }
@@ -1243,13 +1243,13 @@ impl Parser {
                                 elems.push(self.parse_method(r, ctx)?);
                             } else {
                                 self.push_token(tn);
-                                let n = r.slice_pos(t.from(), t.to())?;
+                                let n = r.slice_pos(t.start(), t.end())?;
                                 let id = box Id::new(n);
                                 elems.push(Expr::Property(id));
                             }
                         }
                         Terminal::Attr => {
-                            let n = r.slice_pos(t.from(), t.to())?;
+                            let n = r.slice_pos(t.start(), t.end())?;
                             if let Ok(attr) = Attr::from_str(&n) {
                                 elems.push(Expr::Attribute(attr));
                             } else {
@@ -1373,8 +1373,8 @@ impl Parser {
                 term if term == tsep => break,
                 _ => {
                     let err = parse_diag!(ParseErrorDetail::UnclosedGroup(tsep), r, {
-                        op.from(), op.to() => "opened here",
-                        t.from(), t.to() => "error occurred here",
+                        op.start(), op.end() => "opened here",
+                        t.start(), t.end() => "error occurred here",
                     });
                     return Err(err);
                 }
